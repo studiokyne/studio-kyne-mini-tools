@@ -144,6 +144,11 @@
   font-weight: 760;
 }
 
+.skmt-stat--small {
+  font-size: clamp(18px, 2.2vw, 24px);
+  line-height: 1.25;
+}
+
 .skmt-list {
   margin: 0;
   padding-left: 18px;
@@ -635,6 +640,35 @@
 .skmt-notification-list li p {
   margin: 0;
   color: var(--skmt-text-soft);
+}
+
+.skmt-feedback-category-pill {
+  display: inline-flex;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #a3a3a3;
+  vertical-align: middle;
+}
+
+.skmt-feedback-category-pill--none {
+  background: #a3a3a3;
+}
+
+.skmt-feedback-category-pill--development {
+  background: #16a34a;
+}
+
+.skmt-feedback-category-pill--interaction {
+  background: #2563eb;
+}
+
+.skmt-feedback-category-pill--accessibility {
+  background: #db2777;
+}
+
+.skmt-feedback-category-pill--content {
+  background: #d97706;
 }
 
 .skmt-toast-stack {

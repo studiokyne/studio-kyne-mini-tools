@@ -575,6 +575,9 @@ class SKMT_Admin {
 		if ( in_array( $icon, array( 'format-image', 'image' ), true ) ) {
 			return 'image';
 		}
+		if ( in_array( $icon, array( 'message-circle', 'message-square', 'messages-square' ), true ) ) {
+			return 'message-circle';
+		}
 		if ( in_array( $icon, array( 'admin-generic', 'settings' ), true ) ) {
 			return 'settings';
 		}
