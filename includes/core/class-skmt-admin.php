@@ -206,7 +206,7 @@ class SKMT_Admin {
 							<?php endif; ?>
 						</ul>
 						<div class="skmt-actions">
-							<a class="button" href="<?php echo esc_url( self_admin_url( 'update-core.php' ) ); ?>"><?php echo esc_html__( 'Vérifier les mises à jour', 'studio-kyne-mini-tools' ); ?></a>
+							<a class="button" href="<?php echo esc_url( add_query_arg( 'force-check', '1', self_admin_url( 'update-core.php' ) ) ); ?>"><?php echo esc_html__( 'Vérifier les mises à jour', 'studio-kyne-mini-tools' ); ?></a>
 						</div>
 					</div>
 				</div>

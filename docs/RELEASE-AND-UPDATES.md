@@ -51,6 +51,7 @@ Notes:
 - The updater reads the latest release from GitHub API.
 - It compares release tag version (example: `v0.2.0`) to `SKMT_VERSION`.
 - WordPress then shows update availability and supports native auto-update toggle.
+- SKMT caches release metadata for a short period; using `force-check=1` on update screen triggers a fresh lookup.
 
 ## Recommendations
 

@@ -36,7 +36,14 @@ class SKMT_Updater {
 			return $transient;
 		}
 
-		$release = $this->get_latest_release();
+		$force_refresh = $this->should_force_refresh();
+		$release       = $this->get_latest_release( $force_refresh );
+
+		// If cached data is stale (same/older than installed), retry once bypassing cache.
+		if ( ! $force_refresh && is_array( $release ) && ! empty( $release['version'] ) && version_compare( $release['version'], $this->current_version, '<=' ) ) {
+			$release = $this->get_latest_release( true );
+		}
+
 		if ( empty( $release ) || empty( $release['version'] ) || empty( $release['package'] ) ) {
 			return $transient;
 		}
@@ -136,7 +143,13 @@ class SKMT_Updater {
 		}
 	}
 
-	protected function get_latest_release() {
+	protected function get_latest_release( $force_refresh = false ) {
+		$force_refresh = (bool) $force_refresh;
+
+		if ( $force_refresh ) {
+			delete_site_transient( $this->cache_key );
+		}
+
 		$cached = get_site_transient( $this->cache_key );
 		if ( is_array( $cached ) && ! empty( $cached['version'] ) ) {
 			return $cached;
@@ -203,8 +216,26 @@ class SKMT_Updater {
 			'changelog'    => $description,
 		);
 
-		set_site_transient( $this->cache_key, $release, 6 * HOUR_IN_SECONDS );
+		set_site_transient( $this->cache_key, $release, 30 * MINUTE_IN_SECONDS );
 
 		return $release;
+	}
+
+	protected function should_force_refresh() {
+		if ( isset( $_GET['force-check'] ) ) {
+			$force_check = sanitize_text_field( wp_unslash( $_GET['force-check'] ) );
+			if ( '1' === $force_check ) {
+				return true;
+			}
+		}
+
+		if ( isset( $_GET['action'] ) ) {
+			$action = sanitize_text_field( wp_unslash( $_GET['action'] ) );
+			if ( in_array( $action, array( 'do-plugin-upgrade', 'upgrade-plugin' ), true ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 }
