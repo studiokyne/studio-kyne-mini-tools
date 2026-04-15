@@ -50,7 +50,8 @@ class SKMT_Admin {
 		}
 
 		wp_enqueue_style( 'skmt-admin', SKMT_PLUGIN_URL . 'assets/admin/admin.css', array(), SKMT_VERSION );
-		wp_enqueue_script( 'skmt-admin', SKMT_PLUGIN_URL . 'assets/admin/admin.js', array(), SKMT_VERSION, true );
+		wp_enqueue_script( 'skmt-lucide', 'https://unpkg.com/lucide@latest', array(), null, true );
+		wp_enqueue_script( 'skmt-admin', SKMT_PLUGIN_URL . 'assets/admin/admin.js', array( 'skmt-lucide' ), SKMT_VERSION, true );
 		wp_localize_script(
 			'skmt-admin',
 			'skmtAdmin',
@@ -398,19 +399,34 @@ class SKMT_Admin {
 			return;
 		}
 
-		if ( 'import-success' === $notice ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ) . '</p></div>';
+		$map = array(
+			'import-success' => array(
+				'type'    => 'success',
+				'message' => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
+			),
+			'import-empty'   => array(
+				'type'    => 'warning',
+				'message' => __( 'Aucune configuration applicable trouvée dans le fichier.', 'studio-kyne-mini-tools' ),
+			),
+			'import-invalid' => array(
+				'type'    => 'error',
+				'message' => __( 'Le fichier importé est invalide.', 'studio-kyne-mini-tools' ),
+			),
+		);
+
+		if ( ! isset( $map[ $notice ] ) ) {
 			return;
 		}
 
-		if ( 'import-empty' === $notice ) {
-			echo '<div class="notice notice-warning is-dismissible"><p>' . esc_html__( 'Aucune configuration applicable trouvée dans le fichier.', 'studio-kyne-mini-tools' ) . '</p></div>';
-			return;
-		}
+		$payload = $map[ $notice ];
+		$role    = 'error' === $payload['type'] ? 'alert' : 'status';
 
-		if ( 'import-invalid' === $notice ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Le fichier importé est invalide.', 'studio-kyne-mini-tools' ) . '</p></div>';
-		}
+		echo '<div class="skmt-toast-stack" data-skmt-toast-stack>';
+		echo '<div class="skmt-toast skmt-toast--' . esc_attr( $payload['type'] ) . '" role="' . esc_attr( $role ) . '" aria-live="polite" data-skmt-toast>';
+		echo '<div class="skmt-toast__message">' . esc_html( $payload['message'] ) . '</div>';
+		echo '<button type="button" class="skmt-toast__close" aria-label="' . esc_attr__( 'Fermer la notification', 'studio-kyne-mini-tools' ) . '" data-skmt-toast-close>&times;</button>';
+		echo '</div>';
+		echo '</div>';
 	}
 
 	protected function redirect_settings_notice( $notice ) {
@@ -474,21 +490,12 @@ class SKMT_Admin {
 	}
 
 	protected function render_icon( $icon_name ) {
-		$svg = $this->get_icon_svg( $icon_name );
-		return '<span class="skmt-icon" aria-hidden="true">' . $svg . '</span>';
-	}
+		$icon_name = str_replace( '_', '-', sanitize_key( (string) $icon_name ) );
+		if ( '' === $icon_name ) {
+			$icon_name = 'circle';
+		}
 
-	protected function get_icon_svg( $icon_name ) {
-		$icons = array(
-			'image'    => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><path d="m21 15-5-5L5 21"></path></svg>',
-			'boxes'    => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path><path d="M3 10h18"></path><path d="M8 14h2"></path></svg>',
-			'settings' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z"></path><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51h.01a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>',
-			'activity' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9-6-18-3 9H2"></path></svg>',
-			'database' => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"></path><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"></path></svg>',
-			'box'      => '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path></svg>',
-		);
-
-		return isset( $icons[ $icon_name ] ) ? $icons[ $icon_name ] : $icons['box'];
+		return '<span class="skmt-icon" aria-hidden="true"><i class="skmt-lucide" data-lucide="' . esc_attr( $icon_name ) . '"></i></span>';
 	}
 
 	protected function get_menu_icon_data_uri() {

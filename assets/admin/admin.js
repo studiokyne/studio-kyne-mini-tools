@@ -1,4 +1,10 @@
 (() => {
+  const initLucideIcons = () => {
+    if (window.lucide && typeof window.lucide.createIcons === "function") {
+      window.lucide.createIcons();
+    }
+  };
+
   const syncRanges = () => {
     document.querySelectorAll("[data-range-target]").forEach((range) => {
       const target = document.getElementById(
@@ -161,9 +167,39 @@
     });
   };
 
+  const initToasts = () => {
+    const stack = document.querySelector("[data-skmt-toast-stack]");
+    if (!stack) return;
+
+    stack.querySelectorAll("[data-skmt-toast]").forEach((toast, index) => {
+      let isClosing = false;
+
+      const closeToast = () => {
+        if (isClosing) return;
+        isClosing = true;
+        toast.classList.add("is-leaving");
+        window.setTimeout(() => {
+          toast.remove();
+          if (!stack.querySelector("[data-skmt-toast]")) {
+            stack.remove();
+          }
+        }, 220);
+      };
+
+      const timeoutId = window.setTimeout(closeToast, 5000 + index * 150);
+      const closeButton = toast.querySelector("[data-skmt-toast-close]");
+      closeButton?.addEventListener("click", () => {
+        window.clearTimeout(timeoutId);
+        closeToast();
+      });
+    });
+  };
+
   document.addEventListener("DOMContentLoaded", () => {
+    initLucideIcons();
     syncRanges();
     initBulkTool();
     initConfigImport();
+    initToasts();
   });
 })();

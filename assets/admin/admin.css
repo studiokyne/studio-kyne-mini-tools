@@ -1,5 +1,8 @@
 :root {
-  --skmt-font-sans: "Segoe UI", "Inter", "Helvetica Neue", sans-serif;
+  --skmt-font-sans:
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+    sans-serif;
   --skmt-bg: #f5f5f5;
   --skmt-surface: #ffffff;
   --skmt-surface-soft: #fafafa;
@@ -8,16 +11,16 @@
   --skmt-muted: #737373;
   --skmt-border: #e5e5e5;
   --skmt-border-strong: #d4d4d4;
-  --skmt-primary: #262626;
-  --skmt-primary-soft: #f3f4f6;
-  --skmt-success: #166534;
-  --skmt-success-soft: #ecfdf3;
-  --skmt-warning: #a16207;
-  --skmt-warning-soft: #fffbeb;
-  --skmt-error: #b91c1c;
-  --skmt-error-soft: #fef2f2;
-  --skmt-danger: #b42318;
-  --skmt-danger-soft: #fef3f2;
+  --skmt-primary: oklch(58.5% 0.233 277.117);
+  --skmt-primary-soft: oklch(93.2% 0.032 255.585);
+  --skmt-success: oklch(69.6% 0.17 162.48);
+  --skmt-success-soft: oklch(95% 0.052 163.051);
+  --skmt-warning: oklch(75% 0.183 55.934);
+  --skmt-warning-soft: oklch(95.4% 0.038 75.164);
+  --skmt-error: oklch(63.7% 0.237 25.331);
+  --skmt-error-soft: oklch(93.6% 0.032 17.717);
+  --skmt-danger: oklch(63.7% 0.237 25.331);
+  --skmt-danger-soft: oklch(93.6% 0.032 17.717);
   --skmt-radius-xs: 8px;
   --skmt-radius-sm: 12px;
   --skmt-radius-md: 16px;
@@ -183,6 +186,12 @@
   justify-content: center;
   width: 16px;
   height: 16px;
+}
+
+.skmt-lucide {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .skmt-icon svg {
@@ -599,6 +608,82 @@
   margin: 0;
 }
 
+.skmt-toast-stack {
+  position: fixed;
+  top: 52px;
+  right: var(--skmt-space-4);
+  z-index: 100000;
+  display: grid;
+  gap: var(--skmt-space-2);
+  pointer-events: none;
+}
+
+.skmt-toast {
+  pointer-events: auto;
+  width: min(420px, calc(100vw - 32px));
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--skmt-space-3);
+  padding: var(--skmt-space-3);
+  border: 1px solid var(--skmt-border);
+  border-left-width: 4px;
+  border-radius: var(--skmt-radius-sm);
+  background: var(--skmt-surface);
+  color: var(--skmt-text);
+  box-shadow: var(--skmt-shadow-md);
+  transform: translateY(0);
+  opacity: 1;
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.skmt-toast.is-leaving {
+  opacity: 0;
+  transform: translateY(-6px);
+}
+
+.skmt-toast__message {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.skmt-toast__close {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--skmt-muted);
+  padding: 0;
+  margin: 0;
+  min-width: 20px;
+  min-height: 20px;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.skmt-toast__close:hover,
+.skmt-toast__close:focus {
+  color: var(--skmt-text);
+}
+
+.skmt-toast--success {
+  border-left-color: var(--skmt-success);
+  background: var(--skmt-success-soft);
+}
+
+.skmt-toast--warning {
+  border-left-color: var(--skmt-warning);
+  background: var(--skmt-warning-soft);
+}
+
+.skmt-toast--error {
+  border-left-color: var(--skmt-error);
+  background: var(--skmt-error-soft);
+}
+
 #toplevel_page_skmt .wp-submenu a[href$="page=skmt-separator"] {
   pointer-events: none;
   cursor: default;
@@ -664,6 +749,15 @@
   .skmt-actions .button,
   .skmt-page-head .button,
   .skmt-card .button {
+    width: 100%;
+  }
+
+  .skmt-toast-stack {
+    right: var(--skmt-space-3);
+    left: var(--skmt-space-3);
+  }
+
+  .skmt-toast {
     width: 100%;
   }
 }
