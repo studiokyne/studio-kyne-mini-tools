@@ -163,7 +163,6 @@ class SKMT_Admin {
 		$settings      = $this->plugin->settings()->get_all();
 		$update_status = $this->get_update_status();
 		$languages     = $this->get_language_options();
-		$notifications = SKMT_Notifications::get_recent( 12 );
 		?>
 		<div class="wrap skmt-wrap">
 			<div class="skmt-shell">
@@ -204,7 +203,6 @@ class SKMT_Admin {
 							<h2 class="skmt-title-inline"><?php echo $this->render_icon( 'activity' ); ?><?php echo esc_html__( 'Version et mises à jour', 'studio-kyne-mini-tools' ); ?></h2>
 						</div>
 						<ul class="skmt-status-list">
-							<li><span><?php echo esc_html__( 'Repository GitHub', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( $update_status['repository'] ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Version installée', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">v<?php echo esc_html( $update_status['current_version'] ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Statut', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--<?php echo esc_attr( $update_status['badge'] ); ?>"><?php echo esc_html( $update_status['label'] ); ?></span></li>
 							<?php if ( ! empty( $update_status['target_version'] ) ) : ?>
@@ -238,33 +236,6 @@ class SKMT_Admin {
 							<p id="skmt-import-config-name" class="description"></p>
 						</form>
 					</div>
-				</div>
-
-				<div class="skmt-card">
-					<div class="skmt-card-head">
-						<h2 class="skmt-title-inline"><?php echo $this->render_icon( 'bell' ); ?><?php echo esc_html__( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?></h2>
-					</div>
-					<p class="description"><?php echo esc_html__( 'Retrouvez ici les derniers événements importants: imports, modules et conversions planifiées.', 'studio-kyne-mini-tools' ); ?></p>
-					<?php if ( empty( $notifications ) ) : ?>
-						<p class="description"><?php echo esc_html__( 'Aucun événement récent.', 'studio-kyne-mini-tools' ); ?></p>
-					<?php else : ?>
-						<ul class="skmt-notification-list">
-							<?php foreach ( $notifications as $entry ) : ?>
-								<?php
-								$level   = isset( $entry['level'] ) ? sanitize_key( $entry['level'] ) : 'info';
-								$message = isset( $entry['message'] ) ? sanitize_text_field( (string) $entry['message'] ) : '';
-								$created = isset( $entry['created_at'] ) ? sanitize_text_field( (string) $entry['created_at'] ) : '';
-								?>
-								<li>
-									<div class="skmt-notification-list__meta">
-										<span class="skmt-badge skmt-badge--<?php echo esc_attr( $this->map_notification_badge( $level ) ); ?>"><?php echo esc_html( $this->get_notification_level_label( $level ) ); ?></span>
-										<span class="description"><?php echo esc_html( $this->format_notification_time( $created ) ); ?></span>
-									</div>
-									<p><?php echo esc_html( $message ); ?></p>
-								</li>
-							<?php endforeach; ?>
-						</ul>
-					<?php endif; ?>
 				</div>
 			</div>
 		</div>
@@ -509,28 +480,23 @@ class SKMT_Admin {
 			'current_version'      => SKMT_VERSION,
 			'target_version'       => '',
 			'has_update'           => false,
-			'repository_configured' => true,
-			'repository'           => defined( 'SKMT_GITHUB_REPO' ) ? (string) SKMT_GITHUB_REPO : '',
 			'label'                => __( 'À jour', 'studio-kyne-mini-tools' ),
 			'badge'                => 'success',
 		);
 
-		$repository = trim( (string) $status['repository'] );
-		$status['repository'] = '' !== $repository ? $repository : 'studiokyne/studio-kyne-mini-tools';
-		if ( '' === $repository ) {
-			$status['label'] = __( 'Repository source indisponible', 'studio-kyne-mini-tools' );
-			$status['badge'] = 'warning';
-			return $status;
-		}
 		$updates = get_site_transient( 'update_plugins' );
 
 		if ( is_object( $updates ) && ! empty( $updates->response[ SKMT_PLUGIN_BASENAME ] ) ) {
 			$update = $updates->response[ SKMT_PLUGIN_BASENAME ];
-			$status['has_update']     = true;
-			$status['target_version'] = ! empty( $update->new_version ) ? (string) $update->new_version : '';
-			$status['label']          = __( 'Mise à jour disponible', 'studio-kyne-mini-tools' );
-			$status['badge']          = 'warning';
-			return $status;
+			$new_version = ! empty( $update->new_version ) ? (string) $update->new_version : '';
+
+			if ( '' !== $new_version && version_compare( $new_version, (string) SKMT_VERSION, '>' ) ) {
+				$status['has_update']     = true;
+				$status['target_version'] = $new_version;
+				$status['label']          = __( 'Mise à jour disponible', 'studio-kyne-mini-tools' );
+				$status['badge']          = 'warning';
+				return $status;
+			}
 		}
 
 		return $status;
@@ -538,36 +504,6 @@ class SKMT_Admin {
 
 	protected function get_module_option_name( $module_id ) {
 		return 'skmt_' . str_replace( '-', '_', sanitize_key( $module_id ) ) . '_settings';
-	}
-
-	protected function map_notification_badge( $level ) {
-		$level = sanitize_key( (string) $level );
-		if ( in_array( $level, array( 'success', 'warning', 'error' ), true ) ) {
-			return $level;
-		}
-		return 'info';
-	}
-
-	protected function get_notification_level_label( $level ) {
-		$level = sanitize_key( (string) $level );
-
-		$labels = array(
-			'success' => __( 'Succès', 'studio-kyne-mini-tools' ),
-			'warning' => __( 'Alerte', 'studio-kyne-mini-tools' ),
-			'error'   => __( 'Erreur', 'studio-kyne-mini-tools' ),
-			'info'    => __( 'Info', 'studio-kyne-mini-tools' ),
-		);
-
-		return $labels[ $level ] ?? $labels['info'];
-	}
-
-	protected function format_notification_time( $created_at ) {
-		$timestamp = strtotime( (string) $created_at );
-		if ( false === $timestamp ) {
-			return __( 'Date inconnue', 'studio-kyne-mini-tools' );
-		}
-
-		return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp );
 	}
 
 	protected function map_module_icon( $icon ) {

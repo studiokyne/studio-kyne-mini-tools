@@ -31,7 +31,7 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 	public function get_name() { return __( 'Image Optimizer', 'studio-kyne-mini-tools' ); }
 	public function get_description() { return __( 'Optimise automatiquement les images à l’upload et permet une conversion de masse.', 'studio-kyne-mini-tools' ); }
 	public function get_icon() { return 'image'; }
-	public function is_default_active() { return true; }
+	public function is_default_active() { return false; }
 	public function is_configurable() { return true; }
 	public function plugin() { return $this->plugin; }
 	public function activate() { $this->maybe_seed_defaults(); SKMT_Image_Stats_Repository::create_table(); }

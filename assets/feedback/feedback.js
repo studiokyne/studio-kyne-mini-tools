@@ -9,27 +9,27 @@
   const state = {
     authenticated: Boolean(config.hasSession),
     tokenFromUrl: String(config.tokenFromUrl || ""),
-    mobileMode: false,
-    mobileWidth: 390,
+    requiresPassword: Boolean(config.requiresPassword),
     pickMode: false,
     selectedTarget: null,
     items: [],
+    selectedItemId: null,
+    deviceMode: config.deviceMode === "mobile" ? "mobile" : "desktop",
   };
 
   const selectors = {
     root: null,
     panel: null,
+    pinLayer: null,
     info: null,
-    authForm: null,
-    password: null,
     pickButton: null,
     sendButton: null,
-    comment: null,
     category: null,
-    mobileToggle: null,
-    mobileWidth: null,
-    mobileFrame: null,
-    pinLayer: null,
+    comment: null,
+    desktopButton: null,
+    mobileButton: null,
+    structureList: null,
+    structureDetails: null,
   };
 
   let highlightBox = null;
@@ -49,26 +49,27 @@
 
   const toast = (message, type = "info") => {
     if (!message) return;
+
     const stack =
       document.querySelector("[data-skmt-feedback-toast-stack]") ||
       (() => {
-        const s = createElem("div", "skmt-feedback-toast-stack");
-        s.setAttribute("data-skmt-feedback-toast-stack", "");
-        document.body.appendChild(s);
-        return s;
+        const next = createElem("div", "skmt-feedback-toast-stack");
+        next.setAttribute("data-skmt-feedback-toast-stack", "");
+        document.body.appendChild(next);
+        return next;
       })();
 
-    const item = createElem(
+    const toastItem = createElem(
       "div",
       `skmt-feedback-toast skmt-feedback-toast--${type}`,
+      message,
     );
-    item.textContent = message;
-    stack.appendChild(item);
+    stack.appendChild(toastItem);
 
     window.setTimeout(() => {
-      item.classList.add("is-leaving");
+      toastItem.classList.add("is-leaving");
       window.setTimeout(() => {
-        item.remove();
+        toastItem.remove();
         if (!stack.querySelector(".skmt-feedback-toast")) {
           stack.remove();
         }
@@ -102,6 +103,7 @@
   const getDocSize = () => {
     const body = document.body;
     const doc = document.documentElement;
+
     return {
       width: Math.max(
         body.scrollWidth,
@@ -121,7 +123,7 @@
   };
 
   const formatCategory = (value) => {
-    return categories?.[value] || categories?.[""] || "No category";
+    return categories?.[value] || categories?.[""] || "Sans categorie";
   };
 
   const getElementSelector = (element) => {
@@ -139,6 +141,7 @@
       parts.length < 5
     ) {
       let selector = current.tagName.toLowerCase();
+
       if (current.classList && current.classList.length) {
         selector += `.${Array.from(current.classList)
           .slice(0, 2)
@@ -152,8 +155,7 @@
           (node) => node.tagName === current.tagName,
         );
         if (siblings.length > 1) {
-          const index = siblings.indexOf(current) + 1;
-          selector += `:nth-of-type(${index})`;
+          selector += `:nth-of-type(${siblings.indexOf(current) + 1})`;
         }
       }
 
@@ -164,33 +166,173 @@
     return parts.join(" > ");
   };
 
-  const renderPins = () => {
-    if (!selectors.pinLayer) return;
-    selectors.pinLayer.innerHTML = "";
+  const setDeviceButtonState = () => {
+    selectors.desktopButton?.classList.toggle(
+      "is-active",
+      state.deviceMode === "desktop",
+    );
+    selectors.mobileButton?.classList.toggle(
+      "is-active",
+      state.deviceMode === "mobile",
+    );
+  };
 
-    const docSize = getDocSize();
+  const switchDeviceMode = (mode) => {
+    const nextMode = mode === "mobile" ? "mobile" : "desktop";
+    if (nextMode === state.deviceMode) {
+      return;
+    }
+
+    const url = new URL(window.location.href);
+    const queryArg = String(config.deviceQueryArg || "skmt_feedback_device");
+    url.searchParams.set(queryArg, nextMode);
+
+    window.location.href = url.toString();
+  };
+
+  const getPointCoordinates = (item) => {
+    const doc = getDocSize();
+    const x = (Number(item.x_percent || 0) / 100) * doc.width;
+    const y = (Number(item.y_percent || 0) / 100) * doc.height;
+
+    return {
+      x,
+      y,
+    };
+  };
+
+  const goToItem = (itemId) => {
+    const selected = state.items.find((item) => item.id === itemId);
+    if (!selected) return;
+
+    const { y } = getPointCoordinates(selected);
+    const offset = Math.max(0, y - 180);
+
+    window.scrollTo({
+      top: offset,
+      left: 0,
+      behavior: "smooth",
+    });
+
+    const pin = selectors.pinLayer?.querySelector(
+      `[data-item-id="${CSS.escape(selected.id)}"]`,
+    );
+    if (pin) {
+      pin.classList.add("is-focus");
+      window.setTimeout(() => {
+        pin.classList.remove("is-focus");
+      }, 900);
+    }
+  };
+
+  const renderStructure = () => {
+    if (!selectors.structureList || !selectors.structureDetails) {
+      return;
+    }
+
+    selectors.structureList.innerHTML = "";
+
+    if (!state.items.length) {
+      const empty = createElem(
+        "p",
+        "skmt-feedback-structure-empty",
+        t("emptyStructure", "Aucun point sur cette page."),
+      );
+      selectors.structureList.appendChild(empty);
+      selectors.structureDetails.innerHTML = "";
+      return;
+    }
 
     state.items.forEach((item, index) => {
-      const x = (Number(item.x_percent || 0) / 100) * docSize.width;
-      const y = (Number(item.y_percent || 0) / 100) * docSize.height;
+      const row = createElem("button", "skmt-feedback-structure-item");
+      row.type = "button";
+      row.setAttribute("data-category", String(item.category || "") || "none");
+      row.classList.toggle("is-selected", item.id === state.selectedItemId);
+
+      const statusLabel = item.status === "resolved" ? "RESOLU" : "OUVERT";
+      const label = `${index + 1}. ${formatCategory(item.category || "")}`;
+      const preview = String(item.comment || "").slice(0, 68);
+
+      row.innerHTML =
+        `<span class="skmt-feedback-structure-item__title">${label}</span>` +
+        `<span class="skmt-feedback-structure-item__meta">${statusLabel}</span>` +
+        `<span class="skmt-feedback-structure-item__preview">${preview}</span>`;
+
+      row.addEventListener("click", () => {
+        state.selectedItemId = item.id;
+        renderStructure();
+      });
+
+      selectors.structureList.appendChild(row);
+    });
+
+    const selected =
+      state.items.find((item) => item.id === state.selectedItemId) ||
+      state.items[0];
+
+    if (!selected) {
+      selectors.structureDetails.innerHTML = "";
+      return;
+    }
+
+    state.selectedItemId = selected.id;
+
+    const details = createElem("div", "skmt-feedback-structure-details");
+    const title = createElem(
+      "h4",
+      "",
+      t("selectedPointTitle", "Point selectionne"),
+    );
+    const info = createElem(
+      "p",
+      "",
+      `${formatCategory(selected.category || "")} • ${selected.status === "resolved" ? "RESOLU" : "OUVERT"}`,
+    );
+    const message = createElem("p", "", String(selected.comment || ""));
+    const goto = createElem(
+      "button",
+      "skmt-feedback-button skmt-feedback-button--primary",
+      t("goToPoint", "Aller au point"),
+    );
+
+    goto.type = "button";
+    goto.addEventListener("click", () => {
+      goToItem(selected.id);
+    });
+
+    details.appendChild(title);
+    details.appendChild(info);
+    details.appendChild(message);
+    details.appendChild(goto);
+
+    selectors.structureDetails.innerHTML = "";
+    selectors.structureDetails.appendChild(details);
+  };
+
+  const renderPins = () => {
+    if (!selectors.pinLayer) {
+      return;
+    }
+
+    selectors.pinLayer.innerHTML = "";
+
+    state.items.forEach((item, index) => {
       const pin = createElem("button", "skmt-feedback-pin");
       pin.type = "button";
-      pin.style.left = `${x}px`;
-      pin.style.top = `${y}px`;
       pin.textContent = String(index + 1);
+      pin.setAttribute("data-item-id", String(item.id || ""));
+      pin.setAttribute("data-category", String(item.category || "") || "none");
 
-      const category = String(item.category || "");
-      pin.setAttribute("data-category", category || "none");
-      pin.setAttribute(
-        "title",
-        `[${formatCategory(category)}] ${item.comment || ""}`,
-      );
+      const coords = getPointCoordinates(item);
+      pin.style.left = `${coords.x}px`;
+      pin.style.top = `${coords.y}px`;
 
       pin.addEventListener("click", (event) => {
         event.preventDefault();
-        const status = item.status === "resolved" ? "Resolved" : "Open";
+        state.selectedItemId = item.id;
+        renderStructure();
         toast(
-          `${formatCategory(category)} • ${status}\n${item.comment || ""}`,
+          `[${formatCategory(item.category || "")}] ${String(item.comment || "")}`,
           item.status === "resolved" ? "success" : "info",
         );
       });
@@ -205,7 +347,11 @@
     })
       .then((data) => {
         state.items = Array.isArray(data.items) ? data.items : [];
+        if (!state.selectedItemId && state.items.length) {
+          state.selectedItemId = state.items[0].id;
+        }
         renderPins();
+        renderStructure();
       })
       .catch((error) => {
         toast(
@@ -242,17 +388,6 @@
       ));
   };
 
-  const updateMobileFrame = () => {
-    if (!selectors.mobileFrame) return;
-    if (!state.mobileMode) {
-      selectors.mobileFrame.style.display = "none";
-      return;
-    }
-
-    selectors.mobileFrame.style.display = "block";
-    selectors.mobileFrame.style.width = `${state.mobileWidth}px`;
-  };
-
   const collectPayload = () => {
     if (!state.selectedTarget) {
       throw new Error(
@@ -263,6 +398,7 @@
     const comment = selectors.comment?.value
       ? selectors.comment.value.trim()
       : "";
+
     if (!comment) {
       throw new Error(t("commentRequired", "Merci de saisir un commentaire."));
     }
@@ -274,8 +410,8 @@
       y_percent: state.selectedTarget.yPercent,
       comment,
       category: selectors.category?.value || "",
-      device_mode: state.mobileMode ? "mobile" : "desktop",
-      mobile_width: state.mobileMode ? state.mobileWidth : 0,
+      device_mode: state.deviceMode,
+      mobile_width: state.deviceMode === "mobile" ? 390 : 0,
       viewport_width: window.innerWidth,
       viewport_height: window.innerHeight,
     };
@@ -297,15 +433,20 @@
       .then((data) => {
         if (data.item) {
           state.items.unshift(data.item);
-          renderPins();
+          state.selectedItemId = data.item.id;
         }
 
         if (selectors.comment) {
           selectors.comment.value = "";
         }
+
         state.selectedTarget = null;
         selectors.info &&
           (selectors.info.textContent = t("sendSuccess", "Feedback envoye."));
+
+        stopPickMode();
+        renderPins();
+        renderStructure();
         toast(t("sendSuccess", "Feedback envoye."), "success");
       })
       .catch((error) => {
@@ -317,7 +458,9 @@
   };
 
   const initPickingEvents = () => {
-    if (highlightBox) return;
+    if (highlightBox) {
+      return;
+    }
 
     highlightBox = createElem("div", "skmt-feedback-highlight");
     document.body.appendChild(highlightBox);
@@ -365,14 +508,16 @@
 
         selectors.info &&
           (selectors.info.textContent = `${t("selectedElement", "Element selectionne.")} ${state.selectedTarget.selector}`);
+
         stopPickMode();
       },
       true,
     );
   };
 
-  const renderAuthenticatedPanel = () => {
-    const body = createElem("div", "skmt-feedback-panel__body");
+  const renderComposer = () => {
+    const section = createElem("section", "skmt-feedback-section");
+    const title = createElem("h3", "skmt-feedback-section__title", "Capture");
 
     selectors.info = createElem(
       "p",
@@ -402,8 +547,8 @@
       "skmt-feedback-label",
       t("categoryLabel", "Categorie"),
     );
-    selectors.category = createElem("select", "skmt-feedback-select");
 
+    selectors.category = createElem("select", "skmt-feedback-select");
     Object.entries(categories).forEach(([value, label]) => {
       const option = createElem("option", "", label);
       option.value = value;
@@ -425,51 +570,43 @@
     selectors.sendButton.type = "button";
     selectors.sendButton.addEventListener("click", submitFeedback);
 
-    body.appendChild(selectors.info);
-    body.appendChild(selectors.pickButton);
-    body.appendChild(categoryLabel);
-    body.appendChild(selectors.category);
-    body.appendChild(commentLabel);
-    body.appendChild(selectors.comment);
+    section.appendChild(title);
+    section.appendChild(selectors.info);
+    section.appendChild(selectors.pickButton);
+    section.appendChild(categoryLabel);
+    section.appendChild(selectors.category);
+    section.appendChild(commentLabel);
+    section.appendChild(selectors.comment);
+    section.appendChild(selectors.sendButton);
 
-    if (config.allowMobileMode) {
-      const mobileRow = createElem("div", "skmt-feedback-mobile-row");
-      selectors.mobileToggle = createElem(
-        "button",
-        "skmt-feedback-button",
-        t("mobileMode", "Mode mobile"),
-      );
-      selectors.mobileToggle.type = "button";
-      selectors.mobileToggle.addEventListener("click", () => {
-        state.mobileMode = !state.mobileMode;
-        selectors.mobileToggle.classList.toggle("is-active", state.mobileMode);
-        selectors.mobileToggle.textContent = state.mobileMode
-          ? `${t("mobileMode", "Mode mobile")}: ON`
-          : `${t("mobileMode", "Mode mobile")}: OFF`;
-        updateMobileFrame();
-      });
+    return section;
+  };
 
-      selectors.mobileWidth = createElem("select", "skmt-feedback-select");
-      [360, 375, 390, 414, 428].forEach((width) => {
-        const option = createElem("option", "", `${width}px`);
-        option.value = String(width);
-        if (width === state.mobileWidth) {
-          option.selected = true;
-        }
-        selectors.mobileWidth.appendChild(option);
-      });
-      selectors.mobileWidth.addEventListener("change", () => {
-        state.mobileWidth = Number(selectors.mobileWidth.value || 390);
-        updateMobileFrame();
-      });
+  const renderStructurePanel = () => {
+    const section = createElem("section", "skmt-feedback-section");
+    const title = createElem(
+      "h3",
+      "skmt-feedback-section__title",
+      t("structureTitle", "Structure"),
+    );
 
-      mobileRow.appendChild(selectors.mobileToggle);
-      mobileRow.appendChild(selectors.mobileWidth);
-      body.appendChild(mobileRow);
-    }
+    selectors.structureList = createElem("div", "skmt-feedback-structure-list");
+    selectors.structureDetails = createElem(
+      "div",
+      "skmt-feedback-structure-details-wrap",
+    );
 
-    body.appendChild(selectors.sendButton);
+    section.appendChild(title);
+    section.appendChild(selectors.structureList);
+    section.appendChild(selectors.structureDetails);
 
+    return section;
+  };
+
+  const renderUnlockedPanel = () => {
+    const body = createElem("div", "skmt-feedback-panel__body");
+    body.appendChild(renderComposer());
+    body.appendChild(renderStructurePanel());
     return body;
   };
 
@@ -481,10 +618,10 @@
       t("lockedTitle", "Lien protege"),
     );
 
-    selectors.authForm = createElem("form", "skmt-feedback-auth-form");
-    selectors.password = createElem("input", "skmt-feedback-input");
-    selectors.password.type = "password";
-    selectors.password.placeholder = t("passwordPlaceholder", "Mot de passe");
+    const form = createElem("form", "skmt-feedback-auth-form");
+    const password = createElem("input", "skmt-feedback-input");
+    password.type = "password";
+    password.placeholder = t("passwordPlaceholder", "Mot de passe");
 
     const submit = createElem(
       "button",
@@ -493,14 +630,14 @@
     );
     submit.type = "submit";
 
-    selectors.authForm.appendChild(selectors.password);
-    selectors.authForm.appendChild(submit);
+    form.appendChild(password);
+    form.appendChild(submit);
 
-    selectors.authForm.addEventListener("submit", (event) => {
+    form.addEventListener("submit", (event) => {
       event.preventDefault();
 
-      const password = selectors.password?.value || "";
-      if (!password || !state.tokenFromUrl) {
+      const value = password.value || "";
+      if (!state.tokenFromUrl || !value) {
         toast(
           t("unlockError", "Mot de passe invalide ou lien expire."),
           "error",
@@ -512,7 +649,7 @@
 
       post("skmt_feedback_auth", {
         token: state.tokenFromUrl,
-        password,
+        password: value,
       })
         .then(() => {
           state.authenticated = true;
@@ -534,37 +671,78 @@
     });
 
     body.appendChild(title);
-    body.appendChild(selectors.authForm);
+    body.appendChild(form);
 
     return body;
   };
 
-  const mountPanelContents = () => {
+  const renderHeader = () => {
     const header = createElem("div", "skmt-feedback-panel__header");
-    header.textContent = t("hudTitle", "Feedback");
-
-    selectors.panel.appendChild(header);
-    selectors.panel.appendChild(
-      state.authenticated ? renderAuthenticatedPanel() : renderLockedPanel(),
+    const title = createElem(
+      "span",
+      "skmt-feedback-panel__title",
+      t("hudTitle", "Feedback"),
     );
+    const modes = createElem("div", "skmt-feedback-device-switch");
+
+    selectors.desktopButton = createElem(
+      "button",
+      "skmt-feedback-device-button",
+      "🖥",
+    );
+    selectors.desktopButton.type = "button";
+    selectors.desktopButton.title = t("desktopMode", "Desktop");
+    selectors.desktopButton.addEventListener("click", () => {
+      switchDeviceMode("desktop");
+    });
+
+    selectors.mobileButton = createElem(
+      "button",
+      "skmt-feedback-device-button",
+      "📱",
+    );
+    selectors.mobileButton.type = "button";
+    selectors.mobileButton.title = t("mobileMode", "Mobile");
+    selectors.mobileButton.addEventListener("click", () => {
+      switchDeviceMode("mobile");
+    });
+
+    modes.appendChild(selectors.desktopButton);
+    if (config.allowMobileMode) {
+      modes.appendChild(selectors.mobileButton);
+    }
+
+    header.appendChild(title);
+    header.appendChild(modes);
+
+    return header;
+  };
+
+  const mountPanelContents = () => {
+    selectors.panel.appendChild(renderHeader());
+    setDeviceButtonState();
+
+    if (state.requiresPassword && !state.authenticated) {
+      selectors.panel.appendChild(renderLockedPanel());
+      return;
+    }
+
+    selectors.panel.appendChild(renderUnlockedPanel());
   };
 
   const buildHud = () => {
     selectors.root = createElem("div", "skmt-feedback-root");
     selectors.panel = createElem("div", "skmt-feedback-panel");
     selectors.pinLayer = createElem("div", "skmt-feedback-pin-layer");
-    selectors.mobileFrame = createElem("div", "skmt-feedback-mobile-frame");
 
     selectors.root.appendChild(selectors.panel);
     document.body.appendChild(selectors.root);
     document.body.appendChild(selectors.pinLayer);
-    document.body.appendChild(selectors.mobileFrame);
 
     mountPanelContents();
     initPickingEvents();
-    updateMobileFrame();
 
-    if (state.authenticated) {
+    if (!state.requiresPassword || state.authenticated) {
       loadItems();
     }
 

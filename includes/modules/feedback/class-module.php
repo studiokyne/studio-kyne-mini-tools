@@ -8,14 +8,17 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 	protected $option_name = 'skmt_feedback_settings';
 	protected $items_option_name = 'skmt_feedback_items';
 	protected $share_query_arg = 'skmt_feedback_access';
+	protected $device_query_arg = 'skmt_feedback_device';
 	protected $session_cookie_name = 'skmt_feedback_session';
 	protected $max_items = 1000;
 	protected $defaults = array(
-		'enabled'            => 1,
-		'share_token'        => '',
-		'share_password_hash'=> '',
-		'share_expires_at'   => 0,
-		'allow_mobile_mode'  => 1,
+		'enabled'              => 1,
+		'share_token'          => '',
+		'password_enabled'     => 0,
+		'share_password_hash'  => '',
+		'expiration_enabled'   => 0,
+		'share_expires_at'     => 0,
+		'allow_mobile_mode'    => 1,
 	);
 
 	public function __construct( $plugin ) {
@@ -24,9 +27,9 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 
 	public function get_id() { return 'feedback'; }
 	public function get_name() { return __( 'Feedback', 'studio-kyne-mini-tools' ); }
-	public function get_description() { return __( 'Lien sécurisé client pour laisser des retours in-page avec HUD, catégories et positions.', 'studio-kyne-mini-tools' ); }
+	public function get_description() { return __( 'Lien sécurisé client pour retours visuels in-page, avec HUD, catégories et navigation par points.', 'studio-kyne-mini-tools' ); }
 	public function get_icon() { return 'message-circle'; }
-	public function is_default_active() { return true; }
+	public function is_default_active() { return false; }
 	public function is_configurable() { return true; }
 	public function activate() { $this->maybe_seed_defaults(); }
 	public function deactivate() { $this->clear_session_cookie(); }
@@ -36,6 +39,7 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		add_action( 'admin_post_skmt_feedback_regenerate_link', array( $this, 'handle_regenerate_link' ) );
 		add_action( 'admin_post_skmt_feedback_update_item', array( $this, 'handle_update_item' ) );
 
+		add_action( 'wp_head', array( $this, 'inject_mobile_viewport' ), 1 );
 		add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_front_assets' ) );
 
 		add_action( 'wp_ajax_skmt_feedback_auth', array( $this, 'ajax_auth' ) );
@@ -78,9 +82,19 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			update_option( $this->option_name, $settings, false );
 		}
 
-		$settings['enabled']           = empty( $settings['enabled'] ) ? 0 : 1;
-		$settings['allow_mobile_mode'] = empty( $settings['allow_mobile_mode'] ) ? 0 : 1;
-		$settings['share_expires_at']  = absint( $settings['share_expires_at'] );
+		$settings['enabled']            = 1;
+		$settings['password_enabled']   = empty( $settings['password_enabled'] ) ? 0 : 1;
+		$settings['expiration_enabled'] = empty( $settings['expiration_enabled'] ) ? 0 : 1;
+		$settings['allow_mobile_mode']  = empty( $settings['allow_mobile_mode'] ) ? 0 : 1;
+		$settings['share_expires_at']   = absint( $settings['share_expires_at'] );
+
+		if ( empty( $settings['password_enabled'] ) ) {
+			$settings['share_password_hash'] = '';
+		}
+
+		if ( empty( $settings['expiration_enabled'] ) ) {
+			$settings['share_expires_at'] = 0;
+		}
 
 		return $settings;
 	}
@@ -89,15 +103,25 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		$current = $this->get_settings();
 		$input   = is_array( $input ) ? $input : array();
 
-		$current['enabled']           = empty( $input['enabled'] ) ? 0 : 1;
-		$current['allow_mobile_mode'] = empty( $input['allow_mobile_mode'] ) ? 0 : 1;
-
-		$expires_value = isset( $input['share_expires_at'] ) ? sanitize_text_field( wp_unslash( (string) $input['share_expires_at'] ) ) : '';
-		$current['share_expires_at'] = $this->parse_datetime_input( $expires_value );
+		$current['enabled']            = 1;
+		$current['allow_mobile_mode']  = empty( $input['allow_mobile_mode'] ) ? 0 : 1;
+		$current['password_enabled']   = empty( $input['password_enabled'] ) ? 0 : 1;
+		$current['expiration_enabled'] = empty( $input['expiration_enabled'] ) ? 0 : 1;
 
 		$new_password = isset( $input['share_password'] ) ? trim( (string) wp_unslash( $input['share_password'] ) ) : '';
-		if ( '' !== $new_password ) {
-			$current['share_password_hash'] = wp_hash_password( $new_password );
+		if ( ! empty( $current['password_enabled'] ) ) {
+			if ( '' !== $new_password ) {
+				$current['share_password_hash'] = wp_hash_password( $new_password );
+			}
+		} else {
+			$current['share_password_hash'] = '';
+		}
+
+		$expires_value = isset( $input['share_expires_at'] ) ? sanitize_text_field( wp_unslash( (string) $input['share_expires_at'] ) ) : '';
+		if ( ! empty( $current['expiration_enabled'] ) ) {
+			$current['share_expires_at'] = $this->parse_datetime_input( $expires_value );
+		} else {
+			$current['share_expires_at'] = 0;
 		}
 
 		if ( empty( $current['share_token'] ) ) {
@@ -112,18 +136,21 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			wp_die( esc_html__( 'Vous n’avez pas l’autorisation d’accéder à cette page.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$settings        = $this->get_settings();
-		$share_url       = add_query_arg( $this->share_query_arg, (string) $settings['share_token'], home_url( '/' ) );
-		$password_set    = ! empty( $settings['share_password_hash'] );
-		$expires_display = $settings['share_expires_at'] > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $settings['share_expires_at'] ) : __( 'Jamais', 'studio-kyne-mini-tools' );
-		$expires_input   = $settings['share_expires_at'] > 0 ? wp_date( 'Y-m-d\\TH:i', $settings['share_expires_at'] ) : '';
-		$notice          = isset( $_GET['skmt_feedback_notice'] ) ? sanitize_key( wp_unslash( $_GET['skmt_feedback_notice'] ) ) : '';
+		$settings              = $this->get_settings();
+		$share_url             = add_query_arg( $this->share_query_arg, (string) $settings['share_token'], home_url( '/' ) );
+		$password_enabled      = ! empty( $settings['password_enabled'] );
+		$expiration_enabled    = ! empty( $settings['expiration_enabled'] );
+		$password_set          = ! empty( $settings['share_password_hash'] );
+		$expires_display       = $settings['share_expires_at'] > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $settings['share_expires_at'] ) : __( 'Jamais', 'studio-kyne-mini-tools' );
+		$expires_input         = $settings['share_expires_at'] > 0 ? wp_date( 'Y-m-d\\TH:i', $settings['share_expires_at'] ) : '';
+		$notice                = isset( $_GET['skmt_feedback_notice'] ) ? sanitize_key( wp_unslash( $_GET['skmt_feedback_notice'] ) ) : '';
+		$items                 = $this->get_items();
+		$open_count            = 0;
+		$resolved_count        = 0;
+
 		if ( '' === $notice && ! empty( $_GET['settings-updated'] ) ) {
 			$notice = 'settings-saved';
 		}
-		$items           = $this->get_items();
-		$open_count      = 0;
-		$resolved_count  = 0;
 
 		foreach ( $items as $item ) {
 			$status = isset( $item['status'] ) ? sanitize_key( $item['status'] ) : 'open';
@@ -141,9 +168,9 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 				<header class="skmt-page-head">
 					<div>
 						<h1><?php echo esc_html__( 'Feedback', 'studio-kyne-mini-tools' ); ?></h1>
-						<p><?php echo esc_html__( 'Partagez un lien sécurisé avec le client pour collecter des retours visuels sur toutes les pages du site.', 'studio-kyne-mini-tools' ); ?></p>
+						<p><?php echo esc_html__( 'Partagez un lien sécurisé client pour collecter des retours visuels sur toutes les pages du site.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
-					<span class="skmt-badge skmt-badge--<?php echo ! empty( $settings['enabled'] ) ? 'success' : 'muted'; ?>"><?php echo esc_html( ! empty( $settings['enabled'] ) ? __( 'Actif', 'studio-kyne-mini-tools' ) : __( 'Inactif', 'studio-kyne-mini-tools' ) ); ?></span>
+					<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
 				</header>
 
 				<div class="skmt-grid skmt-grid--3">
@@ -169,32 +196,39 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 						<form action="options.php" method="post">
 							<?php settings_fields( 'skmt_feedback_group' ); ?>
 							<div class="skmt-field">
+								<label for="skmt-feedback-share-url"><strong><?php echo esc_html__( 'Lien à partager', 'studio-kyne-mini-tools' ); ?></strong></label>
+								<input id="skmt-feedback-share-url" type="text" readonly value="<?php echo esc_attr( $share_url ); ?>" />
+								<p class="description"><?php echo esc_html__( 'Lien unique pour le projet: le client peut naviguer entre les pages tout en gardant ses retours.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
+							<div class="skmt-field">
 								<label class="skmt-toggle">
-									<input type="checkbox" name="skmt_feedback_settings[enabled]" value="1" <?php checked( ! empty( $settings['enabled'] ) ); ?> />
+									<input type="checkbox" name="skmt_feedback_settings[password_enabled]" value="1" <?php checked( $password_enabled ); ?> />
 									<span></span>
-									<strong><?php echo esc_html__( 'Activer le module Feedback', 'studio-kyne-mini-tools' ); ?></strong>
+									<strong><?php echo esc_html__( 'Protéger le lien par mot de passe', 'studio-kyne-mini-tools' ); ?></strong>
 								</label>
 							</div>
 							<div class="skmt-field">
-								<label for="skmt-feedback-share-url"><strong><?php echo esc_html__( 'Lien à partager', 'studio-kyne-mini-tools' ); ?></strong></label>
-								<input id="skmt-feedback-share-url" type="text" readonly value="<?php echo esc_attr( $share_url ); ?>" />
-								<p class="description"><?php echo esc_html__( 'Un lien unique pour tout le projet. Le client peut naviguer librement de page en page.', 'studio-kyne-mini-tools' ); ?></p>
-							</div>
-							<div class="skmt-field">
-								<label for="skmt-feedback-password"><strong><?php echo esc_html__( 'Mot de passe du lien', 'studio-kyne-mini-tools' ); ?></strong></label>
+								<label for="skmt-feedback-password"><strong><?php echo esc_html__( 'Mot de passe', 'studio-kyne-mini-tools' ); ?></strong></label>
 								<input id="skmt-feedback-password" type="password" name="skmt_feedback_settings[share_password]" autocomplete="new-password" placeholder="<?php echo esc_attr__( 'Laisser vide pour conserver le mot de passe actuel', 'studio-kyne-mini-tools' ); ?>" />
-								<p class="description"><?php echo esc_html( $password_set ? __( 'Un mot de passe est déjà configuré.', 'studio-kyne-mini-tools' ) : __( 'Aucun mot de passe défini. Configurez-en un avant partage.', 'studio-kyne-mini-tools' ) ); ?></p>
+								<p class="description"><?php echo esc_html( $password_set ? __( 'Mot de passe enregistré.', 'studio-kyne-mini-tools' ) : __( 'Aucun mot de passe: accès via lien sécurisé seulement.', 'studio-kyne-mini-tools' ) ); ?></p>
 							</div>
 							<div class="skmt-field">
-								<label for="skmt-feedback-expiration"><strong><?php echo esc_html__( 'Date d’expiration', 'studio-kyne-mini-tools' ); ?></strong></label>
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_feedback_settings[expiration_enabled]" value="1" <?php checked( $expiration_enabled ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Activer une date d’expiration', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
+							<div class="skmt-field">
+								<label for="skmt-feedback-expiration"><strong><?php echo esc_html__( 'Date et heure d’expiration', 'studio-kyne-mini-tools' ); ?></strong></label>
 								<input id="skmt-feedback-expiration" type="datetime-local" name="skmt_feedback_settings[share_expires_at]" value="<?php echo esc_attr( $expires_input ); ?>" />
-								<p class="description"><?php echo esc_html__( 'Laissez vide pour ne pas expirer automatiquement le lien.', 'studio-kyne-mini-tools' ); ?></p>
+								<p class="description"><?php echo esc_html__( 'Ignorée si l’option d’expiration est désactivée.', 'studio-kyne-mini-tools' ); ?></p>
 							</div>
 							<div class="skmt-field">
 								<label class="skmt-toggle">
 									<input type="checkbox" name="skmt_feedback_settings[allow_mobile_mode]" value="1" <?php checked( ! empty( $settings['allow_mobile_mode'] ) ); ?> />
 									<span></span>
-									<strong><?php echo esc_html__( 'Activer le mode mobile dédié dans le HUD', 'studio-kyne-mini-tools' ); ?></strong>
+									<strong><?php echo esc_html__( 'Autoriser le mode responsive client (desktop/mobile)', 'studio-kyne-mini-tools' ); ?></strong>
 								</label>
 							</div>
 							<?php submit_button( __( 'Enregistrer les réglages', 'studio-kyne-mini-tools' ) ); ?>
@@ -203,14 +237,14 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 							<input type="hidden" name="action" value="skmt_feedback_regenerate_link" />
 							<?php wp_nonce_field( 'skmt_feedback_regenerate_link' ); ?>
 							<div class="skmt-actions">
-								<button type="submit" class="button"><?php echo esc_html__( 'Régénérer le lien', 'studio-kyne-mini-tools' ); ?></button>
+								<button type="submit" class="button button-primary"><?php echo esc_html__( 'Régénérer le lien', 'studio-kyne-mini-tools' ); ?></button>
 							</div>
 						</form>
 					</div>
 
 					<div class="skmt-card">
 						<div class="skmt-card-head">
-							<h2><?php echo esc_html__( 'Catégories disponibles', 'studio-kyne-mini-tools' ); ?></h2>
+							<h2><?php echo esc_html__( 'Catégories (client)', 'studio-kyne-mini-tools' ); ?></h2>
 						</div>
 						<ul class="skmt-status-list">
 							<?php foreach ( $this->get_categories() as $key => $label ) : ?>
@@ -220,7 +254,7 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 								</li>
 							<?php endforeach; ?>
 						</ul>
-						<p class="description"><?php echo esc_html__( 'Le client choisit une catégorie optionnelle pour chaque remarque (comme dans les outils de design).', 'studio-kyne-mini-tools' ); ?></p>
+						<p class="description"><?php echo esc_html__( 'Le client peut catégoriser ses remarques directement depuis le HUD.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
 				</div>
 
@@ -301,8 +335,12 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 
 		check_admin_referer( 'skmt_feedback_regenerate_link' );
 
+		if ( false === get_option( $this->option_name, false ) ) {
+			$this->maybe_seed_defaults();
+		}
+
 		$settings               = $this->get_settings();
-		$settings['share_token']= $this->generate_share_token();
+		$settings['share_token'] = $this->generate_share_token();
 		update_option( $this->option_name, $settings, false );
 		$this->clear_session_cookie();
 
@@ -317,15 +355,15 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 
 		check_admin_referer( 'skmt_feedback_update_item' );
 
-		$item_id    = isset( $_POST['item_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['item_id'] ) ) : '';
+		$item_id     = isset( $_POST['item_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['item_id'] ) ) : '';
 		$update_type = isset( $_POST['update_type'] ) ? sanitize_key( wp_unslash( (string) $_POST['update_type'] ) ) : '';
 
 		if ( '' === $item_id || ! in_array( $update_type, array( 'resolved', 'open', 'delete' ), true ) ) {
 			$this->redirect_admin( 'update-error' );
 		}
 
-		$items    = $this->get_items();
-		$updated  = false;
+		$items     = $this->get_items();
+		$updated   = false;
 		$new_items = array();
 
 		foreach ( $items as $item ) {
@@ -340,9 +378,9 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 				continue;
 			}
 
-			$item['status']      = 'resolved' === $update_type ? 'resolved' : 'open';
-			$item['updated_at']  = current_time( 'mysql' );
-			$new_items[]         = $item;
+			$item['status']     = 'resolved' === $update_type ? 'resolved' : 'open';
+			$item['updated_at'] = current_time( 'mysql' );
+			$new_items[]        = $item;
 		}
 
 		if ( ! $updated ) {
@@ -360,23 +398,43 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		$this->redirect_admin( 'item-updated' );
 	}
 
+	public function inject_mobile_viewport() {
+		if ( is_admin() ) {
+			return;
+		}
+
+		$settings = $this->get_settings();
+		if ( ! $this->should_load_front_hud( $settings ) ) {
+			return;
+		}
+
+		if ( 'mobile' !== $this->get_device_mode( $settings ) ) {
+			return;
+		}
+
+		echo '<script>(function(){var m=document.querySelector("meta[name=\\"viewport\\"]");if(!m){m=document.createElement("meta");m.setAttribute("name","viewport");document.head.appendChild(m);}m.setAttribute("content","width=390, initial-scale=1, viewport-fit=cover");document.documentElement.classList.add("skmt-feedback-device-mobile");})();</script>';
+		echo '<style id="skmt-feedback-mobile-style">html.skmt-feedback-device-mobile body{max-width:390px!important;margin-left:auto!important;margin-right:auto!important;overflow-x:hidden!important;}html.skmt-feedback-device-mobile{background:#fff;}</style>';
+	}
+
 	public function enqueue_front_assets() {
 		if ( is_admin() ) {
 			return;
 		}
 
 		$settings = $this->get_settings();
-		if ( empty( $settings['enabled'] ) ) {
+		if ( ! $this->should_load_front_hud( $settings ) ) {
 			return;
 		}
 
-		$has_session      = $this->has_valid_session( $settings );
 		$request_token    = $this->get_request_token();
 		$has_request_auth = $this->is_request_token_valid( $settings, $request_token );
 		$is_admin_user    = SKMT_Capabilities::current_user_can_manage();
+		$has_session      = $this->has_valid_session( $settings );
+		$requires_password = $this->is_password_required( $settings );
 
-		if ( ! $is_admin_user && ! $has_session && ! $has_request_auth ) {
-			return;
+		if ( ! $requires_password && $has_request_auth && ! $has_session && ! $is_admin_user ) {
+			$this->set_session_cookie( $settings );
+			$has_session = true;
 		}
 
 		wp_enqueue_style( 'skmt-feedback-front', SKMT_PLUGIN_URL . 'assets/feedback/feedback.css', array(), SKMT_VERSION );
@@ -386,32 +444,38 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			'skmt-feedback-front',
 			'skmtFeedback',
 			array(
-				'enabled'         => true,
-				'ajaxUrl'         => admin_url( 'admin-ajax.php' ),
-				'hasSession'      => $has_session || $is_admin_user,
-				'tokenFromUrl'    => $has_request_auth ? $request_token : '',
-				'allowMobileMode' => ! empty( $settings['allow_mobile_mode'] ),
-				'categories'      => $this->get_categories(),
-				'currentUrl'      => $this->get_current_url(),
-				'strings'         => array(
-					'hudTitle'           => __( 'Feedback', 'studio-kyne-mini-tools' ),
-					'lockedTitle'        => __( 'Lien protégé', 'studio-kyne-mini-tools' ),
-					'passwordPlaceholder'=> __( 'Mot de passe', 'studio-kyne-mini-tools' ),
-					'unlock'             => __( 'Déverrouiller', 'studio-kyne-mini-tools' ),
-					'unlockSuccess'      => __( 'Accès autorisé.', 'studio-kyne-mini-tools' ),
-					'unlockError'        => __( 'Mot de passe invalide ou lien expiré.', 'studio-kyne-mini-tools' ),
-					'pickElement'        => __( 'Sélectionner un élément', 'studio-kyne-mini-tools' ),
-					'pickHint'           => __( 'Cliquez sur un élément de la page, puis rédigez votre remarque.', 'studio-kyne-mini-tools' ),
-					'selectedElement'    => __( 'Élément sélectionné.', 'studio-kyne-mini-tools' ),
-					'feedbackPlaceholder'=> __( 'Décrivez votre retour (texte, bug responsive, interaction, etc.)', 'studio-kyne-mini-tools' ),
-					'sendFeedback'       => __( 'Envoyer la remarque', 'studio-kyne-mini-tools' ),
-					'commentRequired'    => __( 'Merci de saisir un commentaire.', 'studio-kyne-mini-tools' ),
-					'targetRequired'     => __( 'Sélectionnez un élément avant d’envoyer.', 'studio-kyne-mini-tools' ),
-					'sendSuccess'        => __( 'Feedback envoyé.', 'studio-kyne-mini-tools' ),
-					'loadError'          => __( 'Impossible de charger les feedbacks.', 'studio-kyne-mini-tools' ),
-					'mobileMode'         => __( 'Mode mobile', 'studio-kyne-mini-tools' ),
-					'mobileFrame'        => __( 'Cadre mobile visuel', 'studio-kyne-mini-tools' ),
-					'categoryLabel'      => __( 'Catégorie', 'studio-kyne-mini-tools' ),
+				'enabled'          => true,
+				'ajaxUrl'          => admin_url( 'admin-ajax.php' ),
+				'hasSession'       => $has_session || $is_admin_user,
+				'tokenFromUrl'     => $has_request_auth ? $request_token : '',
+				'requiresPassword' => $requires_password,
+				'allowMobileMode'  => ! empty( $settings['allow_mobile_mode'] ),
+				'deviceMode'       => $this->get_device_mode( $settings ),
+				'deviceQueryArg'   => $this->device_query_arg,
+				'categories'       => $this->get_categories(),
+				'strings'          => array(
+					'hudTitle'            => __( 'Feedback', 'studio-kyne-mini-tools' ),
+					'lockedTitle'         => __( 'Lien protégé', 'studio-kyne-mini-tools' ),
+					'passwordPlaceholder' => __( 'Mot de passe', 'studio-kyne-mini-tools' ),
+					'unlock'              => __( 'Déverrouiller', 'studio-kyne-mini-tools' ),
+					'unlockSuccess'       => __( 'Accès autorisé.', 'studio-kyne-mini-tools' ),
+					'unlockError'         => __( 'Mot de passe invalide ou lien expiré.', 'studio-kyne-mini-tools' ),
+					'pickElement'         => __( 'Sélectionner un élément', 'studio-kyne-mini-tools' ),
+					'pickHint'            => __( 'Cliquez sur un élément de la page, puis rédigez votre remarque.', 'studio-kyne-mini-tools' ),
+					'selectedElement'     => __( 'Élément sélectionné.', 'studio-kyne-mini-tools' ),
+					'feedbackPlaceholder' => __( 'Décrivez votre retour (texte, bug responsive, interaction, etc.)', 'studio-kyne-mini-tools' ),
+					'sendFeedback'        => __( 'Envoyer la remarque', 'studio-kyne-mini-tools' ),
+					'commentRequired'     => __( 'Merci de saisir un commentaire.', 'studio-kyne-mini-tools' ),
+					'targetRequired'      => __( 'Sélectionnez un élément avant d’envoyer.', 'studio-kyne-mini-tools' ),
+					'sendSuccess'         => __( 'Feedback envoyé.', 'studio-kyne-mini-tools' ),
+					'loadError'           => __( 'Impossible de charger les feedbacks.', 'studio-kyne-mini-tools' ),
+					'desktopMode'         => __( 'Desktop', 'studio-kyne-mini-tools' ),
+					'mobileMode'          => __( 'Mobile', 'studio-kyne-mini-tools' ),
+					'categoryLabel'       => __( 'Catégorie', 'studio-kyne-mini-tools' ),
+					'structureTitle'      => __( 'Structure', 'studio-kyne-mini-tools' ),
+					'emptyStructure'      => __( 'Aucun point sur cette page.', 'studio-kyne-mini-tools' ),
+					'selectedPointTitle'  => __( 'Point sélectionné', 'studio-kyne-mini-tools' ),
+					'goToPoint'           => __( 'Aller au point', 'studio-kyne-mini-tools' ),
 				),
 			)
 		);
@@ -419,11 +483,6 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 
 	public function ajax_auth() {
 		$settings = $this->get_settings();
-
-		if ( empty( $settings['enabled'] ) ) {
-			wp_send_json_error( array( 'message' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ) ), 403 );
-		}
-
 		$token    = isset( $_POST['token'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['token'] ) ) : '';
 		$password = isset( $_POST['password'] ) ? (string) wp_unslash( $_POST['password'] ) : '';
 
@@ -435,7 +494,7 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			wp_send_json_error( array( 'message' => __( 'Lien expiré.', 'studio-kyne-mini-tools' ) ), 403 );
 		}
 
-		if ( empty( $settings['share_password_hash'] ) || ! wp_check_password( $password, $settings['share_password_hash'] ) ) {
+		if ( $this->is_password_required( $settings ) && ! wp_check_password( $password, (string) $settings['share_password_hash'] ) ) {
 			wp_send_json_error( array( 'message' => __( 'Mot de passe invalide.', 'studio-kyne-mini-tools' ) ), 403 );
 		}
 
@@ -491,20 +550,20 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		$y_percent     = isset( $_POST['y_percent'] ) ? $this->sanitize_percent( wp_unslash( $_POST['y_percent'] ) ) : 0;
 
 		$item = array(
-			'id'             => wp_generate_uuid4(),
-			'page_url'       => $page_url,
-			'page_key'       => $page_key,
-			'selector'       => $selector,
-			'comment'        => $comment,
-			'category'       => $this->normalize_category( $category ),
-			'status'         => 'open',
-			'device_mode'    => in_array( $device_mode, array( 'desktop', 'mobile' ), true ) ? $device_mode : 'desktop',
-			'mobile_width'   => $mobile_width,
-			'viewport_width' => $viewport_w,
-			'viewport_height'=> $viewport_h,
-			'x_percent'      => $x_percent,
-			'y_percent'      => $y_percent,
-			'created_at'     => current_time( 'mysql' ),
+			'id'              => wp_generate_uuid4(),
+			'page_url'        => $page_url,
+			'page_key'        => $page_key,
+			'selector'        => $selector,
+			'comment'         => $comment,
+			'category'        => $this->normalize_category( $category ),
+			'status'          => 'open',
+			'device_mode'     => in_array( $device_mode, array( 'desktop', 'mobile' ), true ) ? $device_mode : 'desktop',
+			'mobile_width'    => $mobile_width,
+			'viewport_width'  => $viewport_w,
+			'viewport_height' => $viewport_h,
+			'x_percent'       => $x_percent,
+			'y_percent'       => $y_percent,
+			'created_at'      => current_time( 'mysql' ),
 		);
 
 		$items = $this->get_items();
@@ -518,7 +577,7 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		SKMT_Notifications::add(
 			'info',
 			sprintf(
-				/* translators: %s page key */
+				/* translators: %s: page key */
 				__( 'Nouveau feedback reçu sur %s', 'studio-kyne-mini-tools' ),
 				$page_key
 			)
@@ -532,11 +591,24 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			return true;
 		}
 
-		if ( empty( $settings['enabled'] ) || $this->is_share_expired( $settings ) ) {
+		if ( $this->is_share_expired( $settings ) ) {
 			return false;
 		}
 
 		return $this->has_valid_session( $settings );
+	}
+
+	protected function should_load_front_hud( $settings ) {
+		$is_admin_user    = SKMT_Capabilities::current_user_can_manage();
+		$has_session      = $this->has_valid_session( $settings );
+		$request_token    = $this->get_request_token();
+		$has_request_auth = $this->is_request_token_valid( $settings, $request_token );
+
+		if ( $this->is_share_expired( $settings ) ) {
+			return $is_admin_user;
+		}
+
+		return $is_admin_user || $has_session || $has_request_auth;
 	}
 
 	protected function get_items() {
@@ -578,9 +650,13 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			return;
 		}
 
-		$defaults               = $this->defaults;
-		$defaults['share_token']= $this->generate_share_token();
+		$defaults                = $this->defaults;
+		$defaults['share_token'] = $this->generate_share_token();
 		add_option( $this->option_name, $defaults );
+	}
+
+	protected function is_password_required( $settings ) {
+		return ! empty( $settings['password_enabled'] ) && ! empty( $settings['share_password_hash'] );
 	}
 
 	protected function generate_share_token() {
@@ -616,6 +692,15 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		return hash_equals( $share_token, $request_token );
 	}
 
+	protected function get_device_mode( $settings ) {
+		if ( empty( $settings['allow_mobile_mode'] ) ) {
+			return 'desktop';
+		}
+
+		$mode = isset( $_GET[ $this->device_query_arg ] ) ? sanitize_key( wp_unslash( (string) $_GET[ $this->device_query_arg ] ) ) : 'desktop';
+		return in_array( $mode, array( 'desktop', 'mobile' ), true ) ? $mode : 'desktop';
+	}
+
 	protected function is_share_expired( $settings ) {
 		$expires_at = absint( $settings['share_expires_at'] ?? 0 );
 		if ( $expires_at < 1 ) {
@@ -640,11 +725,11 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			return false;
 		}
 
-		$token     = (string) $bits[0];
-		$expires   = absint( $bits[1] );
-		$signature = (string) $bits[2];
+		$token         = (string) $bits[0];
+		$expires       = absint( $bits[1] );
+		$signature     = (string) $bits[2];
 		$password_hash = (string) ( $settings['share_password_hash'] ?? '' );
-		$expected  = hash_hmac( 'sha256', $token . '|' . $expires . '|' . $password_hash, wp_salt( 'auth' ) );
+		$expected      = hash_hmac( 'sha256', $token . '|' . $expires . '|' . $password_hash, wp_salt( 'auth' ) );
 
 		if ( ! hash_equals( (string) ( $settings['share_token'] ?? '' ), $token ) ) {
 			return false;
@@ -669,10 +754,10 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 			$expiration = min( $expiration, $share_expiration );
 		}
 
-		$token     = (string) ( $settings['share_token'] ?? '' );
+		$token         = (string) ( $settings['share_token'] ?? '' );
 		$password_hash = (string) ( $settings['share_password_hash'] ?? '' );
-		$signature = hash_hmac( 'sha256', $token . '|' . $expiration . '|' . $password_hash, wp_salt( 'auth' ) );
-		$value     = $token . '|' . $expiration . '|' . $signature;
+		$signature     = hash_hmac( 'sha256', $token . '|' . $expiration . '|' . $password_hash, wp_salt( 'auth' ) );
+		$value         = $token . '|' . $expiration . '|' . $signature;
 
 		setcookie( $this->session_cookie_name, $value, $expiration, COOKIEPATH, COOKIE_DOMAIN, is_ssl(), true );
 		if ( COOKIEPATH !== SITECOOKIEPATH ) {
@@ -720,11 +805,11 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 
 	protected function get_categories() {
 		return array(
-			''              => __( 'No category', 'studio-kyne-mini-tools' ),
-			'development'   => __( 'Development', 'studio-kyne-mini-tools' ),
+			''              => __( 'Sans categorie', 'studio-kyne-mini-tools' ),
+			'development'   => __( 'Developpement', 'studio-kyne-mini-tools' ),
 			'interaction'   => __( 'Interaction', 'studio-kyne-mini-tools' ),
-			'accessibility' => __( 'Accessibility', 'studio-kyne-mini-tools' ),
-			'content'       => __( 'Content', 'studio-kyne-mini-tools' ),
+			'accessibility' => __( 'Accessibilite', 'studio-kyne-mini-tools' ),
+			'content'       => __( 'Contenu', 'studio-kyne-mini-tools' ),
 		);
 	}
 
@@ -751,11 +836,11 @@ class SKMT_Module_Feedback implements SKMT_Module_Interface {
 		}
 
 		$map = array(
-			'settings-saved'  => array( 'type' => 'success', 'message' => __( 'Réglages Feedback enregistrés.', 'studio-kyne-mini-tools' ) ),
-			'link-regenerated'=> array( 'type' => 'warning', 'message' => __( 'Le lien a été régénéré.', 'studio-kyne-mini-tools' ) ),
-			'item-updated'    => array( 'type' => 'success', 'message' => __( 'Le feedback a été mis à jour.', 'studio-kyne-mini-tools' ) ),
-			'item-deleted'    => array( 'type' => 'warning', 'message' => __( 'Le feedback a été supprimé.', 'studio-kyne-mini-tools' ) ),
-			'update-error'    => array( 'type' => 'error', 'message' => __( 'Impossible de mettre à jour ce feedback.', 'studio-kyne-mini-tools' ) ),
+			'settings-saved'   => array( 'type' => 'success', 'message' => __( 'Reglages Feedback enregistres.', 'studio-kyne-mini-tools' ) ),
+			'link-regenerated' => array( 'type' => 'warning', 'message' => __( 'Le lien a ete regenere.', 'studio-kyne-mini-tools' ) ),
+			'item-updated'     => array( 'type' => 'success', 'message' => __( 'Le feedback a ete mis a jour.', 'studio-kyne-mini-tools' ) ),
+			'item-deleted'     => array( 'type' => 'warning', 'message' => __( 'Le feedback a ete supprime.', 'studio-kyne-mini-tools' ) ),
+			'update-error'     => array( 'type' => 'error', 'message' => __( 'Impossible de mettre a jour ce feedback.', 'studio-kyne-mini-tools' ) ),
 		);
 
 		if ( ! isset( $map[ $notice ] ) ) {

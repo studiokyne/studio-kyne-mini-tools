@@ -47,14 +47,8 @@ class SKMT_Module_Manager {
 		if ( false !== get_option( $this->option_name, false ) ) {
 			return;
 		}
-		$defaults = array();
-		foreach ( $this->get_modules() as $module ) {
-			if ( $module->is_default_active() ) {
-				$defaults[] = $module->get_id();
-			}
-		}
-		add_option( $this->option_name, array_values( array_unique( $defaults ) ) );
-		$this->active_modules = $defaults;
+		add_option( $this->option_name, array() );
+		$this->active_modules = array();
 	}
 
 	public function get_modules() {
