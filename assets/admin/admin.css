@@ -405,8 +405,8 @@
 .skmt-toggle span::after {
   content: "";
   position: absolute;
-  top: 2px;
-  left: 2px;
+  top: 3px;
+  left: 3px;
   width: 18px;
   height: 18px;
   border-radius: 50%;
@@ -608,6 +608,35 @@
   margin: 0;
 }
 
+.skmt-notification-list {
+  list-style: none;
+  margin: var(--skmt-space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: var(--skmt-space-2);
+}
+
+.skmt-notification-list li {
+  display: grid;
+  gap: 6px;
+  padding: var(--skmt-space-3);
+  border: 1px solid var(--skmt-border);
+  border-radius: var(--skmt-radius-sm);
+  background: var(--skmt-surface-soft);
+}
+
+.skmt-notification-list__meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--skmt-space-2);
+}
+
+.skmt-notification-list li p {
+  margin: 0;
+  color: var(--skmt-text-soft);
+}
+
 .skmt-toast-stack {
   position: fixed;
   top: 52px;
@@ -682,6 +711,11 @@
 .skmt-toast--error {
   border-left-color: var(--skmt-error);
   background: var(--skmt-error-soft);
+}
+
+.skmt-toast--info {
+  border-left-color: var(--skmt-border-strong);
+  background: var(--skmt-surface);
 }
 
 #toplevel_page_skmt .wp-submenu a[href$="page=skmt-separator"] {

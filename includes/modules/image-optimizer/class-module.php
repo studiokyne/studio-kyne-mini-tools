@@ -35,7 +35,9 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 	public function is_configurable() { return true; }
 	public function plugin() { return $this->plugin; }
 	public function activate() { $this->maybe_seed_defaults(); SKMT_Image_Stats_Repository::create_table(); }
-	public function deactivate() {}
+	public function deactivate() {
+		$this->bulk_runner->stop_scheduled_runner();
+	}
 
 	public function get_settings() {
 		$stored = get_option( $this->option_name, array() );
@@ -82,6 +84,10 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 
 		$format = isset( $input['target_format'] ) ? sanitize_key( $input['target_format'] ) : $current['target_format'];
 		$current['target_format'] = in_array( $format, array( 'auto', 'avif', 'webp' ), true ) ? $format : 'auto';
+
+		if ( empty( $current['enable_bulk_tools'] ) ) {
+			$this->bulk_runner->stop_scheduled_runner();
+		}
 
 		return $current;
 	}
@@ -473,11 +479,11 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 						<?php if ( ! $bulk_enabled ) : ?>
 							<p class="description"><?php echo esc_html__( 'Activez la conversion de masse dans les réglages du module pour utiliser cet outil.', 'studio-kyne-mini-tools' ); ?></p>
 						<?php else : ?>
-							<div class="skmt-bulk-box" id="skmt-bulk-box" data-nonce="<?php echo esc_attr( wp_create_nonce( 'skmt_image_bulk' ) ); ?>" data-batch-size="10">
-								<p><?php echo esc_html__( 'Traitement par lots légers pour éviter de bloquer l’admin. Vous pouvez relancer l’outil à tout moment.', 'studio-kyne-mini-tools' ); ?></p>
+							<div class="skmt-bulk-box" id="skmt-bulk-box" data-nonce="<?php echo esc_attr( wp_create_nonce( 'skmt_image_bulk' ) ); ?>" data-batch-size="10" data-poll-interval="4000">
+								<p><?php echo esc_html__( 'Le traitement tourne en arrière-plan via des tâches planifiées. Vous pouvez quitter cette page, la conversion continue.', 'studio-kyne-mini-tools' ); ?></p>
 								<div class="skmt-actions">
-									<button type="button" class="button button-primary" id="skmt-bulk-start"><?php echo esc_html__( 'Lancer la conversion de masse', 'studio-kyne-mini-tools' ); ?></button>
-									<button type="button" class="button" id="skmt-bulk-stop" disabled><?php echo esc_html__( 'Mettre en pause', 'studio-kyne-mini-tools' ); ?></button>
+									<button type="button" class="button button-primary" id="skmt-bulk-start"><?php echo esc_html__( 'Lancer la conversion planifiée', 'studio-kyne-mini-tools' ); ?></button>
+									<button type="button" class="button skmt-button-danger" id="skmt-bulk-stop" disabled><?php echo esc_html__( 'Arrêter la conversion', 'studio-kyne-mini-tools' ); ?></button>
 								</div>
 								<div class="skmt-progress"><div class="skmt-progress__bar" id="skmt-bulk-progress-bar"></div></div>
 								<p id="skmt-bulk-status" class="description"><?php echo esc_html__( 'En attente.', 'studio-kyne-mini-tools' ); ?></p>

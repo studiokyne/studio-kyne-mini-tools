@@ -61,12 +61,17 @@ class SKMT_Admin {
 					'bulkRunning'     => __( 'Conversion en cours…', 'studio-kyne-mini-tools' ),
 					'bulkCompleted'   => __( 'Conversion terminée.', 'studio-kyne-mini-tools' ),
 					'bulkError'       => __( 'Une erreur est survenue pendant la conversion.', 'studio-kyne-mini-tools' ),
-					'bulkBatchLog'    => __( 'Lot: %1$d optimisées, %2$d ignorées, %3$d erreurs.', 'studio-kyne-mini-tools' ),
+					'bulkStarting'    => __( 'Démarrage de la conversion…', 'studio-kyne-mini-tools' ),
+					'bulkStopping'    => __( 'Arrêt de la conversion…', 'studio-kyne-mini-tools' ),
+					'bulkStopped'     => __( 'Conversion arrêtée.', 'studio-kyne-mini-tools' ),
+					'bulkIdle'        => __( 'En attente.', 'studio-kyne-mini-tools' ),
+					'bulkStatusError' => __( 'Impossible de récupérer le statut de conversion.', 'studio-kyne-mini-tools' ),
 					'bulkStart'       => __( 'Démarrage de la conversion de masse…', 'studio-kyne-mini-tools' ),
 					'bulkPaused'      => __( 'Conversion mise en pause.', 'studio-kyne-mini-tools' ),
 					'genericError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
 					'importingConfig' => __( 'Import en cours…', 'studio-kyne-mini-tools' ),
 					'selectedFile'    => __( 'Fichier sélectionné :', 'studio-kyne-mini-tools' ),
+					'closeNotification' => __( 'Fermer la notification', 'studio-kyne-mini-tools' ),
 				),
 			)
 		);
@@ -158,6 +163,7 @@ class SKMT_Admin {
 		$settings      = $this->plugin->settings()->get_all();
 		$update_status = $this->get_update_status();
 		$languages     = $this->get_language_options();
+		$notifications = SKMT_Notifications::get_recent( 12 );
 		?>
 		<div class="wrap skmt-wrap">
 			<div class="skmt-shell">
@@ -233,6 +239,33 @@ class SKMT_Admin {
 						</form>
 					</div>
 				</div>
+
+				<div class="skmt-card">
+					<div class="skmt-card-head">
+						<h2 class="skmt-title-inline"><?php echo $this->render_icon( 'bell' ); ?><?php echo esc_html__( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?></h2>
+					</div>
+					<p class="description"><?php echo esc_html__( 'Retrouvez ici les derniers événements importants: imports, modules et conversions planifiées.', 'studio-kyne-mini-tools' ); ?></p>
+					<?php if ( empty( $notifications ) ) : ?>
+						<p class="description"><?php echo esc_html__( 'Aucun événement récent.', 'studio-kyne-mini-tools' ); ?></p>
+					<?php else : ?>
+						<ul class="skmt-notification-list">
+							<?php foreach ( $notifications as $entry ) : ?>
+								<?php
+								$level   = isset( $entry['level'] ) ? sanitize_key( $entry['level'] ) : 'info';
+								$message = isset( $entry['message'] ) ? sanitize_text_field( (string) $entry['message'] ) : '';
+								$created = isset( $entry['created_at'] ) ? sanitize_text_field( (string) $entry['created_at'] ) : '';
+								?>
+								<li>
+									<div class="skmt-notification-list__meta">
+										<span class="skmt-badge skmt-badge--<?php echo esc_attr( $this->map_notification_badge( $level ) ); ?>"><?php echo esc_html( $this->get_notification_level_label( $level ) ); ?></span>
+										<span class="description"><?php echo esc_html( $this->format_notification_time( $created ) ); ?></span>
+									</div>
+									<p><?php echo esc_html( $message ); ?></p>
+								</li>
+							<?php endforeach; ?>
+						</ul>
+					<?php endif; ?>
+				</div>
 			</div>
 		</div>
 		<?php
@@ -286,10 +319,29 @@ class SKMT_Admin {
 		$state  = isset( $_GET['state'] ) ? sanitize_key( wp_unslash( $_GET['state'] ) ) : '';
 		check_admin_referer( 'skmt_toggle_module_' . $module );
 
+		$module_instance = $this->plugin->modules()->get_modules()[ $module ] ?? null;
+		$module_name     = $module_instance ? $module_instance->get_name() : $module;
+
 		if ( 'enable' === $state ) {
 			$this->plugin->modules()->activate_module( $module );
+			SKMT_Notifications::add(
+				'success',
+				sprintf(
+					/* translators: %s: module name. */
+					__( 'Module activé: %s', 'studio-kyne-mini-tools' ),
+					$module_name
+				)
+			);
 		} elseif ( 'disable' === $state ) {
 			$this->plugin->modules()->deactivate_module( $module );
+			SKMT_Notifications::add(
+				'warning',
+				sprintf(
+					/* translators: %s: module name. */
+					__( 'Module désactivé: %s', 'studio-kyne-mini-tools' ),
+					$module_name
+				)
+			);
 		}
 
 		wp_safe_redirect( admin_url( 'admin.php?page=skmt-modules' ) );
@@ -299,6 +351,8 @@ class SKMT_Admin {
 	public function handle_export_config() {
 		$this->assert_capability();
 		check_admin_referer( 'skmt_export_config' );
+
+		SKMT_Notifications::add( 'info', __( 'Configuration SKMT exportée.', 'studio-kyne-mini-tools' ) );
 
 		$payload = array(
 			'plugin'      => 'studio-kyne-mini-tools',
@@ -321,20 +375,28 @@ class SKMT_Admin {
 
 		$file = isset( $_FILES['skmt_config_file'] ) ? $_FILES['skmt_config_file'] : null;
 		if ( empty( $file['tmp_name'] ) || ! is_uploaded_file( $file['tmp_name'] ) ) {
+			SKMT_Notifications::add( 'error', __( 'Import impossible: fichier manquant ou invalide.', 'studio-kyne-mini-tools' ) );
 			$this->redirect_settings_notice( 'import-invalid' );
 		}
 
 		$raw = file_get_contents( $file['tmp_name'] ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( false === $raw ) {
+			SKMT_Notifications::add( 'error', __( 'Import impossible: lecture du fichier échouée.', 'studio-kyne-mini-tools' ) );
 			$this->redirect_settings_notice( 'import-invalid' );
 		}
 
 		$decoded = json_decode( $raw, true );
 		if ( ! is_array( $decoded ) || empty( $decoded['options'] ) || ! is_array( $decoded['options'] ) ) {
+			SKMT_Notifications::add( 'error', __( 'Import impossible: structure JSON invalide.', 'studio-kyne-mini-tools' ) );
 			$this->redirect_settings_notice( 'import-invalid' );
 		}
 
 		$applied = $this->apply_import_options( $decoded['options'] );
+		if ( $applied ) {
+			SKMT_Notifications::add( 'success', __( 'Configuration SKMT importée avec succès.', 'studio-kyne-mini-tools' ) );
+		} else {
+			SKMT_Notifications::add( 'warning', __( 'Import effectué, aucune option applicable trouvée.', 'studio-kyne-mini-tools' ) );
+		}
 		$this->redirect_settings_notice( $applied ? 'import-success' : 'import-empty' );
 	}
 
@@ -476,6 +538,36 @@ class SKMT_Admin {
 
 	protected function get_module_option_name( $module_id ) {
 		return 'skmt_' . str_replace( '-', '_', sanitize_key( $module_id ) ) . '_settings';
+	}
+
+	protected function map_notification_badge( $level ) {
+		$level = sanitize_key( (string) $level );
+		if ( in_array( $level, array( 'success', 'warning', 'error' ), true ) ) {
+			return $level;
+		}
+		return 'info';
+	}
+
+	protected function get_notification_level_label( $level ) {
+		$level = sanitize_key( (string) $level );
+
+		$labels = array(
+			'success' => __( 'Succès', 'studio-kyne-mini-tools' ),
+			'warning' => __( 'Alerte', 'studio-kyne-mini-tools' ),
+			'error'   => __( 'Erreur', 'studio-kyne-mini-tools' ),
+			'info'    => __( 'Info', 'studio-kyne-mini-tools' ),
+		);
+
+		return $labels[ $level ] ?? $labels['info'];
+	}
+
+	protected function format_notification_time( $created_at ) {
+		$timestamp = strtotime( (string) $created_at );
+		if ( false === $timestamp ) {
+			return __( 'Date inconnue', 'studio-kyne-mini-tools' );
+		}
+
+		return wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $timestamp );
 	}
 
 	protected function map_module_icon( $icon ) {

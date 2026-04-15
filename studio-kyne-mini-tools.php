@@ -32,6 +32,7 @@ require_once SKMT_PLUGIN_DIR . 'includes/core/interfaces/interface-skmt-module.p
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-loader.php';
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-capabilities.php';
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-logger.php';
+require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-notifications.php';
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-settings.php';
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-jobs.php';
 require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-module-manager.php';
