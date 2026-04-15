@@ -22,7 +22,7 @@ define('SKMT_PLUGIN_BASENAME', plugin_basename(__FILE__));
 define('SKMT_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SKMT_PLUGIN_URL', plugin_dir_url(__FILE__));
 if (!defined('SKMT_GITHUB_REPO')) {
-	define('SKMT_GITHUB_REPO', '');
+	define('SKMT_GITHUB_REPO', 'studiokyne/studio-kyne-mini-tools');
 }
 if (!defined('SKMT_GITHUB_TOKEN')) {
 	define('SKMT_GITHUB_TOKEN', '');

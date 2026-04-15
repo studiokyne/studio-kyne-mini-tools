@@ -47,9 +47,19 @@ class SKMT_Plugin {
 	}
 
 	protected function register_hooks() {
+		$this->loader->add_filter( 'plugin_locale', $this, 'filter_plugin_locale', 10, 2 );
 		$this->loader->add_action( 'plugins_loaded', $this, 'load_textdomain' );
 		$this->loader->add_action( 'admin_init', $this, 'register_settings' );
 		$this->admin->register();
+	}
+
+	public function filter_plugin_locale( $locale, $domain ) {
+		if ( 'studio-kyne-mini-tools' !== $domain ) {
+			return $locale;
+		}
+
+		$selected_locale = (string) $this->settings->get( 'plugin_locale' );
+		return '' !== $selected_locale ? $selected_locale : $locale;
 	}
 
 	public function load_textdomain() {

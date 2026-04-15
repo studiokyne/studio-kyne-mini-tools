@@ -12,9 +12,9 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 		'enabled'                 => 1,
 		'target_format'           => 'auto',
 		'quality'                 => 82,
-		'max_width'               => 1920,
-		'max_height'              => 1920,
-		'keep_original'           => 1,
+		'max_width'               => 2560,
+		'max_height'              => 2560,
+		'keep_original'           => 0,
 		'enable_upload_optimizer' => 1,
 		'enable_bulk_tools'       => 1,
 		'strip_exif_metadata'     => 1,
@@ -39,12 +39,13 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 
 	public function get_settings() {
 		$stored = get_option( $this->option_name, array() );
-		return wp_parse_args( is_array( $stored ) ? $stored : array(), $this->defaults );
+		$settings = wp_parse_args( is_array( $stored ) ? $stored : array(), $this->defaults );
+		$settings['enabled'] = 1;
+		return $settings;
 	}
 
 	public function is_enabled() {
-		$settings = $this->get_settings();
-		return ! empty( $settings['enabled'] );
+		return true;
 	}
 
 	public function maybe_seed_defaults() {
@@ -69,7 +70,7 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 		$current = $this->get_settings();
 		$input   = is_array( $input ) ? $input : array();
 
-		$current['enabled']                 = empty( $input['enabled'] ) ? 0 : 1;
+		$current['enabled']                 = 1;
 		$current['keep_original']           = empty( $input['keep_original'] ) ? 0 : 1;
 		$current['enable_upload_optimizer'] = empty( $input['enable_upload_optimizer'] ) ? 0 : 1;
 		$current['enable_bulk_tools']       = empty( $input['enable_bulk_tools'] ) ? 0 : 1;
@@ -87,9 +88,6 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 
 	public function register() {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
-		if ( ! $this->is_enabled() ) {
-			return;
-		}
 
 		add_filter( 'big_image_size_threshold', array( $this, 'filter_big_image_threshold' ), 10, 1 );
 		add_filter( 'image_editor_output_format', array( $this, 'filter_output_format' ), 10, 3 );
@@ -358,10 +356,18 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 		}
 
 		$settings     = $this->get_settings();
-		$recent_stats = $this->stats->get_recent( 20 );
+		$recent_stats = $this->stats->get_recent( 50 );
 		$aggregate    = $this->stats->get_aggregate();
 		$processor    = new SKMT_Image_Processor( $settings, $this->plugin->logger() );
 		$editor_name  = class_exists( 'Imagick' ) ? 'Imagick' : 'GD / WP_Image_Editor';
+		$memory_limit = function_exists( 'ini_get' ) ? (string) ini_get( 'memory_limit' ) : '';
+		$upload_limit = size_format( wp_max_upload_size(), 2 );
+		$imagick_on   = class_exists( 'Imagick' );
+		$gd_on        = extension_loaded( 'gd' );
+		$upload_dir   = wp_get_upload_dir();
+		$upload_path  = ! empty( $upload_dir['basedir'] ) ? wp_normalize_path( (string) $upload_dir['basedir'] ) : '';
+		$disk_free    = ( '' !== $upload_path && is_dir( $upload_path ) ) ? @disk_free_space( $upload_path ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$disk_free_ui = false !== $disk_free ? size_format( (int) $disk_free, 2 ) : __( 'Indisponible', 'studio-kyne-mini-tools' );
 		$bulk_enabled = ! empty( $settings['enable_bulk_tools'] );
 		?>
 		<div class="wrap skmt-wrap">
@@ -403,7 +409,6 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 							<div class="skmt-settings-group">
 								<h3><?php echo esc_html__( 'Comportement', 'studio-kyne-mini-tools' ); ?></h3>
 								<div class="skmt-form-grid">
-									<div class="skmt-field"><label class="skmt-toggle"><input type="checkbox" name="skmt_image_optimizer_settings[enabled]" value="1" <?php checked( ! empty( $settings['enabled'] ) ); ?> /><span></span><strong><?php echo esc_html__( 'Activer le module', 'studio-kyne-mini-tools' ); ?></strong></label></div>
 									<div class="skmt-field"><label class="skmt-toggle"><input type="checkbox" name="skmt_image_optimizer_settings[enable_upload_optimizer]" value="1" <?php checked( ! empty( $settings['enable_upload_optimizer'] ) ); ?> /><span></span><strong><?php echo esc_html__( 'Optimiser à l’upload', 'studio-kyne-mini-tools' ); ?></strong></label></div>
 									<div class="skmt-field"><label class="skmt-toggle"><input type="checkbox" name="skmt_image_optimizer_settings[enable_bulk_tools]" value="1" <?php checked( ! empty( $settings['enable_bulk_tools'] ) ); ?> /><span></span><strong><?php echo esc_html__( 'Activer la conversion de masse', 'studio-kyne-mini-tools' ); ?></strong></label></div>
 									<div class="skmt-field"><label class="skmt-toggle"><input type="checkbox" name="skmt_image_optimizer_settings[keep_original]" value="1" <?php checked( ! empty( $settings['keep_original'] ) ); ?> /><span></span><strong><?php echo esc_html__( 'Conserver l’original', 'studio-kyne-mini-tools' ); ?></strong></label></div>
@@ -416,9 +421,11 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 								<h3><?php echo esc_html__( 'Qualité et dimensions', 'studio-kyne-mini-tools' ); ?></h3>
 								<div class="skmt-form-grid">
 									<div class="skmt-field"><label for="skmt-image-target-format"><strong><?php echo esc_html__( 'Format cible', 'studio-kyne-mini-tools' ); ?></strong></label><select id="skmt-image-target-format" name="skmt_image_optimizer_settings[target_format]"><option value="auto" <?php selected( 'auto', $settings['target_format'] ); ?>><?php echo esc_html__( 'Auto', 'studio-kyne-mini-tools' ); ?></option><option value="avif" <?php selected( 'avif', $settings['target_format'] ); ?>>AVIF</option><option value="webp" <?php selected( 'webp', $settings['target_format'] ); ?>>WebP</option></select></div>
-									<div class="skmt-field"><label for="skmt-image-quality"><strong><?php echo esc_html__( 'Qualité', 'studio-kyne-mini-tools' ); ?></strong></label><div class="skmt-range"><input type="range" min="35" max="100" step="1" value="<?php echo esc_attr( (string) $settings['quality'] ); ?>" data-range-target="skmt-image-quality-input" /><input id="skmt-image-quality-input" class="small-text" type="number" min="35" max="100" name="skmt_image_optimizer_settings[quality]" value="<?php echo esc_attr( (string) $settings['quality'] ); ?>" /></div></div>
-									<div class="skmt-field"><label for="skmt-image-max-width"><strong><?php echo esc_html__( 'Largeur max', 'studio-kyne-mini-tools' ); ?></strong></label><input id="skmt-image-max-width" class="small-text" type="number" min="256" max="6000" name="skmt_image_optimizer_settings[max_width]" value="<?php echo esc_attr( (string) $settings['max_width'] ); ?>" /></div>
-									<div class="skmt-field"><label for="skmt-image-max-height"><strong><?php echo esc_html__( 'Hauteur max', 'studio-kyne-mini-tools' ); ?></strong></label><input id="skmt-image-max-height" class="small-text" type="number" min="256" max="6000" name="skmt_image_optimizer_settings[max_height]" value="<?php echo esc_attr( (string) $settings['max_height'] ); ?>" /></div>
+									<div class="skmt-field"><label for="skmt-image-quality-range"><strong><?php echo esc_html__( 'Qualité', 'studio-kyne-mini-tools' ); ?></strong></label><div class="skmt-range"><input id="skmt-image-quality-range" type="range" min="35" max="100" step="1" name="skmt_image_optimizer_settings[quality]" value="<?php echo esc_attr( (string) $settings['quality'] ); ?>" data-range-target="skmt-image-quality-input" /><input id="skmt-image-quality-input" class="skmt-input-number" type="number" min="35" max="100" value="<?php echo esc_attr( (string) $settings['quality'] ); ?>" /></div></div>
+								</div>
+								<div class="skmt-dimensions-row">
+									<div class="skmt-field skmt-field--dimension"><label for="skmt-image-max-width"><strong><?php echo esc_html__( 'Largeur max', 'studio-kyne-mini-tools' ); ?></strong></label><input id="skmt-image-max-width" type="number" min="256" max="6000" name="skmt_image_optimizer_settings[max_width]" value="<?php echo esc_attr( (string) $settings['max_width'] ); ?>" /></div>
+									<div class="skmt-field skmt-field--dimension"><label for="skmt-image-max-height"><strong><?php echo esc_html__( 'Hauteur max', 'studio-kyne-mini-tools' ); ?></strong></label><input id="skmt-image-max-height" type="number" min="256" max="6000" name="skmt_image_optimizer_settings[max_height]" value="<?php echo esc_attr( (string) $settings['max_height'] ); ?>" /></div>
 								</div>
 							</div>
 
@@ -443,7 +450,13 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 						<ul class="skmt-status-list">
 							<li><span><?php echo esc_html__( 'Support WebP', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge <?php echo $processor->supports_webp() ? 'skmt-badge--success' : 'skmt-badge--error'; ?>"><?php echo esc_html( $processor->supports_webp() ? __( 'Oui', 'studio-kyne-mini-tools' ) : __( 'Non', 'studio-kyne-mini-tools' ) ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Support AVIF', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge <?php echo $processor->supports_avif() ? 'skmt-badge--success' : 'skmt-badge--warning'; ?>"><?php echo esc_html( $processor->supports_avif() ? __( 'Oui', 'studio-kyne-mini-tools' ) : __( 'Non', 'studio-kyne-mini-tools' ) ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Extension Imagick', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge <?php echo $imagick_on ? 'skmt-badge--success' : 'skmt-badge--warning'; ?>"><?php echo esc_html( $imagick_on ? __( 'Activée', 'studio-kyne-mini-tools' ) : __( 'Absente', 'studio-kyne-mini-tools' ) ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Extension GD', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge <?php echo $gd_on ? 'skmt-badge--success' : 'skmt-badge--warning'; ?>"><?php echo esc_html( $gd_on ? __( 'Activée', 'studio-kyne-mini-tools' ) : __( 'Absente', 'studio-kyne-mini-tools' ) ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Éditeur détecté', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( $editor_name ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Version PHP', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( PHP_VERSION ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Limite mémoire PHP', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( '' !== $memory_limit ? $memory_limit : __( 'Indisponible', 'studio-kyne-mini-tools' ) ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Upload max WordPress', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( $upload_limit ); ?></span></li>
+							<li><span><?php echo esc_html__( 'Espace libre (uploads)', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( $disk_free_ui ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Format final résolu', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--primary"><?php echo esc_html( strtoupper( str_replace( 'image/', '', $processor->resolve_target_mime() ?: 'none' ) ) ); ?></span></li>
 						</ul>
 						<?php if ( ! $processor->supports_avif() ) : ?>
@@ -480,7 +493,7 @@ class SKMT_Module_Image_Optimizer implements SKMT_Module_Interface {
 						<?php if ( empty( $recent_stats ) ) : ?>
 							<p class="description"><?php echo esc_html__( 'Aucune image traitée pour le moment.', 'studio-kyne-mini-tools' ); ?></p>
 						<?php else : ?>
-							<div class="skmt-table-wrap">
+							<div class="skmt-table-wrap skmt-table-wrap--history">
 								<table class="widefat fixed striped skmt-table">
 									<thead>
 										<tr><th><?php echo esc_html__( 'Image', 'studio-kyne-mini-tools' ); ?></th><th><?php echo esc_html__( 'Statut', 'studio-kyne-mini-tools' ); ?></th><th><?php echo esc_html__( 'Avant', 'studio-kyne-mini-tools' ); ?></th><th><?php echo esc_html__( 'Après', 'studio-kyne-mini-tools' ); ?></th><th><?php echo esc_html__( 'Gain', 'studio-kyne-mini-tools' ); ?></th><th><?php echo esc_html__( 'Message', 'studio-kyne-mini-tools' ); ?></th></tr>

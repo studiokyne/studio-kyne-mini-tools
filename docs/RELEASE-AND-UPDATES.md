@@ -25,16 +25,23 @@ The workflow will:
 
 The plugin supports update checks against GitHub Releases via `SKMT_Updater`.
 
-Configure in `wp-config.php`:
+Default repository:
+
+```text
+studiokyne/studio-kyne-mini-tools
+```
+
+No `SKMT_GITHUB_REPO` configuration is required for this project.
+
+Optional in `wp-config.php`:
 
 ```php
-define( 'SKMT_GITHUB_REPO', 'owner/repository' );
 define( 'SKMT_GITHUB_TOKEN', '' ); // Optional (private repo or API rate-limit mitigation)
 ```
 
 Public repository setup:
 
-- `SKMT_GITHUB_REPO` is required.
+- Repository is hardcoded in plugin bootstrap.
 - `SKMT_GITHUB_TOKEN` is not required in the common public case.
 
 Notes:

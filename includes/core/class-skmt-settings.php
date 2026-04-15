@@ -7,6 +7,7 @@ class SKMT_Settings {
 	protected $option_name = 'skmt_settings';
 	protected $defaults = array(
 		'cleanup_on_uninstall' => 1,
+		'plugin_locale'        => '',
 		'logging_enabled'      => 0,
 		'log_retention_days'   => 0,
 	);
@@ -44,6 +45,13 @@ class SKMT_Settings {
 		$input   = is_array( $input ) ? $input : array();
 
 		$current['cleanup_on_uninstall'] = empty( $input['cleanup_on_uninstall'] ) ? 0 : 1;
+
+		$locale = isset( $input['plugin_locale'] ) ? sanitize_text_field( wp_unslash( (string) $input['plugin_locale'] ) ) : '';
+		if ( '' !== $locale && ! preg_match( '/^[A-Za-z0-9_\-]{2,20}$/', $locale ) ) {
+			$locale = '';
+		}
+		$current['plugin_locale'] = $locale;
+
 		$current['logging_enabled']      = 0;
 		$current['log_retention_days']   = 0;
 

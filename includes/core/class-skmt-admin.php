@@ -138,7 +138,7 @@ class SKMT_Admin {
 									<span class="skmt-badge <?php echo $is_active ? 'skmt-badge--success' : 'skmt-badge--muted'; ?>"><?php echo esc_html( $is_active ? __( 'Actif', 'studio-kyne-mini-tools' ) : __( 'Inactif', 'studio-kyne-mini-tools' ) ); ?></span>
 								</div>
 								<div class="skmt-actions">
-									<a class="button <?php echo $is_active ? '' : 'button-primary'; ?>" href="<?php echo esc_url( $toggle_url ); ?>"><?php echo esc_html( $is_active ? __( 'Désactiver', 'studio-kyne-mini-tools' ) : __( 'Activer', 'studio-kyne-mini-tools' ) ); ?></a>
+									<a class="button <?php echo $is_active ? 'skmt-button-danger' : 'button-primary'; ?>" href="<?php echo esc_url( $toggle_url ); ?>"><?php echo esc_html( $is_active ? __( 'Désactiver', 'studio-kyne-mini-tools' ) : __( 'Activer', 'studio-kyne-mini-tools' ) ); ?></a>
 									<?php if ( $module->is_configurable() && $is_active ) : ?>
 										<a class="button" href="<?php echo esc_url( $settings_url ); ?>"><?php echo esc_html__( 'Configurer', 'studio-kyne-mini-tools' ); ?></a>
 									<?php endif; ?>
@@ -156,6 +156,7 @@ class SKMT_Admin {
 		$this->assert_capability();
 		$settings      = $this->plugin->settings()->get_all();
 		$update_status = $this->get_update_status();
+		$languages     = $this->get_language_options();
 		?>
 		<div class="wrap skmt-wrap">
 			<div class="skmt-shell">
@@ -178,6 +179,15 @@ class SKMT_Admin {
 								<label class="skmt-toggle"><input type="checkbox" name="skmt_settings[cleanup_on_uninstall]" value="1" <?php checked( ! empty( $settings['cleanup_on_uninstall'] ) ); ?> /><span></span><strong><?php echo esc_html__( 'Supprimer les données à la désinstallation', 'studio-kyne-mini-tools' ); ?></strong></label>
 								<p class="description"><?php echo esc_html__( 'Activé par défaut: supprime tables, options et métadonnées SKMT à la suppression complète du plugin.', 'studio-kyne-mini-tools' ); ?></p>
 							</div>
+							<div class="skmt-field">
+								<label for="skmt-plugin-locale"><strong><?php echo esc_html__( 'Langue du plugin', 'studio-kyne-mini-tools' ); ?></strong></label>
+								<select id="skmt-plugin-locale" name="skmt_settings[plugin_locale]">
+									<?php foreach ( $languages as $locale_code => $locale_label ) : ?>
+										<option value="<?php echo esc_attr( $locale_code ); ?>" <?php selected( (string) ( $settings['plugin_locale'] ?? '' ), (string) $locale_code ); ?>><?php echo esc_html( $locale_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<p class="description"><?php echo esc_html__( 'Choisissez une langue spécifique pour SKMT ou laissez la langue du site.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
 							<?php submit_button( __( 'Enregistrer', 'studio-kyne-mini-tools' ) ); ?>
 						</form>
 					</div>
@@ -187,15 +197,13 @@ class SKMT_Admin {
 							<h2 class="skmt-title-inline"><?php echo $this->render_icon( 'activity' ); ?><?php echo esc_html__( 'Version et mises à jour', 'studio-kyne-mini-tools' ); ?></h2>
 						</div>
 						<ul class="skmt-status-list">
+							<li><span><?php echo esc_html__( 'Repository GitHub', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted"><?php echo esc_html( $update_status['repository'] ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Version installée', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">v<?php echo esc_html( $update_status['current_version'] ); ?></span></li>
 							<li><span><?php echo esc_html__( 'Statut', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--<?php echo esc_attr( $update_status['badge'] ); ?>"><?php echo esc_html( $update_status['label'] ); ?></span></li>
 							<?php if ( ! empty( $update_status['target_version'] ) ) : ?>
 								<li><span><?php echo esc_html__( 'Version disponible', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--primary">v<?php echo esc_html( $update_status['target_version'] ); ?></span></li>
 							<?php endif; ?>
 						</ul>
-						<?php if ( ! $update_status['repository_configured'] ) : ?>
-							<p class="description"><?php echo esc_html__( 'Configurez SKMT_GITHUB_REPO dans wp-config.php (owner/repository) pour activer la détection de mise à jour.', 'studio-kyne-mini-tools' ); ?></p>
-						<?php endif; ?>
 						<div class="skmt-actions">
 							<a class="button" href="<?php echo esc_url( self_admin_url( 'update-core.php' ) ); ?>"><?php echo esc_html__( 'Vérifier les mises à jour', 'studio-kyne-mini-tools' ); ?></a>
 						</div>
@@ -206,26 +214,64 @@ class SKMT_Admin {
 					<div class="skmt-card-head">
 						<h2 class="skmt-title-inline"><?php echo $this->render_icon( 'database' ); ?><?php echo esc_html__( 'Import / Export', 'studio-kyne-mini-tools' ); ?></h2>
 					</div>
-					<p class="description"><?php echo esc_html__( 'Exportez la configuration actuelle, puis importez-la sur un autre environnement.', 'studio-kyne-mini-tools' ); ?></p>
-					<div class="skmt-actions">
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+					<p class="description"><?php echo esc_html__( 'Déplacez votre configuration entre environnements en un clic.', 'studio-kyne-mini-tools' ); ?></p>
+					<div class="skmt-import-export-layout">
+						<form class="skmt-import-export-panel" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="skmt_export_config" />
 							<?php wp_nonce_field( 'skmt_export_config' ); ?>
+							<p class="description"><?php echo esc_html__( 'Télécharge un fichier JSON avec tous les réglages SKMT.', 'studio-kyne-mini-tools' ); ?></p>
 							<button type="submit" class="button button-primary"><?php echo esc_html__( 'Exporter la configuration', 'studio-kyne-mini-tools' ); ?></button>
 						</form>
+						<form class="skmt-import-export-panel" id="skmt-import-config-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
+							<input type="hidden" name="action" value="skmt_import_config" />
+							<?php wp_nonce_field( 'skmt_import_config' ); ?>
+							<input id="skmt-config-file" class="skmt-hidden-file-input" type="file" name="skmt_config_file" accept="application/json,.json" required />
+							<p class="description"><?php echo esc_html__( 'Importe un fichier JSON SKMT et applique automatiquement les réglages compatibles.', 'studio-kyne-mini-tools' ); ?></p>
+							<div class="skmt-actions"><button type="button" class="button" id="skmt-import-config-trigger"><?php echo esc_html__( 'Importer la configuration', 'studio-kyne-mini-tools' ); ?></button></div>
+							<p id="skmt-import-config-name" class="description"></p>
+						</form>
 					</div>
-					<hr class="skmt-separator" />
-					<form id="skmt-import-config-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
-						<input type="hidden" name="action" value="skmt_import_config" />
-						<?php wp_nonce_field( 'skmt_import_config' ); ?>
-						<input id="skmt-config-file" class="skmt-hidden-file-input" type="file" name="skmt_config_file" accept="application/json,.json" required />
-						<div class="skmt-actions"><button type="button" class="button" id="skmt-import-config-trigger"><?php echo esc_html__( 'Importer la configuration', 'studio-kyne-mini-tools' ); ?></button></div>
-						<p id="skmt-import-config-name" class="description"></p>
-					</form>
 				</div>
 			</div>
 		</div>
 		<?php
+	}
+
+	protected function get_language_options() {
+		$options = array(
+			'' => __( 'Langue du site (par défaut)', 'studio-kyne-mini-tools' ),
+		);
+
+		$locales = array();
+		if ( function_exists( 'get_available_languages' ) ) {
+			$locales = get_available_languages();
+		}
+
+		if ( function_exists( 'determine_locale' ) ) {
+			$locales[] = determine_locale();
+		}
+
+		$locales[] = 'fr_FR';
+		$locales[] = 'en_US';
+
+		$mo_files = glob( SKMT_PLUGIN_DIR . 'languages/studio-kyne-mini-tools-*.mo' );
+		if ( is_array( $mo_files ) ) {
+			foreach ( $mo_files as $file_path ) {
+				$file_name = wp_basename( $file_path );
+				if ( preg_match( '/studio-kyne-mini-tools-([A-Za-z0-9_\-]+)\.mo$/', $file_name, $matches ) ) {
+					$locales[] = $matches[1];
+				}
+			}
+		}
+
+		$locales = array_values( array_unique( array_filter( array_map( 'sanitize_text_field', $locales ) ) ) );
+		sort( $locales, SORT_STRING );
+
+		foreach ( $locales as $locale_code ) {
+			$options[ $locale_code ] = $locale_code;
+		}
+
+		return $options;
 	}
 
 	public function render_separator_page() {
@@ -385,19 +431,19 @@ class SKMT_Admin {
 			'current_version'      => SKMT_VERSION,
 			'target_version'       => '',
 			'has_update'           => false,
-			'repository_configured' => false,
+			'repository_configured' => true,
+			'repository'           => defined( 'SKMT_GITHUB_REPO' ) ? (string) SKMT_GITHUB_REPO : '',
 			'label'                => __( 'À jour', 'studio-kyne-mini-tools' ),
 			'badge'                => 'success',
 		);
 
-		$repository = defined( 'SKMT_GITHUB_REPO' ) ? trim( (string) SKMT_GITHUB_REPO ) : '';
+		$repository = trim( (string) $status['repository'] );
+		$status['repository'] = '' !== $repository ? $repository : 'studiokyne/studio-kyne-mini-tools';
 		if ( '' === $repository ) {
-			$status['label'] = __( 'Repository non configuré', 'studio-kyne-mini-tools' );
+			$status['label'] = __( 'Repository source indisponible', 'studio-kyne-mini-tools' );
 			$status['badge'] = 'warning';
 			return $status;
 		}
-
-		$status['repository_configured'] = true;
 		$updates = get_site_transient( 'update_plugins' );
 
 		if ( is_object( $updates ) && ! empty( $updates->response[ SKMT_PLUGIN_BASENAME ] ) ) {

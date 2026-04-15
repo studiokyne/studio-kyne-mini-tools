@@ -53,8 +53,8 @@ class SKMT_Image_Processor {
 		if ( method_exists( $editor, 'set_quality' ) ) {
 			$editor->set_quality( max( 35, min( 100, absint( $this->settings['quality'] ?? 82 ) ) ) );
 		}
-		$max_width  = max( 1, absint( $this->settings['max_width'] ?? 1920 ) );
-		$max_height = max( 1, absint( $this->settings['max_height'] ?? 1920 ) );
+		$max_width  = max( 1, absint( $this->settings['max_width'] ?? 2560 ) );
+		$max_height = max( 1, absint( $this->settings['max_height'] ?? 2560 ) );
 		$resize_needed = ( $image_size[0] > $max_width || $image_size[1] > $max_height );
 		if ( $resize_needed ) {
 			$resized = $editor->resize( $max_width, $max_height, false );

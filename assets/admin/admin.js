@@ -5,12 +5,30 @@
         range.getAttribute("data-range-target"),
       );
       if (!target) return;
-      range.addEventListener("input", () => {
+      const syncTargetFromRange = () => {
         target.value = range.value;
+      };
+      const syncRangeFromTarget = () => {
+        const next = Number(target.value || range.value);
+        if (Number.isNaN(next)) return;
+        range.value = String(next);
+      };
+
+      syncTargetFromRange();
+
+      range.addEventListener("input", () => {
+        syncTargetFromRange();
       });
       target.addEventListener("input", () => {
-        range.value = target.value;
+        syncRangeFromTarget();
       });
+
+      if (range.form) {
+        range.form.addEventListener("submit", () => {
+          syncRangeFromTarget();
+          syncTargetFromRange();
+        });
+      }
     });
   };
   const initBulkTool = () => {
