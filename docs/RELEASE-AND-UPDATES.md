@@ -8,12 +8,14 @@ From GitHub:
 
 1. Open `Actions > Release Plugin`.
 2. Click `Run workflow`.
-3. Fill `version` with a semantic version (`X.Y.Z`).
+3. Optional: fill `version` with a semantic version (`X.Y.Z`).
 4. Optionally enable `prerelease`.
+
+If `version` is empty, the workflow auto-increments patch version from the current plugin version.
 
 The workflow will:
 
-- Validate the version format.
+- Resolve version (manual value or automatic patch increment).
 - Update plugin version in `studio-kyne-mini-tools.php`.
 - Update `Stable tag` in `readme.txt`.
 - Commit and push the version bump.
