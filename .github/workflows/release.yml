@@ -1,0 +1,104 @@
+name: Release Plugin
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semantic version X.Y.Z"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark release as pre-release"
+        required: false
+        default: false
+        type: boolean
+      generate_release_notes:
+        description: "Generate release notes automatically"
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skmt-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate version input
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version: $VERSION"
+            exit 1
+          fi
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Update plugin and readme versions
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" studio-kyne-mini-tools.php
+          sed -E -i "s/define\('SKMT_VERSION', '[0-9]+\.[0-9]+\.[0-9]+'\);/define('SKMT_VERSION', '${VERSION}');/" studio-kyne-mini-tools.php
+          sed -E -i "s/^Stable tag: .*/Stable tag: ${VERSION}/" readme.txt
+
+      - name: Commit release version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! git diff --quiet; then
+            git add studio-kyne-mini-tools.php readme.txt
+            git commit -m "chore(release): v${VERSION}"
+            git push origin HEAD
+          else
+            echo "No version changes to commit"
+          fi
+
+      - name: Create and push tag
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          TAG="v${VERSION}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag ${TAG} already exists"
+            exit 1
+          fi
+          git tag "$TAG"
+          git push origin "$TAG"
+
+      - name: Build release zip
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          mkdir -p dist/package/studio-kyne-mini-tools
+          rsync -a ./ dist/package/studio-kyne-mini-tools/ \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.vscode' \
+            --exclude='node_modules' \
+            --exclude='dist'
+          cd dist/package
+          zip -r "../studio-kyne-mini-tools-${VERSION}.zip" studio-kyne-mini-tools
+
+      - name: Publish GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ inputs.version }}
+          files: dist/studio-kyne-mini-tools-${{ inputs.version }}.zip
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: ${{ inputs.generate_release_notes }}
