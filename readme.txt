@@ -12,15 +12,19 @@ Suite modulaire d'outils WordPress par Studio Kyne.
 
 == Description ==
 
-Studio Kyne Mini Tools (SKMT) est une base de plugin modulaire pensée pour accueillir plusieurs outils activables :
+Studio Kyne Mini Tools (SKMT) est une base de plugin modulaire pensee pour accueillir plusieurs outils activables :
 - Image Optimizer
-- futurs modules
+- Securite (en cours)
+- Administration (en cours)
+- Fichiers (en cours)
+- Google Reviews (en cours)
 
-La V1 inclut déjà :
+La V1 inclut deja :
 - un coeur SKMT propre et extensible
 - une gestion des modules activables
-- une interface admin unifiée
-- un module d’optimisation d’images
+- une interface admin unifiee
+- un module d optimisation d images
+- des modules prioritaires en mode squelette pour accelerer la roadmap
 
 == Installation ==
 
@@ -38,6 +42,28 @@ La V1 inclut déjà :
 - conservation optionnelle de l’original
 - conversion de masse
 - statistiques et historique par image
+
+= Securite =
+- URL de connexion personnalisee (avec option blocage wp-login.php)
+- limitation des tentatives de connexion
+- politique de mot de passe fort
+- desactivation inscription publique
+- desactivation XML-RPC
+- protection anti-enumeration utilisateur
+- masquage de la version WordPress
+
+= Administration =
+- squelette admin et roadmap confort/branding/UX
+
+= Fichiers =
+- explorateur en table (selection, nom, taille, date, permissions, proprietaire)
+- actions fichier/dossier: telechargement, suppression
+- telechargement ZIP des dossiers et des selections
+- editeur integre pour fichiers texte/code + sauvegarde
+- upload dans le dossier courant
+
+= Google Reviews =
+- squelette admin et roadmap integration Google My Business
 
 == Architecture ==
 

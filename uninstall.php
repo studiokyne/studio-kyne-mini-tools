@@ -25,10 +25,12 @@ $options = array(
 	'skmt_settings',
 	'skmt_active_modules',
 	'skmt_image_optimizer_settings',
+	'skmt_security_settings',
+	'skmt_administration_settings',
+	'skmt_files_settings',
+	'skmt_google_reviews_settings',
 	'skmt_image_bulk_state',
 	'skmt_notifications_history',
-	'skmt_feedback_settings',
-	'skmt_feedback_items',
 );
 
 foreach ( $options as $option_name ) {

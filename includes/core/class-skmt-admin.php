@@ -517,6 +517,9 @@ class SKMT_Admin {
 		if ( in_array( $icon, array( 'admin-generic', 'settings' ), true ) ) {
 			return 'settings';
 		}
+		if ( in_array( $icon, array( 'shield', 'layout-dashboard', 'folder', 'star', 'box' ), true ) ) {
+			return $icon;
+		}
 		return 'box';
 	}
 

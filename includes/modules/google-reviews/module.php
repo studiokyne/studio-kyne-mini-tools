@@ -5,4 +5,4 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once __DIR__ . '/class-module.php';
 
-return 'SKMT_Module_Feedback';
+return 'SKMT_Module_Google_Reviews';
