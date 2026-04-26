@@ -34,7 +34,7 @@ class SKMT_Module_Administration implements SKMT_Module_Interface {
 
 	public function render_admin_page() {
 		if ( ! SKMT_Capabilities::current_user_can_manage() ) {
-			wp_die( esc_html__( 'Acces refuse.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Accès refusé.', 'studio-kyne-mini-tools' ) );
 		}
 
 		?>
@@ -51,18 +51,18 @@ class SKMT_Module_Administration implements SKMT_Module_Interface {
 				<div class="skmt-card">
 					<h2><?php echo esc_html__( 'Interface', 'studio-kyne-mini-tools' ); ?></h2>
 					<ul class="skmt-status-list">
-						<li><span><?php echo esc_html__( 'Refonte de l administration', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
-						<li><span><?php echo esc_html__( 'Amelioration du design de la page de connexion', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
-						<li><span><?php echo esc_html__( 'Masquer la barre d administration', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
+						<li><span><?php echo esc_html__( 'Refonte de l’administration', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
+						<li><span><?php echo esc_html__( 'Amélioration du design de la page de connexion', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
+						<li><span><?php echo esc_html__( 'Masquer la barre d’administration', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
 					</ul>
 				</div>
 
 				<div class="skmt-card">
-					<h2><?php echo esc_html__( 'Experience utilisateur', 'studio-kyne-mini-tools' ); ?></h2>
+					<h2><?php echo esc_html__( 'Expérience utilisateur', 'studio-kyne-mini-tools' ); ?></h2>
 					<ul class="skmt-status-list">
 						<li><span><?php echo esc_html__( 'Nettoyer les profils', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
 						<li><span><?php echo esc_html__( 'Ajustements UI/UX du back-office', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
-						<li><span><?php echo esc_html__( 'Personnalisation de certains ecrans admin', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
+						<li><span><?php echo esc_html__( 'Personnalisation de certains écrans admin', 'studio-kyne-mini-tools' ); ?></span><span class="skmt-badge skmt-badge--muted">TODO</span></li>
 					</ul>
 				</div>
 			</div>

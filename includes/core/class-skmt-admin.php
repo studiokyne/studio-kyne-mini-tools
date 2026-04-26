@@ -72,6 +72,9 @@ class SKMT_Admin {
 					'importingConfig' => __( 'Import en cours…', 'studio-kyne-mini-tools' ),
 					'selectedFile'    => __( 'Fichier sélectionné :', 'studio-kyne-mini-tools' ),
 					'closeNotification' => __( 'Fermer la notification', 'studio-kyne-mini-tools' ),
+					'autoSaved'       => __( 'Réglages enregistrés automatiquement.', 'studio-kyne-mini-tools' ),
+					'autoSaveError'   => __( 'Impossible d’enregistrer automatiquement les réglages.', 'studio-kyne-mini-tools' ),
+					'unsavedEditor'   => __( 'Vous avez des modifications non enregistrées. Quitter quand même ?', 'studio-kyne-mini-tools' ),
 				),
 			)
 		);

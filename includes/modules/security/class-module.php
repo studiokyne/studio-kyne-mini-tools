@@ -8,18 +8,18 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 	protected $option_name = 'skmt_security_settings';
 	protected $rewrite_flush_flag = 'skmt_security_flush_rewrite';
 	protected $defaults = array(
-		'enabled'                      => 1,
-		'custom_login_enabled'         => 0,
-		'custom_login_slug'            => 'connexion',
-		'block_default_login'          => 0,
-		'limit_login_attempts'         => 1,
-		'max_login_attempts'           => 5,
-		'lockout_minutes'              => 20,
-		'force_strong_password'        => 1,
-		'disable_public_registration'  => 1,
-		'disable_xmlrpc'               => 1,
-		'prevent_user_enumeration'     => 1,
-		'hide_wp_version'              => 1,
+		'enabled'                     => 1,
+		'custom_login_enabled'        => 0,
+		'custom_login_slug'           => 'connexion',
+		'block_default_login'         => 0,
+		'limit_login_attempts'        => 1,
+		'max_login_attempts'          => 5,
+		'lockout_minutes'             => 20,
+		'force_strong_password'       => 1,
+		'disable_public_registration' => 1,
+		'disable_xmlrpc'              => 1,
+		'prevent_user_enumeration'    => 1,
+		'hide_wp_version'             => 1,
 	);
 
 	public function __construct( $plugin ) {
@@ -27,8 +27,8 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 	}
 
 	public function get_id() { return 'security'; }
-	public function get_name() { return __( 'Securite', 'studio-kyne-mini-tools' ); }
-	public function get_description() { return __( 'Renforce l authentification et le hardening WordPress.', 'studio-kyne-mini-tools' ); }
+	public function get_name() { return __( 'Sécurité', 'studio-kyne-mini-tools' ); }
+	public function get_description() { return __( 'Renforce l’authentification et le niveau de protection WordPress.', 'studio-kyne-mini-tools' ); }
 	public function get_icon() { return 'shield'; }
 	public function is_default_active() { return false; }
 	public function is_configurable() { return true; }
@@ -76,8 +76,8 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 	public function register_admin_pages( $parent_slug ) {
 		add_submenu_page(
 			$parent_slug,
-			__( 'Securite', 'studio-kyne-mini-tools' ),
-			__( 'Securite', 'studio-kyne-mini-tools' ),
+			__( 'Sécurité', 'studio-kyne-mini-tools' ),
+			__( 'Sécurité', 'studio-kyne-mini-tools' ),
 			SKMT_Capabilities::admin_capability(),
 			'skmt-security',
 			array( $this, 'render_admin_page' )
@@ -133,18 +133,18 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 		$input   = is_array( $input ) ? $input : array();
 
 		$updated = $current;
-		$updated['enabled']                      = 1;
-		$updated['custom_login_enabled']         = empty( $input['custom_login_enabled'] ) ? 0 : 1;
-		$updated['block_default_login']          = empty( $input['block_default_login'] ) ? 0 : 1;
-		$updated['limit_login_attempts']         = empty( $input['limit_login_attempts'] ) ? 0 : 1;
-		$updated['force_strong_password']        = empty( $input['force_strong_password'] ) ? 0 : 1;
-		$updated['disable_public_registration']  = empty( $input['disable_public_registration'] ) ? 0 : 1;
-		$updated['disable_xmlrpc']               = empty( $input['disable_xmlrpc'] ) ? 0 : 1;
-		$updated['prevent_user_enumeration']     = empty( $input['prevent_user_enumeration'] ) ? 0 : 1;
-		$updated['hide_wp_version']              = empty( $input['hide_wp_version'] ) ? 0 : 1;
-		$updated['max_login_attempts']           = max( 3, min( 20, absint( $input['max_login_attempts'] ?? $current['max_login_attempts'] ) ) );
-		$updated['lockout_minutes']              = max( 1, min( 1440, absint( $input['lockout_minutes'] ?? $current['lockout_minutes'] ) ) );
-		$updated['custom_login_slug']            = $this->sanitize_login_slug( (string) ( $input['custom_login_slug'] ?? $current['custom_login_slug'] ) );
+		$updated['enabled']                     = 1;
+		$updated['custom_login_enabled']        = empty( $input['custom_login_enabled'] ) ? 0 : 1;
+		$updated['block_default_login']         = empty( $input['block_default_login'] ) ? 0 : 1;
+		$updated['limit_login_attempts']        = empty( $input['limit_login_attempts'] ) ? 0 : 1;
+		$updated['force_strong_password']       = empty( $input['force_strong_password'] ) ? 0 : 1;
+		$updated['disable_public_registration'] = empty( $input['disable_public_registration'] ) ? 0 : 1;
+		$updated['disable_xmlrpc']              = empty( $input['disable_xmlrpc'] ) ? 0 : 1;
+		$updated['prevent_user_enumeration']    = empty( $input['prevent_user_enumeration'] ) ? 0 : 1;
+		$updated['hide_wp_version']             = empty( $input['hide_wp_version'] ) ? 0 : 1;
+		$updated['max_login_attempts']          = max( 3, min( 20, absint( $input['max_login_attempts'] ?? $current['max_login_attempts'] ) ) );
+		$updated['lockout_minutes']             = max( 1, min( 1440, absint( $input['lockout_minutes'] ?? $current['lockout_minutes'] ) ) );
+		$updated['custom_login_slug']           = $this->sanitize_login_slug( (string) ( $input['custom_login_slug'] ?? $current['custom_login_slug'] ) );
 
 		if ( '' === $updated['custom_login_slug'] ) {
 			$updated['custom_login_slug'] = $this->defaults['custom_login_slug'];
@@ -162,119 +162,152 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 
 	public function render_admin_page() {
 		if ( ! SKMT_Capabilities::current_user_can_manage() ) {
-			wp_die( esc_html__( 'Acces refuse.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Accès refusé.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$settings = $this->get_settings();
+		$settings  = $this->get_settings();
 		$login_url = $this->build_custom_login_url( $settings );
 
+		$auth_flags = array(
+			! empty( $settings['custom_login_enabled'] ),
+			! empty( $settings['block_default_login'] ),
+			! empty( $settings['limit_login_attempts'] ),
+			! empty( $settings['force_strong_password'] ),
+			! empty( $settings['disable_public_registration'] ),
+		);
+		$hardening_flags = array(
+			! empty( $settings['disable_xmlrpc'] ),
+			! empty( $settings['prevent_user_enumeration'] ),
+			! empty( $settings['hide_wp_version'] ),
+		);
+		$enabled_auth      = count( array_filter( $auth_flags ) );
+		$enabled_hardening = count( array_filter( $hardening_flags ) );
 		?>
 		<div class="wrap skmt-wrap">
 			<div class="skmt-shell">
-				<header class="skmt-page-head">
+				<header class="skmt-page-head skmt-page-head--security">
 					<div>
-						<h1><?php echo esc_html__( 'Module Securite', 'studio-kyne-mini-tools' ); ?></h1>
-						<p><?php echo esc_html__( 'Controlez les protections auth et hardening en gardant une granularite par fonctionnalite.', 'studio-kyne-mini-tools' ); ?></p>
+						<h1><?php echo esc_html__( 'Module Sécurité', 'studio-kyne-mini-tools' ); ?></h1>
+						<p><?php echo esc_html__( 'Pilotez la protection de connexion et le renforcement WordPress depuis une interface claire.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
-					<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
+					<div class="skmt-security-head-badges">
+						<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
+						<span class="skmt-badge"><?php echo esc_html( sprintf( __( '%1$d/5 Auth', 'studio-kyne-mini-tools' ), $enabled_auth ) ); ?></span>
+						<span class="skmt-badge"><?php echo esc_html( sprintf( __( '%1$d/3 Renforcement', 'studio-kyne-mini-tools' ), $enabled_hardening ) ); ?></span>
+					</div>
 				</header>
 
-				<div class="skmt-card">
-					<form action="options.php" method="post">
-						<?php settings_fields( 'skmt_security_group' ); ?>
+				<form action="options.php" method="post" data-skmt-autosave="1" class="skmt-security-form">
+					<?php settings_fields( 'skmt_security_group' ); ?>
 
-						<h2><?php echo esc_html__( 'Authentification', 'studio-kyne-mini-tools' ); ?></h2>
-
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[custom_login_enabled]" value="1" <?php checked( ! empty( $settings['custom_login_enabled'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Activer une URL de connexion personnalisee', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
-
-						<div class="skmt-field">
-							<label for="skmt-security-login-slug"><strong><?php echo esc_html__( 'Slug de connexion', 'studio-kyne-mini-tools' ); ?></strong></label>
-							<input id="skmt-security-login-slug" type="text" name="skmt_security_settings[custom_login_slug]" value="<?php echo esc_attr( (string) $settings['custom_login_slug'] ); ?>" />
-							<p class="description"><?php echo esc_html__( 'URL generee:', 'studio-kyne-mini-tools' ); ?> <a href="<?php echo esc_url( $login_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $login_url ); ?></a></p>
-						</div>
-
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[block_default_login]" value="1" <?php checked( ! empty( $settings['block_default_login'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Bloquer la page wp-login.php par defaut', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-							<p class="description"><?php echo esc_html__( 'A activer seulement apres validation de l URL personnalisee.', 'studio-kyne-mini-tools' ); ?></p>
-						</div>
-
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[limit_login_attempts]" value="1" <?php checked( ! empty( $settings['limit_login_attempts'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Limiter les tentatives de connexion', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
-
-						<div class="skmt-grid skmt-grid--2">
-							<div class="skmt-field">
-								<label for="skmt-security-max-attempts"><strong><?php echo esc_html__( 'Tentatives max', 'studio-kyne-mini-tools' ); ?></strong></label>
-								<input id="skmt-security-max-attempts" type="number" min="3" max="20" name="skmt_security_settings[max_login_attempts]" value="<?php echo esc_attr( (string) $settings['max_login_attempts'] ); ?>" />
+					<div class="skmt-grid skmt-grid--2 skmt-security-layout">
+						<section class="skmt-card skmt-security-card">
+							<div class="skmt-security-card__head">
+								<h2 class="skmt-title-inline"><i class="skmt-lucide" data-lucide="shield-user"></i><?php echo esc_html__( 'Authentification', 'studio-kyne-mini-tools' ); ?></h2>
+								<p><?php echo esc_html__( 'Réduisez le risque d’intrusion sur wp-login.php et les comptes administrateurs.', 'studio-kyne-mini-tools' ); ?></p>
 							</div>
+
 							<div class="skmt-field">
-								<label for="skmt-security-lockout-minutes"><strong><?php echo esc_html__( 'Duree de blocage (minutes)', 'studio-kyne-mini-tools' ); ?></strong></label>
-								<input id="skmt-security-lockout-minutes" type="number" min="1" max="1440" name="skmt_security_settings[lockout_minutes]" value="<?php echo esc_attr( (string) $settings['lockout_minutes'] ); ?>" />
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[custom_login_enabled]" value="1" <?php checked( ! empty( $settings['custom_login_enabled'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Activer une URL de connexion personnalisée', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
 							</div>
-						</div>
 
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[force_strong_password]" value="1" <?php checked( ! empty( $settings['force_strong_password'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Forcer un mot de passe fort', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-							<p class="description"><?php echo esc_html__( 'Regle: 12 caracteres min, majuscule, minuscule, chiffre et caractere special.', 'studio-kyne-mini-tools' ); ?></p>
-						</div>
+							<div class="skmt-field">
+								<label for="skmt-security-login-slug"><strong><?php echo esc_html__( 'Slug de connexion', 'studio-kyne-mini-tools' ); ?></strong></label>
+								<input id="skmt-security-login-slug" type="text" name="skmt_security_settings[custom_login_slug]" value="<?php echo esc_attr( (string) $settings['custom_login_slug'] ); ?>" />
+								<p class="description"><?php echo esc_html__( 'URL générée :', 'studio-kyne-mini-tools' ); ?> <a href="<?php echo esc_url( $login_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $login_url ); ?></a></p>
+							</div>
 
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[disable_public_registration]" value="1" <?php checked( ! empty( $settings['disable_public_registration'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Desactiver l inscription publique', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[block_default_login]" value="1" <?php checked( ! empty( $settings['block_default_login'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Bloquer la page wp-login.php par défaut', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+								<p class="description"><?php echo esc_html__( 'À activer uniquement après validation de l’URL personnalisée.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
 
-						<hr />
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[limit_login_attempts]" value="1" <?php checked( ! empty( $settings['limit_login_attempts'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Limiter les tentatives de connexion', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
 
-						<h2><?php echo esc_html__( 'Hardening', 'studio-kyne-mini-tools' ); ?></h2>
+							<div class="skmt-grid skmt-grid--2">
+								<div class="skmt-field">
+									<label for="skmt-security-max-attempts"><strong><?php echo esc_html__( 'Tentatives max', 'studio-kyne-mini-tools' ); ?></strong></label>
+									<input id="skmt-security-max-attempts" type="number" min="3" max="20" name="skmt_security_settings[max_login_attempts]" value="<?php echo esc_attr( (string) $settings['max_login_attempts'] ); ?>" />
+								</div>
+								<div class="skmt-field">
+									<label for="skmt-security-lockout-minutes"><strong><?php echo esc_html__( 'Durée de blocage (minutes)', 'studio-kyne-mini-tools' ); ?></strong></label>
+									<input id="skmt-security-lockout-minutes" type="number" min="1" max="1440" name="skmt_security_settings[lockout_minutes]" value="<?php echo esc_attr( (string) $settings['lockout_minutes'] ); ?>" />
+								</div>
+							</div>
 
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[disable_xmlrpc]" value="1" <?php checked( ! empty( $settings['disable_xmlrpc'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Desactiver XML-RPC', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[force_strong_password]" value="1" <?php checked( ! empty( $settings['force_strong_password'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Forcer un mot de passe fort', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+								<p class="description"><?php echo esc_html__( 'Règle : 12 caractères minimum, majuscule, minuscule, chiffre et caractère spécial.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
 
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[prevent_user_enumeration]" value="1" <?php checked( ! empty( $settings['prevent_user_enumeration'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Empecher l enumeration des utilisateurs', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[disable_public_registration]" value="1" <?php checked( ! empty( $settings['disable_public_registration'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Désactiver l’inscription publique', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
+						</section>
 
-						<div class="skmt-field">
-							<label class="skmt-toggle">
-								<input type="checkbox" name="skmt_security_settings[hide_wp_version]" value="1" <?php checked( ! empty( $settings['hide_wp_version'] ) ); ?> />
-								<span></span>
-								<strong><?php echo esc_html__( 'Masquer la version WordPress', 'studio-kyne-mini-tools' ); ?></strong>
-							</label>
-						</div>
+						<section class="skmt-card skmt-security-card">
+							<div class="skmt-security-card__head">
+								<h2 class="skmt-title-inline"><i class="skmt-lucide" data-lucide="shield-check"></i><?php echo esc_html__( 'Renforcement', 'studio-kyne-mini-tools' ); ?></h2>
+								<p><?php echo esc_html__( 'Masquez les informations sensibles et coupez les points d’entrée les plus attaqués.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
 
-						<?php submit_button( __( 'Enregistrer les reglages', 'studio-kyne-mini-tools' ) ); ?>
-					</form>
-				</div>
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[disable_xmlrpc]" value="1" <?php checked( ! empty( $settings['disable_xmlrpc'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Désactiver XML-RPC', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
+
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[prevent_user_enumeration]" value="1" <?php checked( ! empty( $settings['prevent_user_enumeration'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Empêcher l’énumération des utilisateurs', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
+
+							<div class="skmt-field">
+								<label class="skmt-toggle">
+									<input type="checkbox" name="skmt_security_settings[hide_wp_version]" value="1" <?php checked( ! empty( $settings['hide_wp_version'] ) ); ?> />
+									<span></span>
+									<strong><?php echo esc_html__( 'Masquer la version de WordPress', 'studio-kyne-mini-tools' ); ?></strong>
+								</label>
+							</div>
+
+							<div class="skmt-security-tip">
+								<p><strong><?php echo esc_html__( 'Astuce UX', 'studio-kyne-mini-tools' ); ?></strong></p>
+								<p><?php echo esc_html__( 'Les changements sont enregistrés automatiquement dès qu’un réglage est modifié.', 'studio-kyne-mini-tools' ); ?></p>
+							</div>
+						</section>
+					</div>
+
+					<div class="skmt-actions skmt-security-actions">
+						<?php submit_button( __( 'Enregistrer maintenant', 'studio-kyne-mini-tools' ), 'secondary', 'submit', false ); ?>
+					</div>
+				</form>
 			</div>
 		</div>
 		<?php
@@ -423,7 +456,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 			return $user;
 		}
 
-		$state = $this->get_attempt_state( $ip );
+		$state      = $this->get_attempt_state( $ip );
 		$lock_until = absint( $state['lock_until'] ?? 0 );
 		if ( $lock_until > time() ) {
 			$remaining = max( 1, (int) ceil( ( $lock_until - time() ) / MINUTE_IN_SECONDS ) );
@@ -431,7 +464,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 				'skmt_security_locked',
 				sprintf(
 					/* translators: %d: number of minutes. */
-					__( 'Trop de tentatives. Reessayez dans %d minute(s).', 'studio-kyne-mini-tools' ),
+					__( 'Trop de tentatives. Réessayez dans %d minute(s).', 'studio-kyne-mini-tools' ),
 					$remaining
 				)
 			);
@@ -451,12 +484,12 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 			return;
 		}
 
-		$state = $this->get_attempt_state( $ip );
-		$attempts = absint( $state['attempts'] ?? 0 ) + 1;
+		$state      = $this->get_attempt_state( $ip );
+		$attempts   = absint( $state['attempts'] ?? 0 ) + 1;
 		$lock_until = 0;
 
 		if ( $attempts >= absint( $settings['max_login_attempts'] ) ) {
-			$attempts = 0;
+			$attempts   = 0;
 			$lock_until = time() + ( absint( $settings['lockout_minutes'] ) * MINUTE_IN_SECONDS );
 		}
 
@@ -489,7 +522,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 		}
 
 		if ( ! $this->is_strong_password( $password ) ) {
-			$errors->add( 'skmt_weak_password', __( 'Mot de passe trop faible. Utilisez 12 caracteres minimum avec majuscule, minuscule, chiffre et symbole.', 'studio-kyne-mini-tools' ) );
+			$errors->add( 'skmt_weak_password', __( 'Mot de passe trop faible. Utilisez 12 caractères minimum avec majuscule, minuscule, chiffre et symbole.', 'studio-kyne-mini-tools' ) );
 		}
 	}
 
@@ -505,7 +538,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 		}
 
 		if ( ! $this->is_strong_password( $password ) ) {
-			$errors->add( 'skmt_weak_password', __( 'Mot de passe trop faible. Utilisez 12 caracteres minimum avec majuscule, minuscule, chiffre et symbole.', 'studio-kyne-mini-tools' ) );
+			$errors->add( 'skmt_weak_password', __( 'Mot de passe trop faible. Utilisez 12 caractères minimum avec majuscule, minuscule, chiffre et symbole.', 'studio-kyne-mini-tools' ) );
 		}
 	}
 
@@ -541,7 +574,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 			return;
 		}
 
-		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+		$request_uri      = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
 		$has_author_query = isset( $_GET['author'] ) && '' !== (string) $_GET['author'];
 		$has_author_path  = '' !== $request_uri && preg_match( '#/author/[^/?]+#i', $request_uri );
 
@@ -567,7 +600,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 
 		$route = (string) $request->get_route();
 		if ( 0 === strpos( $route, '/wp/v2/users' ) ) {
-			return new WP_Error( 'skmt_rest_users_blocked', __( 'Acces refuse.', 'studio-kyne-mini-tools' ), array( 'status' => 403 ) );
+			return new WP_Error( 'skmt_rest_users_blocked', __( 'Accès refusé.', 'studio-kyne-mini-tools' ), array( 'status' => 403 ) );
 		}
 
 		return $response;
@@ -668,7 +701,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 	}
 
 	protected function get_attempt_state( $ip ) {
-		$key = $this->get_attempt_key( $ip );
+		$key   = $this->get_attempt_key( $ip );
 		$state = get_transient( $key );
 		if ( ! is_array( $state ) ) {
 			return array(
@@ -712,7 +745,7 @@ class SKMT_Module_Security implements SKMT_Module_Interface {
 			$raw = sanitize_text_field( wp_unslash( (string) $_SERVER[ $key ] ) );
 			if ( 'HTTP_X_FORWARDED_FOR' === $key ) {
 				$parts = explode( ',', $raw );
-				$raw = trim( (string) ( $parts[0] ?? '' ) );
+				$raw   = trim( (string) ( $parts[0] ?? '' ) );
 			}
 
 			if ( filter_var( $raw, FILTER_VALIDATE_IP ) ) {

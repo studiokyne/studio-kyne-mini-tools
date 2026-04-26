@@ -330,11 +330,243 @@
     });
   };
 
+  const serializeForm = (form) => {
+    const params = new URLSearchParams();
+    const data = new FormData(form);
+    data.forEach((value, key) => {
+      if (value instanceof File) return;
+      params.append(key, String(value));
+    });
+    return params.toString();
+  };
+
+  const initAutoSaveForms = () => {
+    const forms = Array.from(
+      document.querySelectorAll('.skmt-shell form[action*="options.php"]'),
+    ).filter((form) => form.dataset.skmtAutosave !== "0");
+
+    forms.forEach((form) => {
+      let inFlight = false;
+      let queued = false;
+      let timer = null;
+      let lastSerialized = serializeForm(form);
+
+      const runSave = () => {
+        timer = null;
+        const nextSerialized = serializeForm(form);
+        if (nextSerialized === lastSerialized) {
+          return;
+        }
+
+        if (inFlight) {
+          queued = true;
+          return;
+        }
+
+        inFlight = true;
+        const body = new FormData(form);
+
+        fetch(form.action, {
+          method: (form.method || "POST").toUpperCase(),
+          credentials: "same-origin",
+          body,
+        })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error(
+                skmtAdmin?.i18n?.autoSaveError ||
+                  "Impossible d’enregistrer automatiquement les réglages.",
+              );
+            }
+            lastSerialized = nextSerialized;
+            showToast(
+              skmtAdmin?.i18n?.autoSaved ||
+                "Réglages enregistrés automatiquement.",
+              "success",
+            );
+          })
+          .catch((error) => {
+            showToast(
+              error?.message ||
+                skmtAdmin?.i18n?.autoSaveError ||
+                "Impossible d’enregistrer automatiquement les réglages.",
+              "error",
+            );
+          })
+          .finally(() => {
+            inFlight = false;
+            if (queued) {
+              queued = false;
+              runSave();
+            }
+          });
+      };
+
+      const scheduleSave = () => {
+        if (timer) {
+          window.clearTimeout(timer);
+        }
+        timer = window.setTimeout(runSave, 480);
+      };
+
+      form.addEventListener("change", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (target.matches('[type="file"], [type="submit"], [type="button"]')) {
+          return;
+        }
+        scheduleSave();
+      });
+
+      form.addEventListener("input", (event) => {
+        const target = event.target;
+        if (!(target instanceof HTMLElement)) return;
+        if (
+          !target.matches('input[type="text"], input[type="number"], textarea')
+        ) {
+          return;
+        }
+        scheduleSave();
+      });
+    });
+  };
+
+  const escapeHtml = (value) =>
+    String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  const highlightCode = (code, lang) => {
+    let html = escapeHtml(code);
+    const keywordMap = {
+      php: "function|class|public|protected|private|if|else|elseif|return|foreach|while|new|array|static",
+      javascript:
+        "function|const|let|var|if|else|return|class|new|import|export|async|await|try|catch",
+      css: "@media|@keyframes|display|position|color|background|border|grid|flex",
+      json: "true|false|null",
+      html: "div|span|script|style|a|img|form|input|button|section|header|footer",
+      xml: "xml|version|encoding",
+      yaml: "true|false|null",
+    };
+
+    html = html.replace(
+      /(\/\*[\s\S]*?\*\/|\/\/[^\n]*|#.*$)/gm,
+      '<span class="skmt-code-comment">$1</span>',
+    );
+    html = html.replace(
+      /("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')/g,
+      '<span class="skmt-code-string">$1</span>',
+    );
+    html = html.replace(
+      /\b(\d+(?:\.\d+)?)\b/g,
+      '<span class="skmt-code-number">$1</span>',
+    );
+
+    const keywordList = keywordMap[lang] || keywordMap.text;
+    if (keywordList) {
+      const keywordRegex = new RegExp(`\\b(${keywordList})\\b`, "g");
+      html = html.replace(
+        keywordRegex,
+        '<span class="skmt-code-keyword">$1</span>',
+      );
+    }
+
+    return html;
+  };
+
+  const initFilesEditorModal = () => {
+    const modal = document.querySelector("[data-skmt-files-modal]");
+    if (!modal) return;
+
+    const closeTriggers = Array.from(
+      modal.querySelectorAll("[data-skmt-files-modal-close]"),
+    );
+    const form = modal.querySelector("[data-skmt-files-editor-form]");
+    const textarea = modal.querySelector("[data-skmt-files-editor]");
+    const highlight = modal.querySelector(".skmt-files-editor-highlight");
+    const wrap = modal.querySelector(".skmt-files-editor-wrap");
+    if (!(textarea instanceof HTMLTextAreaElement) || !form || !highlight) {
+      return;
+    }
+
+    const lang = wrap?.getAttribute("data-lang") || "text";
+    let hasUnsavedChanges = false;
+
+    const getExitUrl = () => {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("edit");
+      return url.toString();
+    };
+
+    const confirmClose = () => {
+      if (!hasUnsavedChanges) return true;
+      return window.confirm(
+        skmtAdmin?.i18n?.unsavedEditor ||
+          "Vous avez des modifications non enregistrées. Quitter quand même ?",
+      );
+    };
+
+    const updateHighlight = () => {
+      highlight.innerHTML = `${highlightCode(textarea.value, lang)}\n`;
+      highlight.scrollTop = textarea.scrollTop;
+      highlight.scrollLeft = textarea.scrollLeft;
+    };
+
+    const requestClose = () => {
+      if (!confirmClose()) return;
+      hasUnsavedChanges = false;
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.location.href = getExitUrl();
+    };
+
+    const handleBeforeUnload = (event) => {
+      if (!hasUnsavedChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    textarea.addEventListener("input", () => {
+      hasUnsavedChanges = true;
+      modal.setAttribute("data-unsaved", "1");
+      updateHighlight();
+    });
+
+    textarea.addEventListener("scroll", () => {
+      highlight.scrollTop = textarea.scrollTop;
+      highlight.scrollLeft = textarea.scrollLeft;
+    });
+
+    form.addEventListener("submit", () => {
+      hasUnsavedChanges = false;
+      modal.setAttribute("data-unsaved", "0");
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    });
+
+    closeTriggers.forEach((trigger) => {
+      trigger.addEventListener("click", requestClose);
+    });
+
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape") {
+        requestClose();
+      }
+    });
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    updateHighlight();
+    textarea.focus();
+  };
+
   document.addEventListener("DOMContentLoaded", () => {
     initLucideIcons();
     syncRanges();
     initBulkTool();
     initConfigImport();
     initToasts();
+    initAutoSaveForms();
+    initFilesEditorModal();
   });
 })();

@@ -20,7 +20,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 
 	public function get_id() { return 'files'; }
 	public function get_name() { return __( 'Fichiers', 'studio-kyne-mini-tools' ); }
-	public function get_description() { return __( 'Explorateur de fichiers SKMT avec edition et operations securisees.', 'studio-kyne-mini-tools' ); }
+	public function get_description() { return __( 'Explorateur de fichiers SKMT avec édition et opérations sécurisées.', 'studio-kyne-mini-tools' ); }
 	public function get_icon() { return 'folder'; }
 	public function is_default_active() { return false; }
 	public function is_configurable() { return true; }
@@ -86,7 +86,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 
 	public function render_admin_page() {
 		if ( ! SKMT_Capabilities::current_user_can_manage() ) {
-			wp_die( esc_html__( 'Acces refuse.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Accès refusé.', 'studio-kyne-mini-tools' ) );
 		}
 
 		$settings    = $this->get_settings();
@@ -101,14 +101,18 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 		$items       = $this->list_directory_items( $current_abs, $current_rel );
 		$parent_rel  = $this->get_parent_rel( $current_rel );
 
-		$edit_rel     = $this->get_requested_path( 'edit' );
-		$edit_abs     = false;
-		$edit_content = '';
+		$edit_rel         = $this->get_requested_path( 'edit' );
+		$edit_abs         = false;
+		$edit_content     = '';
+		$edit_lang        = 'text';
+		$edit_file_label  = '';
 		if ( '' !== $edit_rel ) {
 			$maybe_edit = $this->resolve_existing_path( $edit_rel, false );
 			if ( false !== $maybe_edit && is_file( $maybe_edit ) && $this->is_editable_file( wp_basename( $maybe_edit ) ) && ! empty( $settings['allow_edit'] ) ) {
-				$edit_abs = $maybe_edit;
-				$raw      = file_get_contents( $edit_abs ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+				$edit_abs        = $maybe_edit;
+				$edit_file_label = wp_basename( $maybe_edit );
+				$edit_lang       = $this->guess_language( $edit_file_label );
+				$raw             = file_get_contents( $edit_abs ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 				if ( false !== $raw ) {
 					$edit_content = (string) $raw;
 				}
@@ -118,28 +122,25 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 		$this->render_notice( $notice );
 		?>
 		<div class="wrap skmt-wrap">
-			<div class="skmt-shell">
-				<header class="skmt-page-head">
+			<div class="skmt-shell skmt-files-shell">
+				<header class="skmt-page-head skmt-page-head--files">
 					<div>
 						<h1><?php echo esc_html__( 'Explorateur de fichiers', 'studio-kyne-mini-tools' ); ?></h1>
-						<p><?php echo esc_html__( 'Racine securisee: wp-content. Actions disponibles: upload, edition, telechargement, suppression et ZIP.', 'studio-kyne-mini-tools' ); ?></p>
+						<p><?php echo esc_html__( 'Vue rapide et lisible de votre wp-content, avec actions sécurisées et édition directe.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
-					<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
+					<div class="skmt-files-head-badges">
+						<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
+						<span class="skmt-badge"><?php echo esc_html( sprintf( __( '%d éléments', 'studio-kyne-mini-tools' ), count( $items ) ) ); ?></span>
+					</div>
 				</header>
 
-				<div class="skmt-card">
-					<div class="skmt-files-toolbar">
-						<div class="skmt-files-breadcrumb">
-							<?php $this->render_breadcrumbs( $current_rel ); ?>
-						</div>
-						<div class="skmt-actions">
-							<?php if ( '' !== $current_rel ) : ?>
-								<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'skmt-files', 'dir' => $parent_rel ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html__( 'Dossier parent', 'studio-kyne-mini-tools' ); ?></a>
-							<?php endif; ?>
-						</div>
+				<div class="skmt-card skmt-files-settings-card">
+					<div class="skmt-card-head">
+						<h2 class="skmt-title-inline"><i class="skmt-lucide" data-lucide="sliders-horizontal"></i><?php echo esc_html__( 'Réglages de l’explorateur', 'studio-kyne-mini-tools' ); ?></h2>
+						<p class="description"><?php echo esc_html__( 'Ces options sont enregistrées automatiquement dès modification.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
 
-					<form class="skmt-form-grid" action="options.php" method="post">
+					<form class="skmt-form-grid" action="options.php" method="post" data-skmt-autosave="1">
 						<?php settings_fields( 'skmt_files_group' ); ?>
 						<div class="skmt-field">
 							<label class="skmt-toggle">
@@ -152,7 +153,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 							<label class="skmt-toggle">
 								<input type="checkbox" name="skmt_files_settings[allow_edit]" value="1" <?php checked( ! empty( $settings['allow_edit'] ) ); ?> />
 								<span></span>
-								<strong><?php echo esc_html__( 'Autoriser l edition de fichiers texte/code', 'studio-kyne-mini-tools' ); ?></strong>
+								<strong><?php echo esc_html__( 'Autoriser l’édition de fichiers texte/code', 'studio-kyne-mini-tools' ); ?></strong>
 							</label>
 						</div>
 						<div class="skmt-field">
@@ -167,56 +168,74 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 							<input id="skmt-files-max-upload" type="number" min="1" max="512" name="skmt_files_settings[max_upload_mb]" value="<?php echo esc_attr( (string) $settings['max_upload_mb'] ); ?>" />
 						</div>
 						<div class="skmt-actions">
-							<?php submit_button( __( 'Enregistrer les reglages', 'studio-kyne-mini-tools' ), 'secondary', 'submit', false ); ?>
+							<?php submit_button( __( 'Enregistrer maintenant', 'studio-kyne-mini-tools' ), 'secondary', 'submit', false ); ?>
 						</div>
 					</form>
-
-					<?php if ( ! empty( $settings['allow_upload'] ) ) : ?>
-						<form class="skmt-field" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data">
-							<input type="hidden" name="action" value="skmt_files_upload" />
-							<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
-							<?php wp_nonce_field( 'skmt_files_upload' ); ?>
-							<label for="skmt-files-upload"><strong><?php echo esc_html__( 'Upload dans le dossier courant', 'studio-kyne-mini-tools' ); ?></strong></label>
-							<div class="skmt-actions">
-								<input id="skmt-files-upload" type="file" name="upload_file" required />
-								<button type="submit" class="button button-primary"><?php echo esc_html__( 'Uploader', 'studio-kyne-mini-tools' ); ?></button>
-							</div>
-						</form>
-					<?php endif; ?>
 				</div>
 
-				<div class="skmt-card">
-					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+				<div class="skmt-card skmt-files-explorer-card">
+					<div class="skmt-files-toolbar">
+						<div class="skmt-files-toolbar__path">
+							<div class="skmt-files-breadcrumb">
+								<?php $this->render_breadcrumbs( $current_rel ); ?>
+							</div>
+							<div class="skmt-files-toolbar__hint"><?php echo esc_html__( 'Racine sécurisée : wp-content', 'studio-kyne-mini-tools' ); ?></div>
+						</div>
+						<div class="skmt-actions skmt-files-toolbar__actions">
+							<?php if ( '' !== $current_rel ) : ?>
+								<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'skmt-files', 'dir' => $parent_rel ), admin_url( 'admin.php' ) ) ); ?>">
+									<i class="skmt-lucide" data-lucide="arrow-up"></i>
+									<?php echo esc_html__( 'Dossier parent', 'studio-kyne-mini-tools' ); ?>
+								</a>
+							<?php endif; ?>
+							<?php if ( ! empty( $settings['allow_upload'] ) ) : ?>
+								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" enctype="multipart/form-data" class="skmt-files-inline-upload">
+									<input type="hidden" name="action" value="skmt_files_upload" />
+									<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
+									<?php wp_nonce_field( 'skmt_files_upload' ); ?>
+									<label class="button button-primary" for="skmt-files-upload-inline">
+										<i class="skmt-lucide" data-lucide="upload"></i>
+										<?php echo esc_html__( 'Uploader', 'studio-kyne-mini-tools' ); ?>
+									</label>
+									<input id="skmt-files-upload-inline" type="file" name="upload_file" required class="skmt-hidden-file-input" />
+									<button type="submit" class="button"><?php echo esc_html__( 'Envoyer', 'studio-kyne-mini-tools' ); ?></button>
+								</form>
+							<?php endif; ?>
+						</div>
+					</div>
+
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-files-explorer-form">
 						<input type="hidden" name="action" value="skmt_files_bulk_action" />
 						<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
 						<?php wp_nonce_field( 'skmt_files_bulk_action' ); ?>
-						<div class="skmt-actions">
+						<div class="skmt-files-bulk-row">
 							<select name="bulk_action" required>
 								<option value=""><?php echo esc_html__( 'Action de masse', 'studio-kyne-mini-tools' ); ?></option>
-								<option value="download_zip"><?php echo esc_html__( 'Telecharger selection (ZIP)', 'studio-kyne-mini-tools' ); ?></option>
+								<option value="download_zip"><?php echo esc_html__( 'Télécharger la sélection (ZIP)', 'studio-kyne-mini-tools' ); ?></option>
 								<?php if ( ! empty( $settings['allow_delete'] ) ) : ?>
-									<option value="delete"><?php echo esc_html__( 'Supprimer selection', 'studio-kyne-mini-tools' ); ?></option>
+									<option value="delete"><?php echo esc_html__( 'Supprimer la sélection', 'studio-kyne-mini-tools' ); ?></option>
 								<?php endif; ?>
 							</select>
 							<button type="submit" class="button"><?php echo esc_html__( 'Appliquer', 'studio-kyne-mini-tools' ); ?></button>
 						</div>
 
-						<div class="skmt-table-wrap">
-							<table class="widefat fixed striped skmt-table">
+						<div class="skmt-files-table-viewport">
+							<table class="widefat fixed striped skmt-table skmt-files-table">
 								<thead>
 									<tr>
 										<th><input type="checkbox" id="skmt-files-select-all" /></th>
 										<th><?php echo esc_html__( 'Nom', 'studio-kyne-mini-tools' ); ?></th>
+										<th><?php echo esc_html__( 'Type', 'studio-kyne-mini-tools' ); ?></th>
 										<th><?php echo esc_html__( 'Taille', 'studio-kyne-mini-tools' ); ?></th>
-										<th><?php echo esc_html__( 'Date de modification', 'studio-kyne-mini-tools' ); ?></th>
+										<th><?php echo esc_html__( 'Dernière modification', 'studio-kyne-mini-tools' ); ?></th>
 										<th><?php echo esc_html__( 'Permissions', 'studio-kyne-mini-tools' ); ?></th>
-										<th><?php echo esc_html__( 'Proprietaire', 'studio-kyne-mini-tools' ); ?></th>
-										<th><?php echo esc_html__( 'Actions', 'studio-kyne-mini-tools' ); ?></th>
+										<th><?php echo esc_html__( 'Propriétaire', 'studio-kyne-mini-tools' ); ?></th>
+										<th><?php echo esc_html__( 'Actions rapides', 'studio-kyne-mini-tools' ); ?></th>
 									</tr>
 								</thead>
 								<tbody>
 									<?php if ( empty( $items ) ) : ?>
-										<tr><td colspan="7"><?php echo esc_html__( 'Ce dossier est vide.', 'studio-kyne-mini-tools' ); ?></td></tr>
+										<tr><td colspan="8"><?php echo esc_html__( 'Ce dossier est vide.', 'studio-kyne-mini-tools' ); ?></td></tr>
 									<?php else : ?>
 										<?php foreach ( $items as $item ) : ?>
 											<?php
@@ -230,27 +249,38 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 												),
 												'skmt_files_download_' . md5( $item['rel'] )
 											);
+											$type = $this->get_file_type( $item['name'], $item['is_dir'] );
+											$icon = $this->get_file_icon( $type );
+											$edit_link = add_query_arg( array( 'page' => 'skmt-files', 'dir' => $current_rel, 'edit' => $item['rel'] ), admin_url( 'admin.php' ) );
 											?>
-											<tr>
+											<tr class="<?php echo esc_attr( $item['is_dir'] ? 'is-directory' : 'is-file' ); ?>">
 												<td><input type="checkbox" name="items[]" value="<?php echo esc_attr( $item['rel'] ); ?>" /></td>
 												<td class="skmt-files-cell-name">
+													<span class="skmt-files-kind skmt-files-kind--<?php echo esc_attr( $type ); ?>">
+														<i class="skmt-lucide" data-lucide="<?php echo esc_attr( $icon ); ?>"></i>
+													</span>
 													<?php if ( $item['is_dir'] ) : ?>
 														<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'skmt-files', 'dir' => $item['rel'] ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $item['name'] ); ?>/</a>
 													<?php elseif ( $item['editable'] && ! empty( $settings['allow_edit'] ) ) : ?>
-														<a href="<?php echo esc_url( add_query_arg( array( 'page' => 'skmt-files', 'dir' => $current_rel, 'edit' => $item['rel'] ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html( $item['name'] ); ?></a>
+														<a href="<?php echo esc_url( $edit_link ); ?>"><?php echo esc_html( $item['name'] ); ?></a>
 													<?php else : ?>
 														<?php echo esc_html( $item['name'] ); ?>
 													<?php endif; ?>
 												</td>
+												<td><span class="skmt-files-pill skmt-files-pill--<?php echo esc_attr( $type ); ?>"><?php echo esc_html( ucfirst( $type ) ); ?></span></td>
 												<td><?php echo esc_html( $this->format_bytes( $item['size'] ) ); ?></td>
 												<td><?php echo esc_html( $this->format_modified( $item['modified'] ) ); ?></td>
 												<td><?php echo esc_html( $item['permissions'] ); ?></td>
 												<td><?php echo esc_html( $item['owner'] ); ?></td>
 												<td>
-													<div class="skmt-actions">
-														<a class="button" href="<?php echo esc_url( $download_url ); ?>"><?php echo esc_html( $item['is_dir'] ? __( 'ZIP', 'studio-kyne-mini-tools' ) : __( 'Telecharger', 'studio-kyne-mini-tools' ) ); ?></a>
+													<div class="skmt-actions skmt-files-quick-actions">
+														<a class="button" href="<?php echo esc_url( $download_url ); ?>" title="<?php echo esc_attr( $item['is_dir'] ? __( 'Télécharger en ZIP', 'studio-kyne-mini-tools' ) : __( 'Télécharger', 'studio-kyne-mini-tools' ) ); ?>">
+															<i class="skmt-lucide" data-lucide="download"></i>
+														</a>
 														<?php if ( ! $item['is_dir'] && $item['editable'] && ! empty( $settings['allow_edit'] ) ) : ?>
-															<a class="button" href="<?php echo esc_url( add_query_arg( array( 'page' => 'skmt-files', 'dir' => $current_rel, 'edit' => $item['rel'] ), admin_url( 'admin.php' ) ) ); ?>"><?php echo esc_html__( 'Editer', 'studio-kyne-mini-tools' ); ?></a>
+															<a class="button" href="<?php echo esc_url( $edit_link ); ?>" title="<?php echo esc_attr__( 'Éditer', 'studio-kyne-mini-tools' ); ?>">
+																<i class="skmt-lucide" data-lucide="file-pen-line"></i>
+															</a>
 														<?php endif; ?>
 														<?php if ( ! empty( $settings['allow_delete'] ) ) : ?>
 															<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" onsubmit="return confirm('<?php echo esc_js( __( 'Confirmer la suppression ?', 'studio-kyne-mini-tools' ) ); ?>');">
@@ -258,7 +288,9 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 																<input type="hidden" name="path" value="<?php echo esc_attr( $item['rel'] ); ?>" />
 																<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
 																<?php wp_nonce_field( 'skmt_files_delete' ); ?>
-																<button type="submit" class="button skmt-button-danger"><?php echo esc_html__( 'Supprimer', 'studio-kyne-mini-tools' ); ?></button>
+																<button type="submit" class="button skmt-button-danger" title="<?php echo esc_attr__( 'Supprimer', 'studio-kyne-mini-tools' ); ?>">
+																	<i class="skmt-lucide" data-lucide="trash-2"></i>
+																</button>
 															</form>
 														<?php endif; ?>
 													</div>
@@ -271,40 +303,73 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 						</div>
 					</form>
 				</div>
-
-				<?php if ( false !== $edit_abs ) : ?>
-					<div class="skmt-card">
-						<h2><?php echo esc_html__( 'Editeur', 'studio-kyne-mini-tools' ); ?>: <?php echo esc_html( $edit_rel ); ?></h2>
-						<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-							<input type="hidden" name="action" value="skmt_files_save_file" />
-							<input type="hidden" name="path" value="<?php echo esc_attr( $edit_rel ); ?>" />
-							<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
-							<?php wp_nonce_field( 'skmt_files_save_file' ); ?>
-							<textarea name="file_content" class="skmt-files-editor" spellcheck="false"><?php echo esc_textarea( $edit_content ); ?></textarea>
-							<div class="skmt-actions">
-								<button type="submit" class="button button-primary"><?php echo esc_html__( 'Enregistrer le fichier', 'studio-kyne-mini-tools' ); ?></button>
-							</div>
-						</form>
-					</div>
-				<?php elseif ( '' !== $edit_rel ) : ?>
-					<div class="skmt-card">
-						<p class="description"><?php echo esc_html__( 'Fichier non editable ou inaccessible.', 'studio-kyne-mini-tools' ); ?></p>
-					</div>
-				<?php endif; ?>
 			</div>
 		</div>
+
+		<?php if ( false !== $edit_abs ) : ?>
+			<div class="skmt-files-modal" data-skmt-files-modal data-unsaved="0">
+				<div class="skmt-files-modal__backdrop" data-skmt-files-modal-close></div>
+				<div class="skmt-files-modal__panel" role="dialog" aria-modal="true" aria-label="<?php echo esc_attr__( 'Éditeur de fichier', 'studio-kyne-mini-tools' ); ?>">
+					<div class="skmt-files-modal__header">
+						<div>
+							<h2 class="skmt-title-inline"><i class="skmt-lucide" data-lucide="file-code-2"></i><?php echo esc_html__( 'Éditeur', 'studio-kyne-mini-tools' ); ?></h2>
+							<p><?php echo esc_html( $edit_rel ); ?></p>
+						</div>
+						<button type="button" class="button" data-skmt-files-modal-close><?php echo esc_html__( 'Quitter', 'studio-kyne-mini-tools' ); ?></button>
+					</div>
+					<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" data-skmt-files-editor-form>
+						<input type="hidden" name="action" value="skmt_files_save_file" />
+						<input type="hidden" name="path" value="<?php echo esc_attr( $edit_rel ); ?>" />
+						<input type="hidden" name="dir" value="<?php echo esc_attr( $current_rel ); ?>" />
+						<?php wp_nonce_field( 'skmt_files_save_file' ); ?>
+						<div class="skmt-files-modal__meta">
+							<span class="skmt-files-pill skmt-files-pill--text"><?php echo esc_html( strtoupper( $edit_lang ) ); ?></span>
+							<span><?php echo esc_html( $edit_file_label ); ?></span>
+						</div>
+						<div class="skmt-files-editor-wrap" data-lang="<?php echo esc_attr( $edit_lang ); ?>">
+							<pre class="skmt-files-editor-highlight" aria-hidden="true"></pre>
+							<textarea name="file_content" class="skmt-files-editor" data-skmt-files-editor spellcheck="false"><?php echo esc_textarea( $edit_content ); ?></textarea>
+						</div>
+						<div class="skmt-files-modal__footer">
+							<button type="submit" class="button button-primary"><?php echo esc_html__( 'Enregistrer', 'studio-kyne-mini-tools' ); ?></button>
+							<button type="button" class="button" data-skmt-files-modal-close><?php echo esc_html__( 'Quitter', 'studio-kyne-mini-tools' ); ?></button>
+						</div>
+					</form>
+				</div>
+			</div>
+		<?php elseif ( '' !== $edit_rel ) : ?>
+			<div class="wrap skmt-wrap">
+				<div class="skmt-shell">
+					<div class="skmt-card">
+						<p class="description"><?php echo esc_html__( 'Fichier non éditable ou inaccessible.', 'studio-kyne-mini-tools' ); ?></p>
+					</div>
+				</div>
+			</div>
+		<?php endif; ?>
+
 		<script>
 			(function () {
 				const selectAll = document.getElementById('skmt-files-select-all');
-				if (!selectAll) {
-					return;
-				}
-				const itemInputs = Array.from(document.querySelectorAll('input[name="items[]"]'));
-				selectAll.addEventListener('change', function () {
-					itemInputs.forEach((input) => {
-						input.checked = selectAll.checked;
+				if (selectAll) {
+					const itemInputs = Array.from(document.querySelectorAll('input[name="items[]"]'));
+					selectAll.addEventListener('change', function () {
+						itemInputs.forEach((input) => {
+							input.checked = selectAll.checked;
+						});
 					});
-				});
+				}
+
+				const uploadInput = document.getElementById('skmt-files-upload-inline');
+				if (uploadInput) {
+					uploadInput.addEventListener('change', function () {
+						if (uploadInput.files && uploadInput.files[0]) {
+							const label = uploadInput.closest('form')?.querySelector('label[for="skmt-files-upload-inline"]');
+							if (label) {
+								label.dataset.filename = uploadInput.files[0].name;
+							}
+						}
+					});
+				}
 			})();
 		</script>
 		<?php
@@ -436,7 +501,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 			);
 		}
 
-		wp_die( esc_html__( 'Element non telechargeable.', 'studio-kyne-mini-tools' ) );
+		wp_die( esc_html__( 'Élément non téléchargeable.', 'studio-kyne-mini-tools' ) );
 	}
 
 	public function handle_bulk_action() {
@@ -499,7 +564,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 
 	protected function assert_capability() {
 		if ( ! SKMT_Capabilities::current_user_can_manage() ) {
-			wp_die( esc_html__( 'Acces refuse.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Accès refusé.', 'studio-kyne-mini-tools' ) );
 		}
 	}
 
@@ -523,9 +588,9 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 	}
 
 	protected function normalize_rel_path( $path ) {
-		$path = rawurldecode( (string) $path );
-		$path = str_replace( '\\', '/', $path );
-		$path = preg_replace( '/\0+/', '', $path );
+		$path  = rawurldecode( (string) $path );
+		$path  = str_replace( '\\', '/', $path );
+		$path  = preg_replace( '/\0+/', '', $path );
 		$parts = array();
 
 		foreach ( explode( '/', $path ) as $segment ) {
@@ -540,13 +605,13 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 	}
 
 	protected function resolve_existing_path( $rel_path, $must_be_dir = false ) {
-		$base      = $this->get_base_dir();
+		$base       = $this->get_base_dir();
 		$normalized = $this->normalize_rel_path( $rel_path );
-		$candidate = '' === $normalized ? $base : $base . '/' . $normalized;
+		$candidate  = '' === $normalized ? $base : $base . '/' . $normalized;
 		if ( file_exists( $candidate ) && is_link( $candidate ) ) {
 			return false;
 		}
-		$real      = realpath( $candidate );
+		$real = realpath( $candidate );
 
 		if ( false === $real ) {
 			return false;
@@ -608,7 +673,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 				continue;
 			}
 
-			$entry_abs  = wp_normalize_path( $dir_abs . '/' . $entry );
+			$entry_abs = wp_normalize_path( $dir_abs . '/' . $entry );
 			if ( is_link( $entry_abs ) ) {
 				continue;
 			}
@@ -724,6 +789,68 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 		return in_array( $ext, $allowed, true );
 	}
 
+	protected function get_file_type( $filename, $is_dir = false ) {
+		if ( $is_dir ) {
+			return 'folder';
+		}
+
+		$ext = strtolower( (string) pathinfo( (string) $filename, PATHINFO_EXTENSION ) );
+		if ( in_array( $ext, array( 'txt', 'md', 'json', 'xml', 'yml', 'yaml', 'ini', 'log', 'csv', 'php', 'js', 'css', 'html', 'htm', 'svg' ), true ) ) {
+			return 'text';
+		}
+		if ( in_array( $ext, array( 'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif', 'bmp', 'ico' ), true ) ) {
+			return 'image';
+		}
+		if ( in_array( $ext, array( 'mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v' ), true ) ) {
+			return 'video';
+		}
+		if ( in_array( $ext, array( 'zip', 'rar', '7z', 'gz', 'tar' ), true ) ) {
+			return 'zip';
+		}
+
+		return 'file';
+	}
+
+	protected function get_file_icon( $type ) {
+		$map = array(
+			'folder' => 'folder',
+			'text'   => 'file-code-2',
+			'image'  => 'image',
+			'video'  => 'film',
+			'zip'    => 'archive',
+			'file'   => 'file',
+		);
+
+		return $map[ $type ] ?? 'file';
+	}
+
+	protected function guess_language( $filename ) {
+		$ext = strtolower( (string) pathinfo( (string) $filename, PATHINFO_EXTENSION ) );
+		$map = array(
+			'php'      => 'php',
+			'js'       => 'javascript',
+			'css'      => 'css',
+			'json'     => 'json',
+			'xml'      => 'xml',
+			'html'     => 'html',
+			'htm'      => 'html',
+			'yml'      => 'yaml',
+			'yaml'     => 'yaml',
+			'md'       => 'markdown',
+			'txt'      => 'text',
+			'log'      => 'text',
+			'conf'     => 'text',
+			'config'   => 'text',
+			'ini'      => 'text',
+			'csv'      => 'text',
+			'htaccess' => 'text',
+			'env'      => 'text',
+			'svg'      => 'xml',
+		);
+
+		return $map[ $ext ] ?? 'text';
+	}
+
 	protected function delete_path( $path ) {
 		if ( is_file( $path ) || is_link( $path ) ) {
 			return unlink( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.unlink_unlink
@@ -749,7 +876,7 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 				}
 				continue;
 			}
-			$real  = realpath( $child );
+			$real = realpath( $child );
 			if ( false === $real ) {
 				continue;
 			}
@@ -788,13 +915,13 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 
 		$tmp_zip = wp_tempnam( 'skmt-files-' . gmdate( 'YmdHis' ) . '.zip' );
 		if ( empty( $tmp_zip ) ) {
-			wp_die( esc_html__( 'Impossible de preparer l archive ZIP.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Impossible de préparer l’archive ZIP.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$zip = new ZipArchive();
+		$zip    = new ZipArchive();
 		$opened = $zip->open( $tmp_zip, ZipArchive::CREATE | ZipArchive::OVERWRITE );
 		if ( true !== $opened ) {
-			wp_die( esc_html__( 'Impossible de creer l archive ZIP.', 'studio-kyne-mini-tools' ) );
+			wp_die( esc_html__( 'Impossible de créer l’archive ZIP.', 'studio-kyne-mini-tools' ) );
 		}
 
 		foreach ( $paths as $path ) {
@@ -876,24 +1003,24 @@ class SKMT_Module_Files implements SKMT_Module_Interface {
 		}
 
 		$map = array(
-			'upload-success'      => array( 'type' => 'success', 'message' => __( 'Upload termine.', 'studio-kyne-mini-tools' ) ),
-			'upload-missing'      => array( 'type' => 'warning', 'message' => __( 'Aucun fichier selectionne.', 'studio-kyne-mini-tools' ) ),
+			'upload-success'      => array( 'type' => 'success', 'message' => __( 'Upload terminé.', 'studio-kyne-mini-tools' ) ),
+			'upload-missing'      => array( 'type' => 'warning', 'message' => __( 'Aucun fichier sélectionné.', 'studio-kyne-mini-tools' ) ),
 			'upload-too-large'    => array( 'type' => 'error', 'message' => __( 'Fichier trop volumineux.', 'studio-kyne-mini-tools' ) ),
 			'upload-invalid-name' => array( 'type' => 'error', 'message' => __( 'Nom de fichier invalide.', 'studio-kyne-mini-tools' ) ),
-			'upload-disabled'     => array( 'type' => 'warning', 'message' => __( 'Upload desactive dans les reglages.', 'studio-kyne-mini-tools' ) ),
-			'upload-failed'       => array( 'type' => 'error', 'message' => __( 'Echec de l upload.', 'studio-kyne-mini-tools' ) ),
-			'save-success'        => array( 'type' => 'success', 'message' => __( 'Fichier enregistre.', 'studio-kyne-mini-tools' ) ),
-			'save-failed'         => array( 'type' => 'error', 'message' => __( 'Impossible d enregistrer le fichier.', 'studio-kyne-mini-tools' ) ),
-			'save-invalid'        => array( 'type' => 'error', 'message' => __( 'Fichier non editable.', 'studio-kyne-mini-tools' ) ),
-			'edit-disabled'       => array( 'type' => 'warning', 'message' => __( 'Edition desactivee dans les reglages.', 'studio-kyne-mini-tools' ) ),
-			'delete-success'      => array( 'type' => 'success', 'message' => __( 'Element supprime.', 'studio-kyne-mini-tools' ) ),
-			'delete-failed'       => array( 'type' => 'error', 'message' => __( 'Impossible de supprimer cet element.', 'studio-kyne-mini-tools' ) ),
-			'delete-disabled'     => array( 'type' => 'warning', 'message' => __( 'Suppression desactivee dans les reglages.', 'studio-kyne-mini-tools' ) ),
-			'delete-invalid'      => array( 'type' => 'error', 'message' => __( 'Element invalide.', 'studio-kyne-mini-tools' ) ),
-			'bulk-empty'          => array( 'type' => 'warning', 'message' => __( 'Aucun element selectionne.', 'studio-kyne-mini-tools' ) ),
+			'upload-disabled'     => array( 'type' => 'warning', 'message' => __( 'Upload désactivé dans les réglages.', 'studio-kyne-mini-tools' ) ),
+			'upload-failed'       => array( 'type' => 'error', 'message' => __( 'Échec de l’upload.', 'studio-kyne-mini-tools' ) ),
+			'save-success'        => array( 'type' => 'success', 'message' => __( 'Fichier enregistré.', 'studio-kyne-mini-tools' ) ),
+			'save-failed'         => array( 'type' => 'error', 'message' => __( 'Impossible d’enregistrer le fichier.', 'studio-kyne-mini-tools' ) ),
+			'save-invalid'        => array( 'type' => 'error', 'message' => __( 'Fichier non éditable.', 'studio-kyne-mini-tools' ) ),
+			'edit-disabled'       => array( 'type' => 'warning', 'message' => __( 'Édition désactivée dans les réglages.', 'studio-kyne-mini-tools' ) ),
+			'delete-success'      => array( 'type' => 'success', 'message' => __( 'Élément supprimé.', 'studio-kyne-mini-tools' ) ),
+			'delete-failed'       => array( 'type' => 'error', 'message' => __( 'Impossible de supprimer cet élément.', 'studio-kyne-mini-tools' ) ),
+			'delete-disabled'     => array( 'type' => 'warning', 'message' => __( 'Suppression désactivée dans les réglages.', 'studio-kyne-mini-tools' ) ),
+			'delete-invalid'      => array( 'type' => 'error', 'message' => __( 'Élément invalide.', 'studio-kyne-mini-tools' ) ),
+			'bulk-empty'          => array( 'type' => 'warning', 'message' => __( 'Aucun élément sélectionné.', 'studio-kyne-mini-tools' ) ),
 			'bulk-invalid'        => array( 'type' => 'error', 'message' => __( 'Action de masse invalide.', 'studio-kyne-mini-tools' ) ),
-			'bulk-delete-success' => array( 'type' => 'success', 'message' => __( 'Selection supprimee.', 'studio-kyne-mini-tools' ) ),
-			'bulk-delete-failed'  => array( 'type' => 'error', 'message' => __( 'Echec de suppression de la selection.', 'studio-kyne-mini-tools' ) ),
+			'bulk-delete-success' => array( 'type' => 'success', 'message' => __( 'Sélection supprimée.', 'studio-kyne-mini-tools' ) ),
+			'bulk-delete-failed'  => array( 'type' => 'error', 'message' => __( 'Échec de suppression de la sélection.', 'studio-kyne-mini-tools' ) ),
 			'invalid-path'        => array( 'type' => 'error', 'message' => __( 'Chemin invalide.', 'studio-kyne-mini-tools' ) ),
 		);
 
