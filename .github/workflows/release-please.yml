@@ -49,7 +49,7 @@ jobs:
             fi
             TARGET_VERSION="$INPUT_VERSION"
           else
-            CURRENT_VERSION=$(grep -E "^define\('SKMT_VERSION', '[0-9]+\.[0-9]+\.[0-9]+'\);" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
+            CURRENT_VERSION=$(grep -E "define\s*\(\s*'SKMT_VERSION'\s*,\s*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
             if [[ -z "$CURRENT_VERSION" ]]; then
               echo "Unable to detect current version from studio-kyne-mini-tools.php"
               exit 1
@@ -72,7 +72,7 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" studio-kyne-mini-tools.php
-          sed -E -i "s/define\('SKMT_VERSION', '[0-9]+\.[0-9]+\.[0-9]+'\);/define('SKMT_VERSION', '${VERSION}');/" studio-kyne-mini-tools.php
+          sed -E -i "s/(define\s*\(\s*'SKMT_VERSION'\s*,\s*')[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" studio-kyne-mini-tools.php
 
       - name: Commit release version
         env:
