@@ -40,16 +40,10 @@ jobs:
           latest=$(curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github+json" \
             "https://api.github.com/repos/${{ github.repository }}/releases/latest" \
-            | python3 - <<'PY'
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    tag = data.get("tag_name", "")
-    print(tag.lstrip("v"))
-except Exception:
-    print("")
-PY
-          )
+            | python3 -c 'import json,sys;\
+data=json.load(sys.stdin) if not sys.stdin.isatty() else {};\
+tag=data.get("tag_name", "");\
+print(tag.lstrip("v"))')
           echo "value=$latest" >> "$GITHUB_OUTPUT"
 
       - name: Validate version bump
