@@ -23,7 +23,12 @@ jobs:
       - name: Read plugin version
         id: version
         run: |
-          version=$(grep -E "^\s*Version:\s*" studio-kyne-mini-tools.php | head -n1 | sed -E 's/.*Version:\s*//')
+          file="studio-kyne-mini-tools.php"
+          if [ ! -f "$file" ]; then
+            echo "Plugin file not found: $file" >&2
+            exit 1
+          fi
+          version=$(grep -i -m1 "^\s*Version:\s*" "$file" | awk -F: '{print $2}' | sed -E 's/^\s+//')
           if [ -z "$version" ]; then
             echo "Version not found" >&2
             exit 1
