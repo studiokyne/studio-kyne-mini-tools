@@ -1,22 +1,55 @@
-name: release-please
+name: release-from-version
 
 on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 permissions:
   contents: write
-  pull-requests: write
 
 jobs:
-  release-please:
+  release:
     runs-on: ubuntu-latest
     env:
       FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: googleapis/release-please-action@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
-          config-file: release-please-config.json
-          manifest-file: .release-please-manifest.json
-          skip-github-pull-request: true
+          fetch-depth: 0
+
+      - name: Read plugin version
+        id: version
+        run: |
+          version=$(grep -E "^\s*Version:\s*" studio-kyne-mini-tools.php | head -n1 | sed -E 's/.*Version:\s*//')
+          if [ -z "$version" ]; then
+            echo "Version not found" >&2
+            exit 1
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Check tag
+        id: tag
+        run: |
+          tag="v${{ steps.version.outputs.value }}"
+          echo "name=$tag" >> "$GITHUB_OUTPUT"
+          if git rev-parse "refs/tags/$tag" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create tag
+        if: steps.tag.outputs.exists != 'true'
+        run: |
+          git tag "${{ steps.tag.outputs.name }}"
+          git push origin "${{ steps.tag.outputs.name }}"
+
+      - name: Create release
+        if: steps.tag.outputs.exists != 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.name }}
+          name: ${{ steps.tag.outputs.name }}
