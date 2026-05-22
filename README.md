@@ -8,7 +8,7 @@
 
 Plugin WordPress modulaire, leger et performant pour optimiser et ameliorer votre site.
 
-## Fonctionnalites
+## Fonctionnalités principales
 
 - Architecture modulaire, modules activables a la demande
 - Interface admin custom moderne et rapide
