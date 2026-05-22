@@ -1,51 +1,48 @@
 <?php
-
 /**
  * Plugin Name: Studio Kyne Mini Tools
- * Plugin URI:  https://studiokyne.com/
- * Description: Suite modulaire d'outils WordPress par Studio Kyne : optimisation d'images et futurs modules activables.
- * Version:     0.1.7
+ * Plugin URI:  https://github.com/studiokyne/studio-kyne-mini-tools
+ * Description: Suite d'outils modulaires pour optimiser et améliorer votre site WordPress.
+ * Version:     1.0.0
  * Author:      Studio Kyne
- * Author URI:  https://studiokyne.com/
+ * Author URI:  https://studiokyne.com
+ * License:     GPL-2.0+
+ * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: studio-kyne-mini-tools
  * Domain Path: /languages
- * Requires at least: 6.2
+ * Requires at least: 5.8
  * Requires PHP: 7.4
  */
-if (!defined('ABSPATH')) {
+
+// Sécurité : empêcher l'accès direct
+if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-define('SKMT_VERSION', '0.1.7');
-define('SKMT_PLUGIN_FILE', __FILE__);
-define('SKMT_PLUGIN_BASENAME', plugin_basename(__FILE__));
-define('SKMT_PLUGIN_DIR', plugin_dir_path(__FILE__));
-define('SKMT_PLUGIN_URL', plugin_dir_url(__FILE__));
-if (!defined('SKMT_GITHUB_REPO')) {
-	define('SKMT_GITHUB_REPO', 'studiokyne/studio-kyne-mini-tools');
-}
-if (!defined('SKMT_GITHUB_TOKEN')) {
-	define('SKMT_GITHUB_TOKEN', '');
-}
+// Constantes de base
+define( 'SKMT_VERSION', '1.0.0' );
+define( 'SKMT_PLUGIN_FILE', __FILE__ );
+define( 'SKMT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
+define( 'SKMT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
+define( 'SKMT_INCLUDES_DIR', SKMT_PLUGIN_DIR . 'includes/' );
+define( 'SKMT_TEMPLATES_DIR', SKMT_PLUGIN_DIR . 'templates/' );
+define( 'SKMT_ASSETS_URL', SKMT_PLUGIN_URL . 'assets/' );
 
-require_once SKMT_PLUGIN_DIR . 'includes/core/interfaces/interface-skmt-module.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-loader.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-capabilities.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-logger.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-notifications.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-settings.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-jobs.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-module-manager.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-updater.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-admin.php';
-require_once SKMT_PLUGIN_DIR . 'includes/core/class-skmt-plugin.php';
+// Autoloader
+require_once SKMT_INCLUDES_DIR . 'Core/Autoloader.php';
+StudioKyne\MiniTools\Core\Autoloader::register();
 
-register_activation_hook(__FILE__, array('SKMT_Plugin', 'activate'));
-register_deactivation_hook(__FILE__, array('SKMT_Plugin', 'deactivate'));
+// Bootstrap
+add_action( 'plugins_loaded', [ 'StudioKyne\MiniTools\Core\Plugin', 'instance' ], 10 );
 
-function skmt()
-{
-	return SKMT_Plugin::instance();
-}
+// Activation hook
+register_activation_hook( __FILE__, function () {
+	require_once SKMT_INCLUDES_DIR . 'Core/Activator.php';
+	StudioKyne\MiniTools\Core\Activator::activate();
+} );
 
-skmt();
+// Deactivation hook
+register_deactivation_hook( __FILE__, function () {
+	require_once SKMT_INCLUDES_DIR . 'Core/Deactivator.php';
+	StudioKyne\MiniTools\Core\Deactivator::deactivate();
+} );

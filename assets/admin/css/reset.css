@@ -1,0 +1,132 @@
+/*
+ * Studio Kyne Mini Tools - Reset + tokens
+ */
+
+:root {
+  /* Neutrals */
+  --skmt-white: oklch(1 0 0);
+  --skmt-black: oklch(0 0 0);
+  --skmt-n50: oklch(0.985 0 0);
+  --skmt-n100: oklch(0.97 0 0);
+  --skmt-n200: oklch(0.922 0 0);
+  --skmt-n300: oklch(0.87 0 0);
+  --skmt-n400: oklch(0.708 0 0);
+  --skmt-n500: oklch(0.556 0 0);
+  --skmt-n600: oklch(0.439 0 0);
+  --skmt-n700: oklch(0.371 0 0);
+  --skmt-n800: oklch(0.269 0 0);
+  --skmt-n900: oklch(0.205 0 0);
+  --skmt-n950: oklch(0.145 0 0);
+
+  /* Accent */
+  --skmt-accent: oklch(0.585 0.233 277.117);
+  --skmt-accent-hover: oklch(0.511 0.262 276.966);
+  --skmt-accent-light: oklch(0.962 0.018 272.314);
+
+  /* Semantic */
+  --skmt-success: oklch(0.696 0.17 162.48);
+  --skmt-success-bg: oklch(0.979 0.021 166.113);
+  --skmt-danger: oklch(0.637 0.237 25.331);
+  --skmt-danger-bg: oklch(0.971 0.013 17.38);
+  --skmt-warning: oklch(0.769 0.188 70.08);
+  --skmt-warning-bg: oklch(0.987 0.022 95.277);
+
+  /* Surfaces */
+  --skmt-surface: var(--skmt-white);
+  --skmt-surface-raised: var(--skmt-white);
+  --skmt-surface-overlay: var(--skmt-white);
+  --skmt-bg: var(--skmt-n100);
+
+  /* Borders */
+  --skmt-border: var(--skmt-n200);
+  --skmt-border-strong: var(--skmt-n300);
+
+  /* Text */
+  --skmt-text: var(--skmt-n900);
+  --skmt-text-secondary: var(--skmt-n500);
+  --skmt-text-muted: var(--skmt-n500);
+
+  /* Shadows */
+  --skmt-shadow-sm: 0 1px 2px oklch(0 0 0 / 0.04);
+  --skmt-shadow: 0 1px 3px oklch(0 0 0 / 0.06), 0 1px 2px oklch(0 0 0 / 0.04);
+  --skmt-shadow-md:
+    0 4px 6px oklch(0 0 0 / 0.04), 0 2px 4px oklch(0 0 0 / 0.03);
+
+  /* Radius */
+  --skmt-radius: 12px;
+  --skmt-radius-sm: 8px;
+  --skmt-radius-xs: 4px;
+
+  /* Transitions */
+  --skmt-transition: all 0.15s ease;
+
+  /* Layout */
+  --skmt-sidebar-width: 260px;
+}
+
+.skmt-admin-wrap {
+  margin: 0 0 0 -20px;
+  padding: 0;
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu,
+    Cantarell, "Helvetica Neue", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--skmt-text);
+  background: var(--skmt-bg);
+  min-height: calc(100vh - 32px);
+}
+
+.skmt-admin-wrap *,
+.skmt-admin-wrap *::before,
+.skmt-admin-wrap *::after {
+  box-sizing: border-box;
+}
+
+.skmt-admin-wrap ul,
+.skmt-admin-wrap ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.skmt-admin-wrap h1,
+.skmt-admin-wrap h2,
+.skmt-admin-wrap h3,
+.skmt-admin-wrap h4,
+.skmt-admin-wrap h5,
+.skmt-admin-wrap h6 {
+  margin: 0;
+  font-weight: 600;
+  color: var(--skmt-text);
+}
+
+.skmt-admin-wrap p {
+  margin: 0;
+}
+
+.skmt-admin-wrap a {
+  text-decoration: none;
+}
+
+.skmt-admin-wrap a:hover,
+.skmt-admin-wrap a:focus {
+  border-radius: var(--skmt-radius-sm);
+  box-shadow: none;
+  outline: none;
+}
+
+.skmt-admin-wrap img {
+  max-width: 100%;
+  height: auto;
+  border: 0;
+}
+
+.skmt-admin-wrap input,
+.skmt-admin-wrap select,
+.skmt-admin-wrap textarea,
+.skmt-admin-wrap button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+}

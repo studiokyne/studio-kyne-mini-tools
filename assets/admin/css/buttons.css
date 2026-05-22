@@ -1,0 +1,69 @@
+/*
+ * Buttons
+ */
+
+.skmt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 20px;
+  border-radius: var(--skmt-radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  border: 1px solid var(--skmt-border);
+  cursor: pointer;
+  transition: var(--skmt-transition);
+  text-decoration: none;
+  line-height: 1.5;
+  font-family: inherit;
+  white-space: nowrap;
+  min-height: 42px;
+  background: var(--skmt-white);
+  color: var(--skmt-text);
+}
+
+.skmt-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.skmt-btn--sm {
+  padding: 7px 14px;
+  font-size: 13px;
+  min-height: 34px;
+}
+
+.skmt-btn--primary {
+  background: var(--skmt-accent);
+  color: var(--skmt-white);
+  border-color: var(--skmt-accent);
+}
+
+.skmt-btn--primary:hover:not(:disabled) {
+  background: var(--skmt-accent-hover);
+  border-color: var(--skmt-accent-hover);
+}
+
+.skmt-btn--secondary {
+  background: var(--skmt-white);
+  color: var(--skmt-text);
+  border-color: var(--skmt-border);
+}
+
+.skmt-btn--secondary:hover:not(:disabled) {
+  background: var(--skmt-n50);
+  border-color: var(--skmt-border-strong);
+}
+
+.skmt-btn--danger {
+  background: var(--skmt-danger-bg);
+  color: var(--skmt-danger);
+  border-color: var(--skmt-danger);
+}
+
+.skmt-btn--danger:hover:not(:disabled) {
+  background: var(--skmt-danger);
+  color: var(--skmt-white);
+  border-color: var(--skmt-danger);
+}

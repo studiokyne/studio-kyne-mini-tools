@@ -1,0 +1,8 @@
+{
+  "release-type": "simple",
+  "packages": {
+    ".": {
+      "extra-files": ["studio-kyne-mini-tools.php", "README.md"]
+    }
+  }
+}
