@@ -13,8 +13,10 @@ class Activator {
 		// Options par défaut
 		$default_settings = [
 			'global'   => [
-				'github_user' => 'studiokyne',
-				'github_repo' => 'studio-kyne-mini-tools',
+				'github_user'   => 'studiokyne',
+				'github_repo'   => 'studio-kyne-mini-tools',
+				'update_channel'=> 'stable',
+				'auto_updates'  => false,
 			],
 			'modules'  => [
 				'image_optimizer' => false,

@@ -32,4 +32,11 @@ interface ModuleInterface {
 	 * @return string[] Liste d'URLs CSS.
 	 */
 	public function get_admin_css(): array;
+
+	/**
+	 * Retourne les scripts admin du module.
+	 *
+	 * @return string[] Liste d'URLs JS.
+	 */
+	public function get_admin_js(): array;
 }

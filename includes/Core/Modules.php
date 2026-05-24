@@ -37,7 +37,11 @@ class Modules {
 	 * Doit être appelé au hook init ou plus tard pour éviter
 	 * le chargement trop tôt des traductions (WP 6.7+ JIT).
 	 */
-	public function register_default_modules(): void {
+	public function register_default_modules( bool $only_active = false ): void {
+		if ( $only_active && ! $this->is_active( 'image_optimizer' ) ) {
+			return;
+		}
+
 		$this->register( 'image_optimizer', [
 			'name'        => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
 			'description' => __( 'Optimisation des images', 'studio-kyne-mini-tools' ),

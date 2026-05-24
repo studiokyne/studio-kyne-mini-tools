@@ -5,6 +5,7 @@
 
 $global = $this->settings->get( 'global', [] );
 $update_channel = $global['update_channel'] ?? 'stable';
+$auto_updates   = ! empty( $global['auto_updates'] );
 
 // Détecter les capacités serveur
 $has_imagick = extension_loaded( 'imagick' );
@@ -94,6 +95,20 @@ $editor = $has_imagick ? 'Imagick' : ( $has_gd ? 'GD' : 'Aucun' );
 						<option value="stable" <?php selected( $update_channel, 'stable' ); ?>><?php echo esc_html__( 'Stable (main)', 'studio-kyne-mini-tools' ); ?></option>
 						<option value="dev" <?php selected( $update_channel, 'dev' ); ?>><?php echo esc_html__( 'Dev (pré-release)', 'studio-kyne-mini-tools' ); ?></option>
 					</select>
+				</div>
+				<div class="skmt-form__group skmt-form__group--toggle">
+					<div class="skmt-form__toggle-label">
+						<label for="skmt_auto_updates" class="skmt-form__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></label>
+						<p class="skmt-form__help"><?php echo esc_html__( 'Autoriser WordPress à mettre à jour automatiquement ce plugin.', 'studio-kyne-mini-tools' ); ?></p>
+					</div>
+					<label class="skmt-toggle">
+						<input type="checkbox"
+							   id="skmt_auto_updates"
+							   name="skmt_global[auto_updates]"
+							   value="1"
+							<?php checked( $auto_updates, true ); ?>>
+						<span class="skmt-toggle__slider"></span>
+					</label>
 				</div>
 			</div>
 		</div>

@@ -85,9 +85,25 @@ class Settings {
 	 */
 	public function update( array $data ): bool {
 		$settings = $this->get_all();
-		$settings = array_merge( $settings, $data );
+		$settings = $this->merge_recursive( $settings, $data );
 		$this->settings = $settings;
 
 		return update_option( $this->option_key, $settings );
+	}
+
+	/**
+	 * Fusionne deux tableaux récursivement en remplaçant les valeurs.
+	 */
+	private function merge_recursive( array $base, array $updates ): array {
+		foreach ( $updates as $key => $value ) {
+			if ( is_array( $value ) && isset( $base[ $key ] ) && is_array( $base[ $key ] ) ) {
+				$base[ $key ] = $this->merge_recursive( $base[ $key ], $value );
+				continue;
+			}
+
+			$base[ $key ] = $value;
+		}
+
+		return $base;
 	}
 }

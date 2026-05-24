@@ -32,10 +32,13 @@ class Admin {
 		$this->settings = $settings;
 
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
+		add_filter( 'parent_file', [ $this, 'filter_parent_file' ] );
+		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'admin_init', [ $this, 'ensure_auto_updates_enabled' ] );
 		add_action( 'admin_post_skmt_save_settings', [ $this, 'handle_save_settings' ] );
 		add_action( 'admin_post_skmt_toggle_module', [ $this, 'handle_toggle_module' ] );
+		add_action( 'admin_post_skmt_update_modules', [ $this, 'handle_update_modules' ] );
 		add_action( 'admin_post_skmt_check_updates', [ $this, 'handle_check_updates' ] );
 		add_action( 'admin_head', [ $this, 'output_menu_separator_css' ] );
 		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ] );
@@ -52,8 +55,8 @@ class Admin {
 			'manage_options',
 			$this->slug,
 			[ $this, 'render_page' ],
-			$this->get_menu_icon(),
-			80
+			plugins_url( 'assets/admin/images/menu-icon.svg', SKMT_PLUGIN_FILE ),
+			99
 		);
 
 		$this->add_submenus();
@@ -63,65 +66,71 @@ class Admin {
 	 * Charge les assets CSS/JS.
 	 */
 	public function enqueue_assets( string $hook ): void {
-		if ( strpos( $hook, $this->slug ) === false ) {
-			return;
+		$is_plugin_screen = strpos( $hook, $this->slug ) !== false;
+
+		if ( $is_plugin_screen ) {
+			wp_enqueue_style(
+				'skmt-reset-css',
+				SKMT_ASSETS_URL . 'admin/css/reset.css',
+				[],
+				SKMT_VERSION
+			);
+
+			wp_enqueue_style(
+				'skmt-layout-css',
+				SKMT_ASSETS_URL . 'admin/css/layout.css',
+				[ 'skmt-reset-css' ],
+				SKMT_VERSION
+			);
+
+			wp_enqueue_style(
+				'skmt-sidebar-css',
+				SKMT_ASSETS_URL . 'admin/css/sidebar.css',
+				[ 'skmt-layout-css' ],
+				SKMT_VERSION
+			);
+
+			wp_enqueue_style(
+				'skmt-components-css',
+				SKMT_ASSETS_URL . 'admin/css/components.css',
+				[ 'skmt-reset-css' ],
+				SKMT_VERSION
+			);
+
+			wp_enqueue_style(
+				'skmt-buttons-css',
+				SKMT_ASSETS_URL . 'admin/css/buttons.css',
+				[ 'skmt-components-css' ],
+				SKMT_VERSION
+			);
+
+			wp_enqueue_script(
+				'lucide-icons',
+				'https://unpkg.com/lucide@latest',
+				[],
+				null,
+				false
+			);
+
+			wp_enqueue_script(
+				'skmt-admin-js',
+				SKMT_ASSETS_URL . 'admin/js/admin.js',
+				[ 'lucide-icons' ],
+				SKMT_VERSION,
+				true
+			);
+
+			$this->localize_admin_script( 'skmt-admin-js' );
+
+			$this->enqueue_module_assets();
 		}
+	}
 
-		wp_enqueue_style(
-			'skmt-reset-css',
-			SKMT_ASSETS_URL . 'admin/css/reset.css',
-			[],
-			SKMT_VERSION
-		);
-
-		wp_enqueue_style(
-			'skmt-layout-css',
-			SKMT_ASSETS_URL . 'admin/css/layout.css',
-			[ 'skmt-reset-css' ],
-			SKMT_VERSION
-		);
-
-		wp_enqueue_style(
-			'skmt-sidebar-css',
-			SKMT_ASSETS_URL . 'admin/css/sidebar.css',
-			[ 'skmt-layout-css' ],
-			SKMT_VERSION
-		);
-
-		wp_enqueue_style(
-			'skmt-components-css',
-			SKMT_ASSETS_URL . 'admin/css/components.css',
-			[ 'skmt-reset-css' ],
-			SKMT_VERSION
-		);
-
-		wp_enqueue_style(
-			'skmt-buttons-css',
-			SKMT_ASSETS_URL . 'admin/css/buttons.css',
-			[ 'skmt-components-css' ],
-			SKMT_VERSION
-		);
-
-		// Charger Lucide Icons
-		wp_enqueue_script(
-			'lucide-icons',
-			'https://unpkg.com/lucide@latest',
-			[],
-			null,
-			false
-		);
-
-		wp_enqueue_script(
-			'skmt-admin-js',
-			SKMT_ASSETS_URL . 'admin/js/admin.js',
-			[ 'lucide-icons' ],
-			SKMT_VERSION,
-			true
-		);
-
-		$this->enqueue_module_assets();
-
-		wp_localize_script( 'skmt-admin-js', 'skmtAdmin', [
+	/**
+	 * Localise les données communes pour un script admin.
+	 */
+	private function localize_admin_script( string $handle ): void {
+		wp_localize_script( $handle, 'skmtAdmin', [
 			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
 			'i18n'    => [
@@ -133,6 +142,9 @@ class Admin {
 				'bulkDone'       => __( 'Optimisation terminée', 'studio-kyne-mini-tools' ),
 				'bulkComplete'   => __( 'Toutes les images ont été optimisées.', 'studio-kyne-mini-tools' ),
 				'bulkRetry'      => __( 'Réessayer', 'studio-kyne-mini-tools' ),
+				'singleRunning'  => __( 'Optimisation…', 'studio-kyne-mini-tools' ),
+				'singleDone'     => __( 'Optimisée', 'studio-kyne-mini-tools' ),
+				'singleError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
 			],
 		] );
 	}
@@ -142,6 +154,36 @@ class Admin {
 	 */
 	public function output_menu_separator_css(): void {
 		echo '<style>' . $this->get_menu_separator_css() . '</style>';
+	}
+
+	/**
+	 * Force le parent actif sur les pages du module.
+	 */
+	public function filter_parent_file( ?string $parent_file ): string {
+		$tab = $this->get_current_tab();
+
+		if ( strpos( $tab, 'module_' ) === 0 || in_array( $tab, [ 'dashboard', 'modules', 'settings' ], true ) ) {
+			return $this->slug;
+		}
+
+		return $parent_file ?? '';
+	}
+
+	/**
+	 * Force le sous-menu actif sur les pages du module.
+	 */
+	public function filter_submenu_file( ?string $submenu_file, ?string $parent_file ): string {
+		$tab = $this->get_current_tab();
+
+		if ( in_array( $tab, [ 'dashboard', 'modules', 'settings' ], true ) ) {
+			return $this->slug . '&tab=' . $tab;
+		}
+
+		if ( strpos( $tab, 'module_' ) === 0 ) {
+			return $this->slug . '&tab=' . $tab;
+		}
+
+		return $submenu_file ?? '';
 	}
 
 	/**
@@ -162,6 +204,7 @@ class Admin {
 		}
 
 		$styles = $instance->get_admin_css();
+		$scripts = method_exists( $instance, 'get_admin_js' ) ? $instance->get_admin_js() : [];
 
 		foreach ( $styles as $index => $style_url ) {
 			if ( empty( $style_url ) ) {
@@ -174,6 +217,16 @@ class Admin {
 				[ 'skmt-components-css', 'skmt-buttons-css', 'skmt-layout-css', 'skmt-sidebar-css' ],
 				SKMT_VERSION
 			);
+		}
+
+		foreach ( $scripts as $index => $script_url ) {
+			if ( empty( $script_url ) ) {
+				continue;
+			}
+
+			$handle = 'skmt-module-' . $module_id . '-js-' . $index;
+			wp_enqueue_script( $handle, $script_url, [], SKMT_VERSION, true );
+			$this->localize_admin_script( $handle );
 		}
 	}
 
@@ -252,6 +305,43 @@ class Admin {
 				[ $this, 'render_page' ]
 			);
 		}
+
+		$this->deduplicate_submenus();
+	}
+
+	/**
+	 * Retire les doublons de sous-menus du plugin.
+	 */
+	private function deduplicate_submenus(): void {
+		global $submenu;
+
+		if ( empty( $submenu[ $this->slug ] ) || ! is_array( $submenu[ $this->slug ] ) ) {
+			return;
+		}
+
+		$top_label = __( 'SKMT', 'studio-kyne-mini-tools' );
+		$seen = [];
+		$filtered = [];
+
+		foreach ( $submenu[ $this->slug ] as $item ) {
+			$label = isset( $item[0] ) ? (string) $item[0] : '';
+			$slug  = isset( $item[2] ) ? (string) $item[2] : '';
+
+			if ( $slug === $this->slug || $label === $top_label ) {
+				continue;
+			}
+
+			$key   = $label . '|' . $slug;
+
+			if ( isset( $seen[ $key ] ) ) {
+				continue;
+			}
+
+			$seen[ $key ] = true;
+			$filtered[] = $item;
+		}
+
+		$submenu[ $this->slug ] = $filtered;
 	}
 
 	/**
@@ -282,6 +372,27 @@ class Admin {
 		}
 
 		return strpos( $screen->id, $this->slug ) !== false;
+	}
+
+	/**
+	 * Retourne l'ID du module courant si on est sur une page module.
+	 */
+	private function get_current_module_id(): string {
+		$tab = $this->get_current_tab();
+
+		if ( strpos( $tab, 'module_' ) !== 0 ) {
+			return '';
+		}
+
+		$module_id = substr( $tab, 7 );
+		return $this->modules->get( $module_id ) ? $module_id : '';
+	}
+
+	/**
+	 * Retourne l'onglet courant.
+	 */
+	private function get_current_tab(): string {
+		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
 	}
 
 	/**
@@ -326,6 +437,7 @@ class Admin {
 				'settings_saved'   => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
 				'module_activated' => __( 'Module activé.', 'studio-kyne-mini-tools' ),
 				'module_deactivated' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
+				'modules_updated'  => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
 				'updates_checked'  => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
 			];
 
@@ -357,6 +469,7 @@ class Admin {
 		if ( 'settings' === $tab && isset( $_POST['skmt_global'] ) ) {
 			$global = [
 				'update_channel' => isset( $_POST['skmt_global']['update_channel'] ) ? sanitize_key( $_POST['skmt_global']['update_channel'] ) : 'stable',
+				'auto_updates'   => ! empty( $_POST['skmt_global']['auto_updates'] ),
 			];
 			$this->settings->set( 'global', $global );
 		}
@@ -418,13 +531,62 @@ class Admin {
 	public function ensure_auto_updates_enabled(): void {
 		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
 		$auto_updates = (array) get_site_option( 'auto_update_plugins', [] );
+		$global = $this->settings->get( 'global', [] );
+		$enabled = ! empty( $global['auto_updates'] );
 
-		if ( in_array( $plugin_file, $auto_updates, true ) ) {
+		if ( $enabled ) {
+			if ( in_array( $plugin_file, $auto_updates, true ) ) {
+				return;
+			}
+
+			$auto_updates[] = $plugin_file;
+			update_site_option( 'auto_update_plugins', array_values( array_unique( $auto_updates ) ) );
 			return;
 		}
 
-		$auto_updates[] = $plugin_file;
-		update_site_option( 'auto_update_plugins', array_values( array_unique( $auto_updates ) ) );
+		if ( ! in_array( $plugin_file, $auto_updates, true ) ) {
+			return;
+		}
+
+		$auto_updates = array_values( array_diff( $auto_updates, [ $plugin_file ] ) );
+		update_site_option( 'auto_update_plugins', $auto_updates );
+	}
+
+	/**
+	 * Gère la mise à jour en masse des modules.
+	 */
+	public function handle_update_modules(): void {
+		if ( ! isset( $_POST['skmt_modules_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['skmt_modules_nonce'] ) ), 'skmt_update_modules' ) ) {
+			wp_die( esc_html__( 'Nonce invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$enabled_modules = [];
+		if ( isset( $_POST['skmt_modules'] ) && is_array( $_POST['skmt_modules'] ) ) {
+			$enabled_modules = array_map( 'sanitize_key', wp_unslash( $_POST['skmt_modules'] ) );
+		}
+
+		foreach ( $this->modules->get_all() as $module_id => $module ) {
+			if ( in_array( $module_id, $enabled_modules, true ) ) {
+				$this->modules->activate( $module_id );
+				continue;
+			}
+
+			$this->modules->deactivate( $module_id );
+		}
+
+		$redirect = add_query_arg( [
+			'page'             => $this->slug,
+			'tab'              => 'modules',
+			'skmt_notice'      => 'modules_updated',
+			'skmt_notice_type' => 'success',
+		], admin_url( 'admin.php' ) );
+
+		wp_safe_redirect( $redirect );
+		exit;
 	}
 
 	/**

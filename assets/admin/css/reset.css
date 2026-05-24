@@ -20,6 +20,7 @@
 
   /* Accent */
   --skmt-accent: oklch(0.585 0.233 277.117);
+  /* --skmt-accent: var(--skmt-n900); */
   --skmt-accent-hover: oklch(0.511 0.262 276.966);
   --skmt-accent-light: oklch(0.962 0.018 272.314);
 
@@ -129,4 +130,8 @@
   font-family: inherit;
   font-size: inherit;
   line-height: inherit;
+}
+
+#wpbody-content {
+  padding: 0 !important;
 }

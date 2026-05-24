@@ -11,7 +11,7 @@ $core_items = [
 		'id'    => 'dashboard',
 		'label' => __( 'Vue d\'ensemble', 'studio-kyne-mini-tools' ),
 		'desc'  => __( 'Tableau de bord', 'studio-kyne-mini-tools' ),
-		'icon'  => 'layout-dashboard',
+		'icon'  => 'layout-panel-left',
 	],
 	[
 		'id'    => 'modules',

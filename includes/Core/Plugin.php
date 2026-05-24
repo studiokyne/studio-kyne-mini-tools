@@ -72,7 +72,7 @@ class Plugin {
 	 */
 	public function on_init(): void {
 		$this->load_textdomain();
-		$this->modules->register_default_modules();
+		$this->modules->register_default_modules( ! is_admin() );
 		$this->modules->init_active_modules();
 	}
 

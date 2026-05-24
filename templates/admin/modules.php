@@ -13,41 +13,46 @@ $modules = $this->modules->get_all();
 		</div>
 	</div>
 
-	<div class="skmt-page__body">
-		<div class="skmt-module-grid">
-			<?php foreach ( $modules as $module_id => $module ) :
-				$is_active = $this->modules->is_active( $module_id );
-				$icon      = ! empty( $module['icon'] ) ? $module['icon'] : 'package';
-			?>
-				<div class="skmt-module-card <?php echo $is_active ? 'skmt-module-card--active' : ''; ?>">
-					<div class="skmt-module-card__header">
-						<i data-lucide="<?php echo esc_attr( $icon ); ?>" class="skmt-icon skmt-icon--md"></i>
-						<h3 class="skmt-module-card__title"><?php echo esc_html( $module['name'] ); ?></h3>
-						<?php if ( $is_active ) : ?>
-							<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
-						<?php else : ?>
-							<span class="skmt-badge skmt-badge--inactive"><?php echo esc_html__( 'Inactif', 'studio-kyne-mini-tools' ); ?></span>
-						<?php endif; ?>
+	<div>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form">
+			<?php wp_nonce_field( 'skmt_update_modules', 'skmt_modules_nonce' ); ?>
+			<input type="hidden" name="action" value="skmt_update_modules">
+
+			<div class="skmt-module-grid skmt-page__body">
+				<?php foreach ( $modules as $module_id => $module ) :
+					$is_active = $this->modules->is_active( $module_id );
+					$icon      = ! empty( $module['icon'] ) ? $module['icon'] : 'package';
+				?>
+					<div class="skmt-module-card <?php echo $is_active ? 'skmt-module-card--active' : ''; ?>">
+						<div class="skmt-module-card__header">
+							<i data-lucide="<?php echo esc_attr( $icon ); ?>" class="skmt-icon skmt-icon--md"></i>
+							<h3 class="skmt-module-card__title"><?php echo esc_html( $module['name'] ); ?></h3>
+							<label class="skmt-toggle">
+								<input type="checkbox"
+									   name="skmt_modules[]"
+									   value="<?php echo esc_attr( $module_id ); ?>"
+									   <?php checked( $is_active, true ); ?>>
+								<span class="skmt-toggle__slider"></span>
+							</label>
+						</div>
+						<p class="skmt-module-card__desc"><?php echo esc_html( $module['description'] ); ?></p>
+						<div class="skmt-module-card__actions">
+
+							<?php if ( $is_active ) : ?>
+								<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=module_' . $module_id ) ); ?>" class="skmt-btn skmt-btn--sm skmt-btn--secondary">
+									<?php echo esc_html__( 'Configurer', 'studio-kyne-mini-tools' ); ?>
+								</a>
+							<?php endif; ?>
+						</div>
 					</div>
-					<p class="skmt-module-card__desc"><?php echo esc_html( $module['description'] ); ?></p>
-					<div class="skmt-module-card__actions">
-						<?php if ( $is_active ) : ?>
-							<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=module_' . $module_id ) ); ?>" class="skmt-btn skmt-btn--sm skmt-btn--secondary">
-								<?php echo esc_html__( 'Configurer', 'studio-kyne-mini-tools' ); ?>
-							</a>
-							<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=skmt_toggle_module&module=' . $module_id . '&skmt_action=deactivate' ), 'skmt_toggle_module', 'skmt_nonce' ) ); ?>"
-							   class="skmt-btn skmt-btn--sm skmt-btn--danger">
-								<?php echo esc_html__( 'Désactiver', 'studio-kyne-mini-tools' ); ?>
-							</a>
-						<?php else : ?>
-							<a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin-post.php?action=skmt_toggle_module&module=' . $module_id . '&skmt_action=activate' ), 'skmt_toggle_module', 'skmt_nonce' ) ); ?>"
-							   class="skmt-btn skmt-btn--sm skmt-btn--primary">
-								<?php echo esc_html__( 'Activer', 'studio-kyne-mini-tools' ); ?>
-							</a>
-						<?php endif; ?>
-					</div>
-				</div>
-			<?php endforeach; ?>
-		</div>
+				<?php endforeach; ?>
+			</div>
+
+			<div class="skmt-page__footer">
+				<button type="submit" class="skmt-btn skmt-btn--primary">
+					<?php echo esc_html__( 'Enregistrer les modules', 'studio-kyne-mini-tools' ); ?>
+				</button>
+			</div>
+		</form>
 	</div>
 </div>

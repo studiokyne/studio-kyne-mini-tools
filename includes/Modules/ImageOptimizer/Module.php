@@ -27,6 +27,11 @@ class Module implements ModuleInterface {
 	private string $stats_key = 'skmt_image_optimizer_stats';
 
 	/**
+	 * Clé d'option pour l'etat du bulk.
+	 */
+	private string $bulk_state_key = 'skmt_image_optimizer_bulk_state';
+
+	/**
 	 * Réglages du module.
 	 */
 	private array $settings = [];
@@ -35,6 +40,11 @@ class Module implements ModuleInterface {
 	 * Capacités détectées du serveur.
 	 */
 	private ?array $capabilities = null;
+
+	/**
+	 * Fichiers deja optimises sur cette requete.
+	 */
+	private array $optimized_paths = [];
 
 	/**
 	 * Initialise le module.
@@ -56,6 +66,14 @@ class Module implements ModuleInterface {
 		// Bulk optimization AJAX
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk', [ $this, 'ajax_bulk_optimize' ] );
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk_status', [ $this, 'ajax_bulk_status' ] );
+
+		// Traitement async via cron
+		add_action( 'skmt_image_optimizer_cron', [ $this, 'run_cron_batch' ], 10, 1 );
+
+		// Assets et media modal
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_media_assets' ] );
+		add_filter( 'attachment_fields_to_edit', [ $this, 'add_media_optimizer_fields' ], 10, 2 );
+		add_action( 'wp_ajax_skmt_optimize_single', [ $this, 'ajax_optimize_single' ] );
 	}
 
 	/* ================================================================
@@ -110,6 +128,15 @@ class Module implements ModuleInterface {
 	public function get_admin_css(): array {
 		return [
 			SKMT_ASSETS_URL . 'admin/css/modules/image-optimizer.css',
+		];
+	}
+
+	/**
+	 * Retourne les scripts admin du module.
+	 */
+	public function get_admin_js(): array {
+		return [
+			SKMT_ASSETS_URL . 'admin/js/modules/image-optimizer.js',
 		];
 	}
 
@@ -202,6 +229,10 @@ class Module implements ModuleInterface {
 			return $upload;
 		}
 
+		if ( $this->is_animated_image( $file_path, $file_type ) ) {
+			return $upload;
+		}
+
 		$this->optimize_file( $file_path );
 
 		return $upload;
@@ -218,6 +249,27 @@ class Module implements ModuleInterface {
 			return $metadata;
 		}
 
+		return $this->process_attachment_metadata( $metadata, $attachment_id, false );
+	}
+
+	/**
+	 * Traite un attachment pour optimisation et conversion.
+	 */
+	private function process_attachment_metadata( array $metadata, int $attachment_id, bool $force ): array {
+		$mime_type = $this->get_file_mime_type( '', $attachment_id );
+		if ( empty( $mime_type ) || ! $this->is_supported_image_mime( $mime_type ) ) {
+			return $metadata;
+		}
+
+		$attached_file = get_attached_file( $attachment_id );
+		if ( $this->is_animated_image( $attached_file, $mime_type ) ) {
+			return $metadata;
+		}
+
+		if ( $this->is_already_optimized( $attachment_id ) ) {
+			return $metadata;
+		}
+
 		$upload_dir = wp_upload_dir();
 		$base_path  = trailingslashit( $upload_dir['basedir'] );
 		
@@ -228,51 +280,73 @@ class Module implements ModuleInterface {
 		$subdir     = dirname( $metadata['file'] );
 		$sizes_path = trailingslashit( $base_path . $subdir );
 
-		// 1. Optimiser chaque taille générée sur place d'abord
+		$total_before = 0;
+		$total_after  = 0;
+		$size_updates = [];
+		$original_converted = false;
+		$original_new_file = '';
+
 		if ( ! empty( $metadata['sizes'] ) ) {
 			foreach ( $metadata['sizes'] as $size => $size_data ) {
-				if ( ! empty( $size_data['file'] ) ) {
-					$size_file = $sizes_path . $size_data['file'];
-					if ( file_exists( $size_file ) ) {
-						$this->optimize_file( $size_file );
-					}
+				if ( empty( $size_data['file'] ) ) {
+					continue;
+				}
+
+				$size_file = $sizes_path . $size_data['file'];
+				if ( ! file_exists( $size_file ) ) {
+					continue;
+				}
+
+				$before = filesize( $size_file );
+				$total_before += $before;
+				$this->optimize_file( $size_file );
+
+				$converted = $this->convert_file( $size_file, $attachment_id, $mime_type );
+				$final_file = $converted ?: $size_file;
+
+				$after = file_exists( $final_file ) ? filesize( $final_file ) : $before;
+				$total_after += $after;
+
+				if ( $converted && $converted !== $size_file ) {
+					$size_updates[ $size ] = [
+						'file' => $converted,
+						'mime' => $this->get_file_mime_type( $converted, 0 ),
+					];
 				}
 			}
 		}
 
-		// 2. Convertir le fichier principal
 		$original_file = $base_path . $metadata['file'];
 		if ( file_exists( $original_file ) ) {
-			$converted = $this->convert_file( $original_file );
+			$before = filesize( $original_file );
+			$total_before += $before;
+			$this->optimize_file( $original_file );
+
+			$converted = $this->convert_file( $original_file, $attachment_id, $mime_type );
+			$final_file = $converted ?: $original_file;
+			$after = file_exists( $final_file ) ? filesize( $final_file ) : $before;
+			$total_after += $after;
+
 			if ( $converted && $converted !== $original_file ) {
-				// Mettre à jour le chemin du fichier attaché dans WordPress
-				update_attached_file( $attachment_id, $converted );
-
-				// Mettre à jour le type MIME du post d'attachement
-				$info = pathinfo( $converted );
-				$ext  = strtolower( $info['extension'] ?? '' );
-				$mime = 'avif' === $ext ? 'image/avif' : 'image/webp';
-				
-				wp_update_post( [
-					'ID'             => $attachment_id,
-					'post_mime_type' => $mime,
-				] );
-
-				// 3. Convertir également physiquement toutes les miniatures générées !
-				if ( ! empty( $metadata['sizes'] ) ) {
-					foreach ( $metadata['sizes'] as $size => $size_data ) {
-						if ( ! empty( $size_data['file'] ) ) {
-							$size_file = $sizes_path . $size_data['file'];
-							if ( file_exists( $size_file ) ) {
-								$this->convert_file( $size_file );
-							}
-						}
-					}
-				}
-
-				// Mettre à jour les métadonnées pour refléter le nouveau format
-				$metadata = $this->update_metadata_format( $metadata, $original_file, $converted );
+				$original_converted = true;
+				$original_new_file = $converted;
+				$this->update_attachment_database_refs( $attachment_id, $original_file, $converted );
 			}
+		}
+
+		if ( $original_converted ) {
+			$metadata = $this->update_metadata_after_conversion( $metadata, $original_file, $original_new_file, $size_updates );
+		} elseif ( ! empty( $size_updates ) ) {
+			$metadata = $this->update_metadata_after_conversion( $metadata, '', '', $size_updates );
+		}
+
+		if ( $total_before > 0 ) {
+			$bytes_saved = max( $total_before - $total_after, 0 );
+			$this->update_stats( $bytes_saved, $total_before );
+
+			$final_mime = $original_converted ? $this->get_file_mime_type( $original_new_file, 0 ) : $mime_type;
+			$final_file = $original_converted ? $original_new_file : $original_file;
+			$this->mark_attachment_optimized( $attachment_id, $total_before, $total_after, $final_file, $final_mime );
 		}
 
 		return $metadata;
@@ -318,6 +392,10 @@ class Module implements ModuleInterface {
 			return;
 		}
 
+		if ( isset( $this->optimized_paths[ $file_path ] ) ) {
+			return;
+		}
+
 		$cap = $this->get_capabilities();
 
 		// Utiliser Imagick si disponible (meilleur contrôle)
@@ -326,6 +404,8 @@ class Module implements ModuleInterface {
 		} elseif ( $cap['gd'] ) {
 			$this->optimize_with_gd( $file_path );
 		}
+
+		$this->optimized_paths[ $file_path ] = true;
 	}
 
 	/**
@@ -397,10 +477,23 @@ class Module implements ModuleInterface {
 	 * @param string $file_path Chemin du fichier source.
 	 * @return string|false Chemin du fichier converti ou false.
 	 */
-	private function convert_file( string $file_path ) {
+	private function convert_file( string $file_path, int $attachment_id = 0, string $mime_type = '' ) {
+		if ( ! file_exists( $file_path ) ) {
+			return false;
+		}
+
 		$target_format = $this->get_target_format();
 
 		if ( empty( $target_format ) ) {
+			return false;
+		}
+
+		$mime_type = $mime_type ?: $this->get_file_mime_type( $file_path, $attachment_id );
+		if ( empty( $mime_type ) || ! $this->is_supported_image_mime( $mime_type ) ) {
+			return false;
+		}
+
+		if ( $this->is_animated_image( $file_path, $mime_type ) ) {
 			return false;
 		}
 
@@ -412,6 +505,7 @@ class Module implements ModuleInterface {
 		}
 
 		$output_path = $info['dirname'] . '/' . $info['filename'] . '.' . $target_format;
+		$before = file_exists( $file_path ) ? filesize( $file_path ) : 0;
 
 		$cap = $this->get_capabilities();
 
@@ -427,13 +521,16 @@ class Module implements ModuleInterface {
 			return false;
 		}
 
+		$after = filesize( $output_path );
+		if ( $before > 0 && $after >= $before ) {
+			wp_delete_file( $output_path );
+			return false;
+		}
+
 		// Supprimer l'original si demandé
 		if ( ! $this->settings['keep_original'] && file_exists( $output_path ) ) {
 			wp_delete_file( $file_path );
 		}
-
-		// Incrémenter les stats
-		$this->increment_stats();
 
 		return $output_path;
 	}
@@ -488,23 +585,21 @@ class Module implements ModuleInterface {
 	/**
 	 * Met à jour les métadonnées après conversion de format.
 	 */
-	private function update_metadata_format( array $metadata, string $old_file, string $new_file ): array {
-		$old_info = pathinfo( $old_file );
-		$new_info = pathinfo( $new_file );
-
-		// Mettre à jour le fichier principal
-		if ( ! empty( $metadata['file'] ) ) {
+	private function update_metadata_after_conversion( array $metadata, string $old_file, string $new_file, array $size_updates ): array {
+		if ( $old_file && $new_file && ! empty( $metadata['file'] ) ) {
+			$old_info = pathinfo( $old_file );
+			$new_info = pathinfo( $new_file );
 			$metadata['file'] = str_replace( $old_info['basename'], $new_info['basename'], $metadata['file'] );
 		}
 
-		// Mettre à jour les tailles
-		if ( ! empty( $metadata['sizes'] ) ) {
-			foreach ( $metadata['sizes'] as $size => $size_data ) {
-				if ( ! empty( $size_data['file'] ) ) {
-					$old_size_info = pathinfo( $size_data['file'] );
-					$metadata['sizes'][ $size ]['file'] = $old_size_info['filename'] . '.' . $new_info['extension'];
-					$metadata['sizes'][ $size ]['mime-type'] = 'avif' === $new_info['extension'] ? 'image/avif' : 'image/webp';
+		if ( ! empty( $metadata['sizes'] ) && ! empty( $size_updates ) ) {
+			foreach ( $size_updates as $size => $update ) {
+				if ( empty( $metadata['sizes'][ $size ] ) ) {
+					continue;
 				}
+
+				$metadata['sizes'][ $size ]['file'] = basename( $update['file'] );
+				$metadata['sizes'][ $size ]['mime-type'] = $update['mime'] ?? $metadata['sizes'][ $size ]['mime-type'];
 			}
 		}
 
@@ -519,7 +614,113 @@ class Module implements ModuleInterface {
 	 * Vérifie si le type MIME est une image.
 	 */
 	private function is_image( string $mime_type ): bool {
-		return strpos( $mime_type, 'image/' ) === 0;
+		return $this->is_supported_image_mime( $mime_type );
+	}
+
+	/**
+	 * Detecte le type MIME d'un fichier.
+	 */
+	private function get_file_mime_type( string $file_path, int $attachment_id = 0 ): string {
+		if ( $attachment_id > 0 ) {
+			$mime = get_post_mime_type( $attachment_id );
+			if ( is_string( $mime ) && $mime !== '' ) {
+				return $mime;
+			}
+		}
+
+		if ( '' === $file_path ) {
+			return '';
+		}
+
+		$info = wp_check_filetype( $file_path );
+		if ( ! empty( $info['type'] ) ) {
+			return $info['type'];
+		}
+
+		if ( function_exists( 'mime_content_type' ) ) {
+			$mime = mime_content_type( $file_path );
+			if ( is_string( $mime ) ) {
+				return $mime;
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * Verifie si un MIME est pris en charge pour optimisation.
+	 */
+	private function is_supported_image_mime( string $mime_type ): bool {
+		if ( strpos( $mime_type, 'image/' ) !== 0 ) {
+			return false;
+		}
+
+		$excluded = [
+			'image/svg+xml',
+			'image/x-icon',
+			'image/vnd.microsoft.icon',
+		];
+
+		if ( in_array( $mime_type, $excluded, true ) ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * Detecte si une image est animee.
+	 */
+	private function is_animated_image( string $file_path, string $mime_type ): bool {
+		if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
+			return false;
+		}
+
+		$cap = $this->get_capabilities();
+
+		if ( $cap['imagick'] ) {
+			try {
+				$imagick = new \Imagick( $file_path );
+				$is_animated = $imagick->getNumberImages() > 1;
+				$imagick->clear();
+				$imagick->destroy();
+				return $is_animated;
+			} catch ( \Exception $e ) {
+				return false;
+			}
+		}
+
+		if ( 'image/gif' === $mime_type ) {
+			return $this->is_animated_gif( $file_path );
+		}
+
+		return false;
+	}
+
+	/**
+	 * Detection simple d'un GIF anime.
+	 */
+	private function is_animated_gif( string $file_path ): bool {
+		if ( ! file_exists( $file_path ) ) {
+			return false;
+		}
+
+		$handle = fopen( $file_path, 'rb' );
+		if ( ! $handle ) {
+			return false;
+		}
+
+		$frames = 0;
+		while ( ! feof( $handle ) && $frames < 2 ) {
+			$chunk = fread( $handle, 1024 * 100 );
+			if ( false === $chunk ) {
+				break;
+			}
+			$frames += preg_match_all( '/\x00\x21\xF9\x04.{4}\x00\x2C/s', $chunk );
+		}
+		fclose( $handle );
+
+		return $frames > 1;
 	}
 
 	/**
@@ -541,11 +742,20 @@ class Module implements ModuleInterface {
 	 * ================================================================ */
 
 	/**
-	 * Incrémente le compteur d'images optimisées.
+	 * Met a jour les statistiques d'optimisation.
 	 */
-	private function increment_stats(): void {
-		$stats = get_option( $this->stats_key, [ 'optimized' => 0, 'bytes_saved' => 0 ] );
+	private function update_stats( int $bytes_saved, int $original_bytes ): void {
+		$defaults = [
+			'optimized'      => 0,
+			'bytes_saved'    => 0,
+			'original_bytes' => 0,
+		];
+		$stats = wp_parse_args( get_option( $this->stats_key, [] ), $defaults );
+
 		$stats['optimized']++;
+		$stats['bytes_saved'] += max( $bytes_saved, 0 );
+		$stats['original_bytes'] += max( $original_bytes, 0 );
+
 		update_option( $this->stats_key, $stats );
 	}
 
@@ -553,11 +763,93 @@ class Module implements ModuleInterface {
 	 * Retourne les statistiques.
 	 */
 	public function get_stats(): array {
-		$stats = get_option( $this->stats_key, [ 'optimized' => 0, 'bytes_saved' => 0 ] );
+		$defaults = [
+			'optimized'      => 0,
+			'bytes_saved'    => 0,
+			'original_bytes' => 0,
+		];
+		$stats = wp_parse_args( get_option( $this->stats_key, [] ), $defaults );
 
 		return array_merge( $stats, [
 			'capabilities' => $this->get_capabilities(),
 		] );
+	}
+
+	/**
+	 * Retourne une estimation de gain pour le bulk.
+	 */
+	public function get_bulk_preview(): array {
+		$stats = $this->get_stats();
+		$state = $this->get_bulk_state();
+		$remaining = (int) $state['remaining'];
+
+		if ( 0 === $remaining && ! $state['running'] ) {
+			$remaining = $this->count_unoptimized_images();
+		}
+
+		$avg_saved = 0;
+		if ( ! empty( $stats['optimized'] ) ) {
+			$avg_saved = (int) floor( $stats['bytes_saved'] / max( 1, (int) $stats['optimized'] ) );
+		}
+
+		$estimated = $avg_saved * $remaining;
+
+		return [
+			'remaining'             => $remaining,
+			'estimated_bytes_saved' => max( 0, $estimated ),
+			'avg_saved_per_image'   => $avg_saved,
+		];
+	}
+
+	/**
+	 * Marque un attachment comme optimise.
+	 */
+	private function mark_attachment_optimized( int $attachment_id, int $original_bytes, int $optimized_bytes, string $final_file, string $final_mime ): void {
+		$bytes_saved = max( $original_bytes - $optimized_bytes, 0 );
+		$format = strtolower( pathinfo( $final_file, PATHINFO_EXTENSION ) );
+
+		update_post_meta( $attachment_id, '_skmt_optimized', time() );
+		update_post_meta( $attachment_id, '_skmt_original_bytes', $original_bytes );
+		update_post_meta( $attachment_id, '_skmt_optimized_bytes', $optimized_bytes );
+		update_post_meta( $attachment_id, '_skmt_bytes_saved', $bytes_saved );
+		update_post_meta( $attachment_id, '_skmt_optimized_format', $format );
+		update_post_meta( $attachment_id, '_skmt_optimized_mime', $final_mime );
+	}
+
+	/**
+	 * Verifie si un attachment est deja optimise.
+	 */
+	private function is_already_optimized( int $attachment_id ): bool {
+		return (bool) get_post_meta( $attachment_id, '_skmt_optimized', true );
+	}
+
+	/**
+	 * Met a jour les references en base apres conversion.
+	 */
+	private function update_attachment_database_refs( int $attachment_id, string $old_file, string $new_file ): void {
+		update_attached_file( $attachment_id, $new_file );
+
+		$mime = $this->get_file_mime_type( $new_file, 0 );
+		if ( $mime ) {
+			wp_update_post( [
+				'ID'             => $attachment_id,
+				'post_mime_type' => $mime,
+			] );
+		}
+
+		$guid = get_post_field( 'guid', $attachment_id );
+		if ( is_string( $guid ) && $guid !== '' ) {
+			$old_basename = basename( $old_file );
+			if ( strpos( $guid, $old_basename ) !== false ) {
+				$uploads = wp_get_upload_dir();
+				$relative = ltrim( str_replace( $uploads['basedir'], '', $new_file ), '/\\' );
+				$new_url = trailingslashit( $uploads['baseurl'] ) . str_replace( '\\', '/', $relative );
+				wp_update_post( [
+					'ID'   => $attachment_id,
+					'guid' => $new_url,
+				] );
+			}
+		}
 	}
 
 	/* ================================================================
@@ -623,86 +915,30 @@ class Module implements ModuleInterface {
 			wp_send_json_error( __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$batch_size = 5;
-
-		$args = [
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'post_status'    => 'inherit',
-			'posts_per_page' => $batch_size,
-			'fields'         => 'ids',
-			'no_found_rows'  => true,
-			'update_post_term_cache' => false,
-			'update_post_meta_cache' => false,
-			'meta_query'     => [
-				[
-					'key'     => '_skmt_optimized',
-					'compare' => 'NOT EXISTS',
-				],
-			],
-		];
-
-		$query = new \WP_Query( $args );
-		$processed = 0;
-		$remaining = 0;
-
-		if ( $query->have_posts() ) {
-			foreach ( $query->posts as $attachment_id ) {
-				$file = get_attached_file( $attachment_id );
-				if ( $file && file_exists( $file ) ) {
-					$this->optimize_file( $file );
-					$converted = $this->convert_file( $file );
-
-					if ( $converted && $converted !== $file ) {
-						// Mettre à jour le fichier attaché
-						update_attached_file( $attachment_id, $converted );
-
-						// Mettre à jour les métadonnées
-						$metadata = wp_get_attachment_metadata( $attachment_id );
-						if ( $metadata ) {
-							$metadata = $this->update_metadata_format( $metadata, $file, $converted );
-							wp_update_attachment_metadata( $attachment_id, $metadata );
-						}
-
-						// Mettre à jour le mime type
-						$info = pathinfo( $converted );
-						$mime = 'avif' === strtolower( $info['extension'] ?? '' ) ? 'image/avif' : 'image/webp';
-						wp_update_post( [
-							'ID'             => $attachment_id,
-							'post_mime_type' => $mime,
-						] );
-					}
-
-					// Alt text
-					$this->generate_alt_text( $attachment_id );
-				}
-
-				update_post_meta( $attachment_id, '_skmt_optimized', time() );
-				$processed++;
-			}
+		$state = $this->get_bulk_state();
+		if ( ! $state['running'] ) {
+			$total = $this->count_unoptimized_images();
+			$state = [
+				'running'   => $total > 0,
+				'total'     => $total,
+				'processed' => 0,
+				'remaining' => $total,
+				'updated_at'=> time(),
+			];
+			$this->set_bulk_state( $state );
 		}
 
-		// Compter le reste
-		$remaining_args = [
-			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
-			'post_status'    => 'inherit',
-			'posts_per_page' => 1,
-			'fields'         => 'ids',
-			'meta_query'     => [
-				[
-					'key'     => '_skmt_optimized',
-					'compare' => 'NOT EXISTS',
-				],
-			],
-		];
-		$remaining_query = new \WP_Query( $remaining_args );
-		$remaining = $remaining_query->found_posts;
+		if ( $state['running'] ) {
+			$this->run_cron_batch( 3 );
+			$this->schedule_bulk_event( 5 );
+		}
 
 		wp_send_json_success( [
-			'processed' => $processed,
-			'remaining' => $remaining,
-			'done'      => 0 === $remaining,
+			'processed' => $state['processed'],
+			'remaining' => $state['remaining'],
+			'done'      => 0 === $state['remaining'] && ! $state['running'],
+			'running'   => $state['running'],
+			'total'     => $state['total'],
 		] );
 	}
 
@@ -716,6 +952,274 @@ class Module implements ModuleInterface {
 			wp_send_json_error( __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 		}
 
+		$state = $this->get_bulk_state();
+		if ( $state['running'] && $state['updated_at'] && ( time() - (int) $state['updated_at'] ) > 20 ) {
+			$this->run_cron_batch( 3 );
+			$state = $this->get_bulk_state();
+		}
+		wp_send_json_success( [
+			'remaining' => $state['remaining'],
+			'processed' => $state['processed'],
+			'done'      => 0 === $state['remaining'] && ! $state['running'],
+			'running'   => $state['running'],
+			'total'     => $state['total'],
+		] );
+	}
+
+	/**
+	 * Traitement cron du batch.
+	 */
+	public function run_cron_batch( int $batch_size = 5 ): void {
+		$state = $this->get_bulk_state();
+		if ( ! $state['running'] ) {
+			return;
+		}
+
+		$ids = $this->get_unoptimized_attachment_ids( $batch_size );
+		if ( empty( $ids ) ) {
+			$state['running'] = false;
+			$state['remaining'] = 0;
+			$state['updated_at'] = time();
+			$this->set_bulk_state( $state );
+			return;
+		}
+
+		$processed_now = 0;
+		foreach ( $ids as $attachment_id ) {
+			$metadata = wp_get_attachment_metadata( $attachment_id );
+			if ( $metadata ) {
+				$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, true );
+				wp_update_attachment_metadata( $attachment_id, $metadata );
+			}
+
+			$this->generate_alt_text( $attachment_id );
+			$processed_now++;
+		}
+
+		$state['processed'] += $processed_now;
+		$state['remaining'] = max( $state['remaining'] - $processed_now, 0 );
+		$state['updated_at'] = time();
+
+		if ( 0 === $state['remaining'] ) {
+			$state['running'] = false;
+			$this->set_bulk_state( $state );
+			return;
+		}
+
+		$this->set_bulk_state( $state );
+		$this->schedule_bulk_event( $batch_size );
+	}
+
+	/**
+	 * Enqueue les assets pour la mediathèque.
+	 */
+	public function enqueue_media_assets( string $hook ): void {
+		if ( ! function_exists( 'get_current_screen' ) ) {
+			return;
+		}
+
+		$screen = get_current_screen();
+		if ( ! $screen ) {
+			return;
+		}
+
+		if ( 'upload' !== $screen->base && 'post' !== $screen->base ) {
+			return;
+		}
+
+		if ( 'post' === $screen->base && 'attachment' !== $screen->post_type ) {
+			return;
+		}
+
+		foreach ( $this->get_admin_js() as $index => $script_url ) {
+			if ( empty( $script_url ) ) {
+				continue;
+			}
+
+			$handle = 'skmt-image-optimizer-js-' . $index;
+			wp_enqueue_script( $handle, $script_url, [], SKMT_VERSION, true );
+			$this->localize_admin_script( $handle );
+		}
+	}
+
+	/**
+	 * Ajoute une section Image Optimizer dans l'edition media.
+	 */
+	public function add_media_optimizer_fields( array $form_fields, \WP_Post $post ): array {
+		$mime = get_post_mime_type( $post->ID );
+		if ( empty( $mime ) || ! $this->is_supported_image_mime( $mime ) ) {
+			return $form_fields;
+		}
+
+		$file = get_attached_file( $post->ID );
+		if ( empty( $file ) || ! file_exists( $file ) ) {
+			return $form_fields;
+		}
+
+		$is_animated = $this->is_animated_image( $file, $mime );
+		$is_optimized = $this->is_already_optimized( $post->ID );
+		$original_bytes = (int) get_post_meta( $post->ID, '_skmt_original_bytes', true );
+		$optimized_bytes = (int) get_post_meta( $post->ID, '_skmt_optimized_bytes', true );
+		$bytes_saved = (int) get_post_meta( $post->ID, '_skmt_bytes_saved', true );
+
+		$estimated = 0;
+		if ( ! $is_optimized ) {
+			$stats = $this->get_stats();
+			$avg_ratio = 0;
+			if ( ! empty( $stats['original_bytes'] ) ) {
+				$avg_ratio = (float) $stats['bytes_saved'] / max( 1, (float) $stats['original_bytes'] );
+			}
+			$estimated = (int) floor( filesize( $file ) * $avg_ratio );
+		}
+
+		$action_html = '';
+		if ( $is_animated ) {
+			$action_html = '<p>' . esc_html__( 'Image animée : optimisation automatique désactivée.', 'studio-kyne-mini-tools' ) . '</p>';
+		} elseif ( ! $is_optimized ) {
+			$action_html = '<button type="button" class="button skmt-optimize-single" data-attachment="' . esc_attr( $post->ID ) . '">'
+				. esc_html__( 'Optimiser cette image', 'studio-kyne-mini-tools' ) . '</button>';
+		} else {
+			$action_html = '<span class="skmt-optimized-status">' . esc_html__( 'Déjà optimisée', 'studio-kyne-mini-tools' ) . '</span>';
+		}
+
+		$current_size = filesize( $file );
+		$potential_style = $is_optimized ? 'style="display:none;"' : '';
+		$result_style = $is_optimized ? '' : 'style="display:none;"';
+
+		$details = '<div class="skmt-gain-potential" ' . $potential_style . '>'
+			. '<p>'
+			. esc_html__( 'Gain potentiel :', 'studio-kyne-mini-tools' )
+			. ' <strong class="skmt-bytes-estimated">' . esc_html( size_format( $estimated, 2 ) ) . '</strong>'
+			. '</p>'
+			. '<p>' . esc_html__( 'Taille actuelle :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-current">' . esc_html( size_format( $current_size, 2 ) ) . '</strong></p>'
+			. '</div>'
+			. '<div class="skmt-gain-result" ' . $result_style . '>'
+			. '<p>'
+			. esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' )
+			. ' <strong class="skmt-bytes-saved">' . esc_html( size_format( $bytes_saved, 2 ) ) . '</strong>'
+			. '</p>'
+			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-original">' . esc_html( size_format( $original_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-final">' . esc_html( size_format( $optimized_bytes, 2 ) ) . '</strong></p>'
+			. '</div>';
+
+		$form_fields['skmt_image_optimizer'] = [
+			'label' => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
+			'input' => 'html',
+			'html'  => '<div class="skmt-media-optimizer" data-attachment="' . esc_attr( $post->ID ) . '">'
+				. $details
+				. '<div class="skmt-media-optimizer__actions">' . $action_html . '</div>'
+				. '<div class="skmt-media-optimizer__message" style="margin-top:6px;"></div>'
+				. '</div>',
+		];
+
+		return $form_fields;
+	}
+
+	/**
+	 * AJAX : optimisation d'une seule image.
+	 */
+	public function ajax_optimize_single(): void {
+		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$attachment_id = isset( $_POST['attachment_id'] ) ? absint( $_POST['attachment_id'] ) : 0;
+		if ( ! $attachment_id ) {
+			wp_send_json_error( __( 'ID invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$mime = get_post_mime_type( $attachment_id );
+		if ( empty( $mime ) || ! $this->is_supported_image_mime( $mime ) ) {
+			wp_send_json_error( __( 'Format non pris en charge.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$file = get_attached_file( $attachment_id );
+		if ( empty( $file ) || ! file_exists( $file ) ) {
+			wp_send_json_error( __( 'Fichier introuvable.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( $this->is_animated_image( $file, $mime ) ) {
+			wp_send_json_error( __( 'Image animée non prise en charge.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( ! $this->is_already_optimized( $attachment_id ) ) {
+			$metadata = wp_get_attachment_metadata( $attachment_id );
+			if ( $metadata ) {
+				$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, true );
+				wp_update_attachment_metadata( $attachment_id, $metadata );
+			}
+		}
+
+		$original_bytes = (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true );
+		$optimized_bytes = (int) get_post_meta( $attachment_id, '_skmt_optimized_bytes', true );
+		$bytes_saved = (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true );
+
+		wp_send_json_success( [
+			'original_bytes'  => $original_bytes,
+			'optimized_bytes' => $optimized_bytes,
+			'bytes_saved'     => $bytes_saved,
+		] );
+	}
+
+	/**
+	 * Localise les données admin communes pour un script du module.
+	 */
+	private function localize_admin_script( string $handle ): void {
+		wp_localize_script( $handle, 'skmtAdmin', [
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+			'i18n'    => [
+				'bulkRunning'    => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
+				'bulkProcessed'  => __( 'Traité :', 'studio-kyne-mini-tools' ),
+				'bulkRemaining'  => __( 'Restant :', 'studio-kyne-mini-tools' ),
+				'bulkDone'       => __( 'Optimisation terminée', 'studio-kyne-mini-tools' ),
+				'bulkComplete'   => __( 'Toutes les images ont été optimisées.', 'studio-kyne-mini-tools' ),
+				'bulkRetry'      => __( 'Réessayer', 'studio-kyne-mini-tools' ),
+				'singleRunning'  => __( 'Optimisation…', 'studio-kyne-mini-tools' ),
+				'singleDone'     => __( 'Optimisée', 'studio-kyne-mini-tools' ),
+				'singleError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
+			],
+		] );
+	}
+
+	/**
+	 * Recuperation de l'etat du bulk.
+	 */
+	private function get_bulk_state(): array {
+		$state = get_option( $this->bulk_state_key, [] );
+		$defaults = [
+			'running'   => false,
+			'total'     => 0,
+			'processed' => 0,
+			'remaining' => 0,
+			'updated_at'=> 0,
+		];
+
+		return wp_parse_args( $state, $defaults );
+	}
+
+	/**
+	 * Sauvegarde l'etat du bulk.
+	 */
+	private function set_bulk_state( array $state ): void {
+		update_option( $this->bulk_state_key, $state );
+	}
+
+	/**
+	 * Programme un batch cron si necessaire.
+	 */
+	private function schedule_bulk_event( int $batch_size ): void {
+		if ( ! wp_next_scheduled( 'skmt_image_optimizer_cron', [ $batch_size ] ) ) {
+			wp_schedule_single_event( time() + 2, 'skmt_image_optimizer_cron', [ $batch_size ] );
+		}
+	}
+
+	/**
+	 * Compte le nombre d'images non optimisees.
+	 */
+	private function count_unoptimized_images(): int {
 		$args = [
 			'post_type'      => 'attachment',
 			'post_mime_type' => 'image',
@@ -731,10 +1235,31 @@ class Module implements ModuleInterface {
 		];
 
 		$query = new \WP_Query( $args );
+		return (int) $query->found_posts;
+	}
 
-		wp_send_json_success( [
-			'remaining' => $query->found_posts,
-			'done'      => 0 === $query->found_posts,
-		] );
+	/**
+	 * Recupere un lot d'IDs non optimises.
+	 */
+	private function get_unoptimized_attachment_ids( int $limit ): array {
+		$args = [
+			'post_type'      => 'attachment',
+			'post_mime_type' => 'image',
+			'post_status'    => 'inherit',
+			'posts_per_page' => $limit,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			'update_post_term_cache' => false,
+			'update_post_meta_cache' => false,
+			'meta_query'     => [
+				[
+					'key'     => '_skmt_optimized',
+					'compare' => 'NOT EXISTS',
+				],
+			],
+		];
+
+		$query = new \WP_Query( $args );
+		return array_map( 'intval', $query->posts );
 	}
 }
