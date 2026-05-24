@@ -13,8 +13,6 @@ class Activator {
 		// Options par défaut
 		$default_settings = [
 			'global'   => [
-				'github_user'   => 'studiokyne',
-				'github_repo'   => 'studio-kyne-mini-tools',
 				'update_channel'=> 'stable',
 				'auto_updates'  => false,
 			],
@@ -27,7 +25,5 @@ class Activator {
 			add_option( 'skmt_settings', $default_settings );
 		}
 
-		// Flush rewrite rules si nécessaire
-		flush_rewrite_rules();
 	}
 }

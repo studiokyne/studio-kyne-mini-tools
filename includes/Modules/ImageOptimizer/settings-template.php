@@ -6,33 +6,11 @@
  */
 
 $module_settings = $instance->get_settings();
-$stats = $instance->get_stats();
 $preview = $instance->get_bulk_preview();
-$bytes_saved = (int) ( $stats['bytes_saved'] ?? 0 );
 $estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 ?>
 
 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-	<!-- Statistiques -->
-	<div class="skmt-section">
-		<div class="skmt-section__header">
-			<h2 class="skmt-section__title"><?php echo esc_html__( 'Statistiques', 'studio-kyne-mini-tools' ); ?></h2>
-			<p class="skmt-section__desc"><?php echo esc_html__( 'Estimation des gains et résultats déjà obtenus.', 'studio-kyne-mini-tools' ); ?></p>
-		</div>
-		<div class="skmt-section__content">
-			<div class="skmt-form__group">
-				<label class="skmt-form__label"><?php echo esc_html__( 'Gain potentiel estimé', 'studio-kyne-mini-tools' ); ?></label>
-				<p class="skmt-form__help"><?php echo esc_html( size_format( $estimated_saved, 2 ) ); ?></p>
-			</div>
-			<div class="skmt-form__group">
-				<label class="skmt-form__label"><?php echo esc_html__( 'Gain total obtenu', 'studio-kyne-mini-tools' ); ?></label>
-				<p class="skmt-form__help"><?php echo esc_html( size_format( $bytes_saved, 2 ) ); ?></p>
-			</div>
-		</div>
-	</div>
-
-	<div class="skmt-divider"></div>
-
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
@@ -204,6 +182,10 @@ $estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 						<?php $remaining = (int) ( $preview['remaining'] ?? 0 ); ?>
 						<span id="skmt-bulk-remaining"><?php echo esc_html( $remaining ); ?></span>
 						<?php echo esc_html__( 'images à optimiser', 'studio-kyne-mini-tools' ); ?>
+					</span>
+					<span class="skmt-form__help">
+						<?php echo esc_html__( 'Gains potentiels :', 'studio-kyne-mini-tools' ); ?>
+						<strong id="skmt-bulk-potential"><?php echo esc_html( size_format( $estimated_saved, 2 ) ); ?></strong>
 					</span>
 				</div>
 				<div class="skmt-bulk-status__progress" style="display: none;">

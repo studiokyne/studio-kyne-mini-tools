@@ -38,18 +38,76 @@ class Modules {
 	 * le chargement trop tôt des traductions (WP 6.7+ JIT).
 	 */
 	public function register_default_modules( bool $only_active = false ): void {
-		if ( $only_active && ! $this->is_active( 'image_optimizer' ) ) {
-			return;
+		$defaults = [
+			'image_optimizer' => [
+				'name'        => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Optimisation des images', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Optimiser les images', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\ImageOptimizer\\Module',
+				'icon'        => 'image',
+			],
+		];
+
+		/**
+		 * Permet d'ajouter/surcharger des modules depuis d'autres plugins/themes.
+		 *
+		 * Format attendu:
+		 * [ 'module_id' => [ 'name' => ..., 'class' => ..., ... ] ]
+		 */
+		$definitions = apply_filters( 'skmt_module_definitions', $defaults );
+
+		if ( ! is_array( $definitions ) ) {
+			$definitions = $defaults;
 		}
 
-		$this->register( 'image_optimizer', [
-			'name'        => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
-			'description' => __( 'Optimisation des images', 'studio-kyne-mini-tools' ),
-			'menu_label'  => __( 'Image Optimizer', 'studio-kyne-mini-tools' ),
-			'menu_desc'   => __( 'Optimiser les images', 'studio-kyne-mini-tools' ),
-			'class'       => 'StudioKyne\\MiniTools\\Modules\\ImageOptimizer\\Module',
-			'icon'        => 'image',
+		foreach ( $definitions as $id => $args ) {
+			$id = sanitize_key( (string) $id );
+			if ( '' === $id || ! is_array( $args ) ) {
+				continue;
+			}
+
+			$args = $this->normalize_definition( $args );
+			if ( empty( $args['class'] ) ) {
+				continue;
+			}
+
+			if ( $only_active && ! $this->is_active( $id ) ) {
+				continue;
+			}
+
+			$this->register( $id, $args );
+		}
+
+		/**
+		 * Hook impératif pour enregistrer des modules via $modules->register(...).
+		 */
+		do_action( 'skmt_register_modules', $this, $only_active );
+	}
+
+	/**
+	 * Normalise une définition de module.
+	 *
+	 * @param array $args Definition brute.
+	 */
+	private function normalize_definition( array $args ): array {
+		$normalized = wp_parse_args( $args, [
+			'name'        => '',
+			'description' => '',
+			'menu_label'  => '',
+			'menu_desc'   => '',
+			'class'       => '',
+			'icon'        => 'package',
 		] );
+
+		$normalized['name']        = is_string( $normalized['name'] ) ? $normalized['name'] : '';
+		$normalized['description'] = is_string( $normalized['description'] ) ? $normalized['description'] : '';
+		$normalized['menu_label']  = is_string( $normalized['menu_label'] ) ? $normalized['menu_label'] : '';
+		$normalized['menu_desc']   = is_string( $normalized['menu_desc'] ) ? $normalized['menu_desc'] : '';
+		$normalized['class']       = is_string( $normalized['class'] ) ? ltrim( $normalized['class'], '\\' ) : '';
+		$normalized['icon']        = is_string( $normalized['icon'] ) ? sanitize_key( $normalized['icon'] ) : 'package';
+
+		return $normalized;
 	}
 
 	/**

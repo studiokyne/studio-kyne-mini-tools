@@ -25,7 +25,7 @@ $modules = $this->modules->get_all();
 				?>
 					<div class="skmt-module-card <?php echo $is_active ? 'skmt-module-card--active' : ''; ?>">
 						<div class="skmt-module-card__header">
-							<i data-lucide="<?php echo esc_attr( $icon ); ?>" class="skmt-icon skmt-icon--md"></i>
+							<?php echo $this->render_icon( $icon, 'md' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<h3 class="skmt-module-card__title"><?php echo esc_html( $module['name'] ); ?></h3>
 							<label class="skmt-toggle">
 								<input type="checkbox"

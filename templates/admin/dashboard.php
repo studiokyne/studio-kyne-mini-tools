@@ -19,7 +19,7 @@ $active_count = count( array_filter( $modules, function( $id ) {
 		<div class="skmt-cards">
 			<div class="skmt-card skmt-card--stat">
 				<div class="skmt-card__icon">
-					<i data-lucide="package" class="skmt-icon skmt-icon--lg"></i>
+					<?php echo $this->render_icon( 'package', 'lg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 				<div class="skmt-card__content">
 					<span class="skmt-card__value"><?php echo esc_html( count( $modules ) ); ?></span>
@@ -29,7 +29,7 @@ $active_count = count( array_filter( $modules, function( $id ) {
 
 			<div class="skmt-card skmt-card--stat">
 				<div class="skmt-card__icon skmt-card__icon--success">
-					<i data-lucide="check-circle" class="skmt-icon skmt-icon--lg"></i>
+					<?php echo $this->render_icon( 'check-circle', 'lg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 				<div class="skmt-card__content">
 					<span class="skmt-card__value"><?php echo esc_html( $active_count ); ?></span>
@@ -39,7 +39,7 @@ $active_count = count( array_filter( $modules, function( $id ) {
 
 			<div class="skmt-card skmt-card--stat">
 				<div class="skmt-card__icon skmt-card__icon--info">
-					<i data-lucide="info" class="skmt-icon skmt-icon--lg"></i>
+					<?php echo $this->render_icon( 'info', 'lg' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				</div>
 				<div class="skmt-card__content">
 					<span class="skmt-card__value"><?php echo esc_html( SKMT_VERSION ); ?></span>
@@ -60,8 +60,8 @@ $active_count = count( array_filter( $modules, function( $id ) {
 							<?php if ( $this->modules->is_active( $module_id ) ) : ?>
 								<?php $icon = ! empty( $module['icon'] ) ? $module['icon'] : 'package'; ?>
 								<div class="skmt-module-card skmt-module-card--active">
-									<div class="skmt-module-card__header">
-										<i data-lucide="<?php echo esc_attr( $icon ); ?>" class="skmt-icon skmt-icon--md"></i>
+								<div class="skmt-module-card__header">
+										<?php echo $this->render_icon( $icon, 'md' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 										<h3 class="skmt-module-card__title"><?php echo esc_html( $module['name'] ); ?></h3>
 										<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'Actif', 'studio-kyne-mini-tools' ); ?></span>
 									</div>
@@ -77,7 +77,7 @@ $active_count = count( array_filter( $modules, function( $id ) {
 					</div>
 				<?php else : ?>
 					<div class="skmt-empty">
-						<i data-lucide="puzzle" class="skmt-icon skmt-icon--xl"></i>
+						<?php echo $this->render_icon( 'package', 'xl' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						<p><?php echo esc_html__( 'Aucun module actif. Activez des modules depuis la page Modules.', 'studio-kyne-mini-tools' ); ?></p>
 						<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=modules' ) ); ?>" class="skmt-btn skmt-btn--primary">
 							<?php echo esc_html__( 'Voir les modules', 'studio-kyne-mini-tools' ); ?>

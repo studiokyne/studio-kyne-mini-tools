@@ -24,6 +24,9 @@ $post_meta_keys = [
 	'_skmt_original_bytes',
 	'_skmt_optimized_bytes',
 	'_skmt_bytes_saved',
+	'_skmt_main_original_bytes',
+	'_skmt_main_optimized_bytes',
+	'_skmt_main_bytes_saved',
 	'_skmt_optimized_format',
 	'_skmt_optimized_mime',
 ];

@@ -105,17 +105,9 @@ class Admin {
 			);
 
 			wp_enqueue_script(
-				'lucide-icons',
-				'https://unpkg.com/lucide@latest',
-				[],
-				null,
-				false
-			);
-
-			wp_enqueue_script(
 				'skmt-admin-js',
 				SKMT_ASSETS_URL . 'admin/js/admin.js',
-				[ 'lucide-icons' ],
+				[],
 				SKMT_VERSION,
 				true
 			);
@@ -147,6 +139,33 @@ class Admin {
 				'singleError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
 			],
 		] );
+	}
+
+	/**
+	 * Retourne le SVG inline d'une icône.
+	 */
+	public function render_icon( string $icon, string $size = 'md', string $extra_class = '' ): string {
+		$paths = $this->get_icon_paths();
+		$path  = $paths[ $icon ] ?? $paths['package'];
+		$class = trim( 'skmt-icon skmt-icon--' . $size . ' ' . $extra_class );
+
+		return '<svg class="' . esc_attr( $class ) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $path . '</svg>';
+	}
+
+	/**
+	 * Dictionnaire minimal des icônes utilisées par l'admin.
+	 *
+	 * @return array<string, string>
+	 */
+	private function get_icon_paths(): array {
+		return [
+			'layout-dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
+			'package'           => '<path d="m7.5 4.27 9 5.15"></path><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"></path><path d="m3.3 7 8.7 5 8.7-5"></path><path d="M12 22V12"></path>',
+			'settings'          => '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
+			'image'             => '<rect x="3" y="3" width="18" height="18" rx="2"></rect><circle cx="9" cy="9" r="2"></circle><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"></path>',
+			'check-circle'      => '<circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>',
+			'info'              => '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
+		];
 	}
 
 	/**
@@ -228,21 +247,6 @@ class Admin {
 			wp_enqueue_script( $handle, $script_url, [], SKMT_VERSION, true );
 			$this->localize_admin_script( $handle );
 		}
-	}
-
-	/**
-	 * Retourne l'icone du menu principal.
-	 */
-	private function get_menu_icon(): string {
-		$icon_path = SKMT_PLUGIN_DIR . 'assets/admin/images/menu-icon.svg';
-		if ( file_exists( $icon_path ) ) {
-			$svg = file_get_contents( $icon_path );
-			if ( $svg ) {
-				return 'data:image/svg+xml;base64,' . base64_encode( $svg );
-			}
-		}
-
-		return 'dashicons-admin-tools';
 	}
 
 	/**
@@ -480,10 +484,9 @@ class Admin {
 			$instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;
 
 			if ( $instance && isset( $_POST['skmt_module_settings'] ) && is_array( $_POST['skmt_module_settings'] ) ) {
-				$module_settings = $this->sanitize_module_settings( wp_unslash( $_POST['skmt_module_settings'] ) );
-				$instance->save_settings( $module_settings );
-			}
+			$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) );
 		}
+	}
 
 		// Redirection avec notice
 		$redirect = add_query_arg( [
@@ -628,23 +631,6 @@ class Admin {
 
 		wp_safe_redirect( $redirect );
 		exit;
-	}
-
-	/**
-	 * Sanitize les réglages d'un module.
-	 */
-	private function sanitize_module_settings( array $settings ): array {
-		$sanitized = [];
-		foreach ( $settings as $key => $value ) {
-			if ( is_bool( $value ) || in_array( $value, [ 'true', 'false', '1', '0', 'on', 'off' ], true ) ) {
-				$sanitized[ $key ] = filter_var( $value, FILTER_VALIDATE_BOOLEAN );
-			} elseif ( is_numeric( $value ) ) {
-				$sanitized[ $key ] = intval( $value );
-			} else {
-				$sanitized[ $key ] = sanitize_text_field( $value );
-			}
-		}
-		return $sanitized;
 	}
 
 	/**

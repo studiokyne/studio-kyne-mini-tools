@@ -18,6 +18,7 @@
     const messageEl = document.querySelector(".skmt-bulk-status__message");
     const barEl = document.querySelector(".skmt-progress__bar");
     const remainingEl = document.getElementById("skmt-bulk-remaining");
+    const potentialEl = document.getElementById("skmt-bulk-potential");
 
     let isRunning = false;
 
@@ -107,6 +108,9 @@
     function updateStatus(result) {
       if (remainingEl) {
         remainingEl.textContent = result.remaining;
+      }
+      if (potentialEl && typeof result.estimated_bytes_saved === "number") {
+        potentialEl.textContent = formatBytes(result.estimated_bytes_saved);
       }
 
       if (messageEl) {
@@ -199,6 +203,9 @@
             const finalEl = wrapper.querySelector(".skmt-bytes-final");
             const estimatedEl = wrapper.querySelector(".skmt-bytes-estimated");
             const originalEl = wrapper.querySelector(".skmt-bytes-original");
+            const mainSavedEl = wrapper.querySelector(".skmt-main-bytes-saved");
+            const mainFinalEl = wrapper.querySelector(".skmt-main-bytes-final");
+            const mainOriginalEl = wrapper.querySelector(".skmt-main-bytes-original");
             const potentialBlock = wrapper.querySelector(
               ".skmt-gain-potential",
             );
@@ -227,6 +234,27 @@
                 typeof result.original_bytes === "number"
                   ? formatBytes(result.original_bytes)
                   : originalEl.textContent;
+            }
+
+            if (mainSavedEl) {
+              mainSavedEl.textContent =
+                typeof result.main_bytes_saved === "number"
+                  ? formatBytes(result.main_bytes_saved)
+                  : mainSavedEl.textContent;
+            }
+
+            if (mainFinalEl) {
+              mainFinalEl.textContent =
+                typeof result.main_optimized_bytes === "number"
+                  ? formatBytes(result.main_optimized_bytes)
+                  : mainFinalEl.textContent;
+            }
+
+            if (mainOriginalEl) {
+              mainOriginalEl.textContent =
+                typeof result.main_original_bytes === "number"
+                  ? formatBytes(result.main_original_bytes)
+                  : mainOriginalEl.textContent;
             }
 
             if (potentialBlock) {

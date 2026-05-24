@@ -10,7 +10,6 @@ class Deactivator {
 	 * Exécuté à la désactivation du plugin.
 	 */
 	public static function deactivate(): void {
-		// Flush rewrite rules si nécessaire
-		flush_rewrite_rules();
+		// Intentionnellement vide: aucune rewrite rule n'est enregistrée par le plugin.
 	}
 }

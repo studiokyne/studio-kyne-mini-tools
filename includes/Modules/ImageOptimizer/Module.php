@@ -1,7 +1,7 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
-use StudioKyne\MiniTools\Core\ModuleInterface;
+use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**
  * Module Image Optimizer.
@@ -14,7 +14,8 @@ use StudioKyne\MiniTools\Core\ModuleInterface;
  * - Génération alt text
  * - Optimisation en masse
  */
-class Module implements ModuleInterface {
+class Module extends AbstractModule {
+	private const BULK_BATCH_SIZE = 5;
 
 	/**
 	 * Clé d'option pour les réglages du module.
@@ -95,7 +96,7 @@ class Module implements ModuleInterface {
 			'keep_original'      => false,
 		];
 
-		$stored = get_option( $this->option_key, [] );
+		$stored = $this->get_option_value( $this->option_key, [] );
 
 		return wp_parse_args( $stored, $defaults );
 	}
@@ -119,7 +120,7 @@ class Module implements ModuleInterface {
 
 		$this->settings = $sanitized;
 
-		return update_option( $this->option_key, $sanitized );
+		return $this->update_option_value( $this->option_key, $sanitized );
 	}
 
 	/**
@@ -266,7 +267,7 @@ class Module implements ModuleInterface {
 			return $metadata;
 		}
 
-		if ( $this->is_already_optimized( $attachment_id ) ) {
+		if ( ! $force && $this->is_already_optimized( $attachment_id ) ) {
 			return $metadata;
 		}
 
@@ -282,6 +283,8 @@ class Module implements ModuleInterface {
 
 		$total_before = 0;
 		$total_after  = 0;
+		$main_before  = 0;
+		$main_after   = 0;
 		$size_updates = [];
 		$original_converted = false;
 		$original_new_file = '';
@@ -319,12 +322,14 @@ class Module implements ModuleInterface {
 		$original_file = $base_path . $metadata['file'];
 		if ( file_exists( $original_file ) ) {
 			$before = filesize( $original_file );
+			$main_before = $before;
 			$total_before += $before;
 			$this->optimize_file( $original_file );
 
 			$converted = $this->convert_file( $original_file, $attachment_id, $mime_type );
 			$final_file = $converted ?: $original_file;
 			$after = file_exists( $final_file ) ? filesize( $final_file ) : $before;
+			$main_after = $after;
 			$total_after += $after;
 
 			if ( $converted && $converted !== $original_file ) {
@@ -340,13 +345,48 @@ class Module implements ModuleInterface {
 			$metadata = $this->update_metadata_after_conversion( $metadata, '', '', $size_updates );
 		}
 
+		// Synchroniser les tailles de fichiers réelles dans les metadata WP.
+		$metadata = $this->refresh_metadata_filesizes( $metadata, $base_path );
+
 		if ( $total_before > 0 ) {
 			$bytes_saved = max( $total_before - $total_after, 0 );
 			$this->update_stats( $bytes_saved, $total_before );
 
 			$final_mime = $original_converted ? $this->get_file_mime_type( $original_new_file, 0 ) : $mime_type;
 			$final_file = $original_converted ? $original_new_file : $original_file;
-			$this->mark_attachment_optimized( $attachment_id, $total_before, $total_after, $final_file, $final_mime );
+			$this->mark_attachment_optimized( $attachment_id, $total_before, $total_after, $final_file, $final_mime, $main_before, $main_after );
+		}
+
+		return $metadata;
+	}
+
+	/**
+	 * Recalcule les tailles réelles des fichiers (original + tailles).
+	 */
+	private function refresh_metadata_filesizes( array $metadata, string $base_path ): array {
+		if ( ! empty( $metadata['file'] ) ) {
+			$original_path = $base_path . $metadata['file'];
+			if ( file_exists( $original_path ) ) {
+				$metadata['filesize'] = filesize( $original_path );
+			}
+		}
+
+		if ( empty( $metadata['sizes'] ) || empty( $metadata['file'] ) ) {
+			return $metadata;
+		}
+
+		$subdir = dirname( $metadata['file'] );
+		$sizes_base_path = trailingslashit( $base_path . $subdir );
+
+		foreach ( $metadata['sizes'] as $size => $size_data ) {
+			if ( empty( $size_data['file'] ) ) {
+				continue;
+			}
+
+			$size_file_path = $sizes_base_path . $size_data['file'];
+			if ( file_exists( $size_file_path ) ) {
+				$metadata['sizes'][ $size ]['filesize'] = filesize( $size_file_path );
+			}
 		}
 
 		return $metadata;
@@ -804,14 +844,18 @@ class Module implements ModuleInterface {
 	/**
 	 * Marque un attachment comme optimise.
 	 */
-	private function mark_attachment_optimized( int $attachment_id, int $original_bytes, int $optimized_bytes, string $final_file, string $final_mime ): void {
+	private function mark_attachment_optimized( int $attachment_id, int $original_bytes, int $optimized_bytes, string $final_file, string $final_mime, int $main_original_bytes = 0, int $main_optimized_bytes = 0 ): void {
 		$bytes_saved = max( $original_bytes - $optimized_bytes, 0 );
+		$main_bytes_saved = max( $main_original_bytes - $main_optimized_bytes, 0 );
 		$format = strtolower( pathinfo( $final_file, PATHINFO_EXTENSION ) );
 
 		update_post_meta( $attachment_id, '_skmt_optimized', time() );
 		update_post_meta( $attachment_id, '_skmt_original_bytes', $original_bytes );
 		update_post_meta( $attachment_id, '_skmt_optimized_bytes', $optimized_bytes );
 		update_post_meta( $attachment_id, '_skmt_bytes_saved', $bytes_saved );
+		update_post_meta( $attachment_id, '_skmt_main_original_bytes', $main_original_bytes );
+		update_post_meta( $attachment_id, '_skmt_main_optimized_bytes', $main_optimized_bytes );
+		update_post_meta( $attachment_id, '_skmt_main_bytes_saved', $main_bytes_saved );
 		update_post_meta( $attachment_id, '_skmt_optimized_format', $format );
 		update_post_meta( $attachment_id, '_skmt_optimized_mime', $final_mime );
 	}
@@ -835,20 +879,6 @@ class Module implements ModuleInterface {
 				'ID'             => $attachment_id,
 				'post_mime_type' => $mime,
 			] );
-		}
-
-		$guid = get_post_field( 'guid', $attachment_id );
-		if ( is_string( $guid ) && $guid !== '' ) {
-			$old_basename = basename( $old_file );
-			if ( strpos( $guid, $old_basename ) !== false ) {
-				$uploads = wp_get_upload_dir();
-				$relative = ltrim( str_replace( $uploads['basedir'], '', $new_file ), '/\\' );
-				$new_url = trailingslashit( $uploads['baseurl'] ) . str_replace( '\\', '/', $relative );
-				wp_update_post( [
-					'ID'   => $attachment_id,
-					'guid' => $new_url,
-				] );
-			}
 		}
 	}
 
@@ -929,9 +959,12 @@ class Module implements ModuleInterface {
 		}
 
 		if ( $state['running'] ) {
-			$this->run_cron_batch( 3 );
-			$this->schedule_bulk_event( 5 );
+			$this->run_cron_batch( self::BULK_BATCH_SIZE );
+			$this->schedule_bulk_event( self::BULK_BATCH_SIZE );
+			$state = $this->get_bulk_state();
 		}
+
+		$preview = $this->get_bulk_preview();
 
 		wp_send_json_success( [
 			'processed' => $state['processed'],
@@ -939,6 +972,7 @@ class Module implements ModuleInterface {
 			'done'      => 0 === $state['remaining'] && ! $state['running'],
 			'running'   => $state['running'],
 			'total'     => $state['total'],
+			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
 		] );
 	}
 
@@ -954,15 +988,17 @@ class Module implements ModuleInterface {
 
 		$state = $this->get_bulk_state();
 		if ( $state['running'] && $state['updated_at'] && ( time() - (int) $state['updated_at'] ) > 20 ) {
-			$this->run_cron_batch( 3 );
+			$this->run_cron_batch( self::BULK_BATCH_SIZE );
 			$state = $this->get_bulk_state();
 		}
+		$preview = $this->get_bulk_preview();
 		wp_send_json_success( [
 			'remaining' => $state['remaining'],
 			'processed' => $state['processed'],
 			'done'      => 0 === $state['remaining'] && ! $state['running'],
 			'running'   => $state['running'],
 			'total'     => $state['total'],
+			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
 		] );
 	}
 
@@ -1038,7 +1074,21 @@ class Module implements ModuleInterface {
 
 			$handle = 'skmt-image-optimizer-js-' . $index;
 			wp_enqueue_script( $handle, $script_url, [], SKMT_VERSION, true );
-			$this->localize_admin_script( $handle );
+			wp_localize_script( $handle, 'skmtAdmin', [
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+				'i18n'    => [
+					'bulkRunning'    => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
+					'bulkProcessed'  => __( 'Traité :', 'studio-kyne-mini-tools' ),
+					'bulkRemaining'  => __( 'Restant :', 'studio-kyne-mini-tools' ),
+					'bulkDone'       => __( 'Optimisation terminée', 'studio-kyne-mini-tools' ),
+					'bulkComplete'   => __( 'Toutes les images ont été optimisées.', 'studio-kyne-mini-tools' ),
+					'bulkRetry'      => __( 'Réessayer', 'studio-kyne-mini-tools' ),
+					'singleRunning'  => __( 'Optimisation…', 'studio-kyne-mini-tools' ),
+					'singleDone'     => __( 'Optimisée', 'studio-kyne-mini-tools' ),
+					'singleError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				],
+			] );
 		}
 	}
 
@@ -1061,6 +1111,22 @@ class Module implements ModuleInterface {
 		$original_bytes = (int) get_post_meta( $post->ID, '_skmt_original_bytes', true );
 		$optimized_bytes = (int) get_post_meta( $post->ID, '_skmt_optimized_bytes', true );
 		$bytes_saved = (int) get_post_meta( $post->ID, '_skmt_bytes_saved', true );
+		$main_original_bytes = (int) get_post_meta( $post->ID, '_skmt_main_original_bytes', true );
+		$main_optimized_bytes = (int) get_post_meta( $post->ID, '_skmt_main_optimized_bytes', true );
+		$main_bytes_saved = (int) get_post_meta( $post->ID, '_skmt_main_bytes_saved', true );
+
+		// Fallback pour les anciens médias optimisés avant l'ajout du détail principal.
+		if ( $is_optimized && 0 === $main_optimized_bytes ) {
+			$main_optimized_bytes = file_exists( $file ) ? (int) filesize( $file ) : 0;
+		}
+
+		if ( $is_optimized && 0 === $main_original_bytes && $main_optimized_bytes > 0 ) {
+			$main_original_bytes = max( $main_optimized_bytes + $main_bytes_saved, $main_optimized_bytes );
+		}
+
+		if ( $is_optimized && 0 === $main_bytes_saved && $main_original_bytes > 0 && $main_optimized_bytes > 0 ) {
+			$main_bytes_saved = max( $main_original_bytes - $main_optimized_bytes, 0 );
+		}
 
 		$estimated = 0;
 		if ( ! $is_optimized ) {
@@ -1094,6 +1160,14 @@ class Module implements ModuleInterface {
 			. '<p>' . esc_html__( 'Taille actuelle :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-current">' . esc_html( size_format( $current_size, 2 ) ) . '</strong></p>'
 			. '</div>'
 			. '<div class="skmt-gain-result" ' . $result_style . '>'
+			. '<p style="margin-bottom:4px;"><strong>' . esc_html__( 'Fichier principal', 'studio-kyne-mini-tools' ) . '</strong></p>'
+			. '<p>'
+			. esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' )
+			. ' <strong class="skmt-main-bytes-saved">' . esc_html( size_format( $main_bytes_saved, 2 ) ) . '</strong>'
+			. '</p>'
+			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-original">' . esc_html( size_format( $main_original_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-final">' . esc_html( size_format( $main_optimized_bytes, 2 ) ) . '</strong></p>'
+			. '<p style="margin:10px 0 4px;"><strong>' . esc_html__( 'Total (principal + miniatures)', 'studio-kyne-mini-tools' ) . '</strong></p>'
 			. '<p>'
 			. esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' )
 			. ' <strong class="skmt-bytes-saved">' . esc_html( size_format( $bytes_saved, 2 ) ) . '</strong>'
@@ -1155,32 +1229,17 @@ class Module implements ModuleInterface {
 		$original_bytes = (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true );
 		$optimized_bytes = (int) get_post_meta( $attachment_id, '_skmt_optimized_bytes', true );
 		$bytes_saved = (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true );
+		$main_original_bytes = (int) get_post_meta( $attachment_id, '_skmt_main_original_bytes', true );
+		$main_optimized_bytes = (int) get_post_meta( $attachment_id, '_skmt_main_optimized_bytes', true );
+		$main_bytes_saved = (int) get_post_meta( $attachment_id, '_skmt_main_bytes_saved', true );
 
 		wp_send_json_success( [
 			'original_bytes'  => $original_bytes,
 			'optimized_bytes' => $optimized_bytes,
 			'bytes_saved'     => $bytes_saved,
-		] );
-	}
-
-	/**
-	 * Localise les données admin communes pour un script du module.
-	 */
-	private function localize_admin_script( string $handle ): void {
-		wp_localize_script( $handle, 'skmtAdmin', [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-			'i18n'    => [
-				'bulkRunning'    => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
-				'bulkProcessed'  => __( 'Traité :', 'studio-kyne-mini-tools' ),
-				'bulkRemaining'  => __( 'Restant :', 'studio-kyne-mini-tools' ),
-				'bulkDone'       => __( 'Optimisation terminée', 'studio-kyne-mini-tools' ),
-				'bulkComplete'   => __( 'Toutes les images ont été optimisées.', 'studio-kyne-mini-tools' ),
-				'bulkRetry'      => __( 'Réessayer', 'studio-kyne-mini-tools' ),
-				'singleRunning'  => __( 'Optimisation…', 'studio-kyne-mini-tools' ),
-				'singleDone'     => __( 'Optimisée', 'studio-kyne-mini-tools' ),
-				'singleError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
-			],
+			'main_original_bytes'  => $main_original_bytes,
+			'main_optimized_bytes' => $main_optimized_bytes,
+			'main_bytes_saved'     => $main_bytes_saved,
 		] );
 	}
 

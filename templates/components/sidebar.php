@@ -11,7 +11,7 @@ $core_items = [
 		'id'    => 'dashboard',
 		'label' => __( 'Vue d\'ensemble', 'studio-kyne-mini-tools' ),
 		'desc'  => __( 'Tableau de bord', 'studio-kyne-mini-tools' ),
-		'icon'  => 'layout-panel-left',
+		'icon'  => 'layout-dashboard',
 	],
 	[
 		'id'    => 'modules',
@@ -46,7 +46,7 @@ $core_items = [
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=' . $item['id'] ) ); ?>"
 					   class="skmt-sidebar__link <?php echo $item['id'] === $tab ? 'is-active' : ''; ?>">
 						<div class="skmt-sidebar__icon-wrapper">
-							<i data-lucide="<?php echo esc_attr( $item['icon'] ); ?>" class="skmt-icon skmt-icon--sm"></i>
+							<?php echo $this->render_icon( $item['icon'], 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
 						<div class="skmt-sidebar__link-text">
 							<span class="skmt-sidebar__link-label"><?php echo esc_html( $item['label'] ); ?></span>
@@ -71,7 +71,7 @@ $core_items = [
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=module_' . $module_id ) ); ?>"
 							   class="skmt-sidebar__link <?php echo 'module_' . $module_id === $tab ? 'is-active' : ''; ?>">
 								<div class="skmt-sidebar__icon-wrapper">
-									<i data-lucide="<?php echo esc_attr( $icon ); ?>" class="skmt-icon skmt-icon--sm"></i>
+									<?php echo $this->render_icon( $icon, 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								</div>
 								<div class="skmt-sidebar__link-text">
 									<span class="skmt-sidebar__link-label"><?php echo esc_html( $label ); ?></span>

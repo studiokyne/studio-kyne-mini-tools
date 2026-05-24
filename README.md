@@ -60,15 +60,15 @@ studio-kyne-mini-tools/
 
 1. Creer un dossier dans includes/Modules/MonModule/
 2. Implementer ModuleInterface
-3. Enregistrer le module dans Core/Modules.php
+3. Enregistrer le module via filtre `skmt_module_definitions`
 
 ```php
 <?php
 namespace StudioKyne\MiniTools\Modules\MonModule;
 
-use StudioKyne\MiniTools\Core\ModuleInterface;
+use StudioKyne\MiniTools\Core\AbstractModule;
 
-class Module implements ModuleInterface {
+class Module extends AbstractModule {
     public function init(): void {}
     public function get_settings(): array { return ['enabled' => true]; }
     public function save_settings( array $settings ): bool {
@@ -79,6 +79,36 @@ class Module implements ModuleInterface {
     }
 }
 ```
+
+### Enregistrement extensible des modules
+
+Le core expose un registre extensible pour eviter de modifier `Core/Modules.php` a chaque nouveau module.
+
+```php
+add_filter( 'skmt_module_definitions', function( array $modules ) {
+    $modules['mon_module'] = [
+        'name'        => __( 'Mon module', 'studio-kyne-mini-tools' ),
+        'description' => __( 'Description courte', 'studio-kyne-mini-tools' ),
+        'menu_label'  => __( 'Mon module', 'studio-kyne-mini-tools' ),
+        'menu_desc'   => __( 'Action principale', 'studio-kyne-mini-tools' ),
+        'class'       => 'StudioKyne\\MiniTools\\Modules\\MonModule\\Module',
+        'icon'        => 'package',
+    ];
+    return $modules;
+} );
+```
+
+### Recommandation architecture module (simple -> complexe)
+
+- Module simple:
+  - `Module.php` (hooks + settings + vue)
+- Module complexe:
+  - `Module.php` (orchestration)
+  - `Services/` (metier, API, cron, stockage)
+  - `Admin/` (UI, handlers, rendering)
+  - `Domain/` (DTO, regles, validation)
+
+Chaque module doit sanitiser ses propres settings dans `save_settings()` (le core n'applique plus de sanitization generique).
 
 ## Releases et versioning
 

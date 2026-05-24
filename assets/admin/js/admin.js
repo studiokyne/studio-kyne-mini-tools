@@ -9,7 +9,6 @@
   document.addEventListener("DOMContentLoaded", function () {
     initToggles();
     initFormValidation();
-    initLucideIcons();
   });
 
   /**
@@ -29,22 +28,6 @@
         }
       });
     });
-  }
-
-  /**
-   * Initialise Lucide Icons
-   */
-  function initLucideIcons() {
-    if (typeof lucide !== "undefined") {
-      lucide.createIcons();
-      document.body.classList.add("skmt-icons-ready");
-      return;
-    }
-
-    // Fallback: avoid hiding icons forever if lucide fails to load
-    setTimeout(function () {
-      document.body.classList.add("skmt-icons-ready");
-    }, 1000);
   }
 
   /**
