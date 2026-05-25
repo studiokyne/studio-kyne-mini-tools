@@ -7,36 +7,37 @@ namespace StudioKyne\MiniTools\Core;
 interface ModuleInterface {
 
 	/**
-	 * Initialise le module.
+	 * Initialise le module (enregistrement des hooks).
 	 */
 	public function init(): void;
 
 	/**
 	 * Retourne les réglages du module.
-	 *
-	 * @return array Tableau de réglages.
 	 */
 	public function get_settings(): array;
 
 	/**
 	 * Enregistre les réglages du module.
-	 *
-	 * @param array $settings Nouveaux réglages.
-	 * @return bool Succès ou échec.
 	 */
 	public function save_settings( array $settings ): bool;
 
 	/**
-	 * Retourne les styles admin du module.
+	 * Retourne les URLs CSS admin du module.
 	 *
-	 * @return string[] Liste d'URLs CSS.
+	 * @return string[]
 	 */
 	public function get_admin_css(): array;
 
 	/**
-	 * Retourne les scripts admin du module.
+	 * Retourne les URLs JS admin du module.
 	 *
-	 * @return string[] Liste d'URLs JS.
+	 * @return string[]
 	 */
 	public function get_admin_js(): array;
+
+	/**
+	 * Retourne les données JS à injecter dans skmtAdmin pour ce module.
+	 * Typiquement : ['i18n' => ['key' => 'translated string', ...]]
+	 */
+	public function get_admin_js_data(): array;
 }

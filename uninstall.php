@@ -1,36 +1,47 @@
 <?php
 /**
- * Nettoyage des donnees lors de la desinstallation.
+ * Nettoyage des données lors de la désinstallation.
+ *
+ * Chaque module déclare les clés à supprimer via ::get_uninstall_keys().
+ * Pour ajouter un module : déclarer sa classe dans $module_classes ci-dessous.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
-$option_keys = [
-	'skmt_settings',
-	'skmt_module_image_optimizer',
-	'skmt_image_optimizer_stats',
-	'skmt_image_optimizer_bulk_state',
+// Chargement de l'autoloader pour accéder aux classes des modules.
+require_once plugin_dir_path( __FILE__ ) . 'includes/Core/Autoloader.php';
+\StudioKyne\MiniTools\Core\Autoloader::register();
+
+/**
+ * Classes des modules intégrés.
+ * À mettre à jour lorsqu'un nouveau module est ajouté.
+ *
+ * @var array<string, class-string>
+ */
+$module_classes = [
+	'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
 ];
 
-foreach ( $option_keys as $key ) {
-	delete_option( $key );
-	delete_site_option( $key );
-}
+// Suppression de l'option globale.
+delete_option( 'skmt_settings' );
+delete_site_option( 'skmt_settings' );
 
-$post_meta_keys = [
-	'_skmt_optimized',
-	'_skmt_original_bytes',
-	'_skmt_optimized_bytes',
-	'_skmt_bytes_saved',
-	'_skmt_main_original_bytes',
-	'_skmt_main_optimized_bytes',
-	'_skmt_main_bytes_saved',
-	'_skmt_optimized_format',
-	'_skmt_optimized_mime',
-];
+// Suppression des options et meta propres à chaque module.
+foreach ( $module_classes as $id => $class ) {
+	if ( ! class_exists( $class ) ) {
+		continue;
+	}
 
-foreach ( $post_meta_keys as $meta_key ) {
-	delete_post_meta_by_key( $meta_key );
+	$keys = $class::get_uninstall_keys();
+
+	foreach ( $keys['options'] ?? [] as $option_key ) {
+		delete_option( $option_key );
+		delete_site_option( $option_key );
+	}
+
+	foreach ( $keys['meta'] ?? [] as $meta_key ) {
+		delete_post_meta_by_key( $meta_key );
+	}
 }

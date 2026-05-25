@@ -33,9 +33,8 @@ class Modules {
 	}
 
 	/**
-	 * Enregistre les modules par défaut.
-	 * Doit être appelé au hook init ou plus tard pour éviter
-	 * le chargement trop tôt des traductions (WP 6.7+ JIT).
+	 * Enregistre les modules par défaut via filter + hook impératif.
+	 * Doit être appelé au hook init ou plus tard (JIT i18n WP 6.7+).
 	 */
 	public function register_default_modules( bool $only_active = false ): void {
 		$defaults = [
@@ -50,10 +49,8 @@ class Modules {
 		];
 
 		/**
-		 * Permet d'ajouter/surcharger des modules depuis d'autres plugins/themes.
-		 *
-		 * Format attendu:
-		 * [ 'module_id' => [ 'name' => ..., 'class' => ..., ... ] ]
+		 * Permet d'ajouter/surcharger des modules depuis d'autres plugins/thèmes.
+		 * Format : [ 'module_id' => [ 'name' => ..., 'class' => ..., ... ] ]
 		 */
 		$definitions = apply_filters( 'skmt_module_definitions', $defaults );
 
@@ -87,8 +84,6 @@ class Modules {
 
 	/**
 	 * Normalise une définition de module.
-	 *
-	 * @param array $args Definition brute.
 	 */
 	private function normalize_definition( array $args ): array {
 		$normalized = wp_parse_args( $args, [
@@ -112,9 +107,6 @@ class Modules {
 
 	/**
 	 * Enregistre un module.
-	 *
-	 * @param string $id   Identifiant unique du module.
-	 * @param array  $args Arguments du module (name, description, class, icon).
 	 */
 	public function register( string $id, array $args ): void {
 		$this->registered[ $id ] = wp_parse_args( $args, [
@@ -149,27 +141,47 @@ class Modules {
 	}
 
 	/**
-	 * Active un module.
+	 * Active un module et appelle son hook on_activate().
 	 */
 	public function activate( string $id ): bool {
 		if ( ! isset( $this->registered[ $id ] ) ) {
 			return false;
 		}
-		return $this->settings->set( "modules.{$id}", true );
+
+		$result = $this->settings->set( "modules.{$id}", true );
+
+		if ( $result ) {
+			$instance = $this->make_instance( $id );
+			if ( $instance ) {
+				$instance->on_activate();
+			}
+		}
+
+		return $result;
 	}
 
 	/**
-	 * Désactive un module.
+	 * Désactive un module et appelle son hook on_deactivate().
 	 */
 	public function deactivate( string $id ): bool {
 		if ( ! isset( $this->registered[ $id ] ) ) {
 			return false;
 		}
-		return $this->settings->set( "modules.{$id}", false );
+
+		// Utiliser l'instance active si disponible, sinon en créer une temporaire.
+		$instance = $this->active[ $id ] ?? $this->make_instance( $id );
+
+		$result = $this->settings->set( "modules.{$id}", false );
+
+		if ( $result && $instance ) {
+			$instance->on_deactivate();
+		}
+
+		return $result;
 	}
 
 	/**
-	 * Initialise les modules actifs.
+	 * Instancie et initialise tous les modules actifs.
 	 */
 	public function init_active_modules(): void {
 		foreach ( $this->registered as $id => $module ) {
@@ -181,7 +193,7 @@ class Modules {
 				continue;
 			}
 
-			$instance = new $module['class']();
+			$instance = new $module['class']( $id );
 
 			if ( $instance instanceof ModuleInterface ) {
 				$instance->init();
@@ -195,5 +207,20 @@ class Modules {
 	 */
 	public function get_active_instances(): array {
 		return $this->active;
+	}
+
+	/**
+	 * Crée une instance du module sans l'initialiser (pour les hooks lifecycle).
+	 */
+	private function make_instance( string $id ): ?ModuleInterface {
+		$class = $this->registered[ $id ]['class'] ?? '';
+
+		if ( empty( $class ) || ! class_exists( $class ) ) {
+			return null;
+		}
+
+		$instance = new $class( $id );
+
+		return $instance instanceof ModuleInterface ? $instance : null;
 	}
 }
