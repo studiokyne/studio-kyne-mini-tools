@@ -20,7 +20,7 @@ class LoginUrlHandler {
 	}
 
 	/**
-	 * Hook template_redirect pour rediriger /wp-login.php vers l'URL personnalisée.
+	 * Hook template_redirect pour bloquer l'accès direct à /wp-login.php.
 	 *
 	 * @return void
 	 */
@@ -32,20 +32,18 @@ class LoginUrlHandler {
 
 		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
 
-		// Vérifier si on accède à /wp-login.php
+		// Vérifier si on accède directement à /wp-login.php
 		if ( strpos( $request_uri, '/wp-login.php' ) === false ) {
 			return;
 		}
 
-		// Construire l'URL de redirection personnalisée
+		// Rediriger vers l'URL personnalisée avec les paramètres GET
 		$redirect_url = home_url( ltrim( $this->custom_login_url, '/' ) );
 
-		// Préserver tous les paramètres GET (?action=, ?redirect_to=, etc.)
 		if ( ! empty( $_GET ) ) {
 			$redirect_url = add_query_arg( array_map( 'sanitize_text_field', wp_unslash( $_GET ) ), $redirect_url );
 		}
 
-		// Rediriger avec un code 302 (temporaire)
 		wp_safe_redirect( $redirect_url, 302 );
 		exit;
 	}
