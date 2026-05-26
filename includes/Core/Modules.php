@@ -46,6 +46,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\ImageOptimizer\\Module',
 				'icon'        => 'image',
 			],
+			'security'        => [
+				'name'        => __( 'Sécurité', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Authentification, hardening et logging de sécurité', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Sécurité', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Gérer la sécurité du site', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Security\\Module',
+				'icon'        => 'shield',
+			],
 		];
 
 		/**

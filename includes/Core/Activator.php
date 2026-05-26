@@ -17,6 +17,7 @@ class Activator {
 	 */
 	private static array $module_classes = [
 		'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
+		'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
 	];
 
 	/**

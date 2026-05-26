@@ -1,0 +1,55 @@
+/* Security Module — styles spécifiques uniquement */
+
+/* Sous-section conditionnelle (ex: options rate limiting) */
+.skmt-security-sub {
+  margin: -8px 0 8px;
+  padding: 16px 20px;
+  background: var(--skmt-n50);
+  border-left: 3px solid var(--skmt-accent);
+  border-radius: 0 var(--skmt-radius-sm) var(--skmt-radius-sm) 0;
+}
+
+.skmt-security-sub .skmt-form__row {
+  margin-bottom: 16px;
+}
+
+.skmt-security-sub__textarea {
+  font-family: 'Courier New', Courier, monospace !important;
+  font-size: 12px !important;
+  line-height: 1.6 !important;
+  resize: vertical;
+  min-height: 100px;
+  max-width: 100% !important;
+}
+
+/* Input composite pour URL personnalisée */
+.skmt-custom-login-url {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.skmt-custom-login-url__base {
+  color: var(--skmt-text-secondary);
+  font-size: 14px;
+  white-space: nowrap;
+  padding: 0 12px;
+  border: 1px solid var(--skmt-border-color);
+  border-radius: var(--skmt-radius-sm);
+  background: var(--skmt-n50);
+  height: 36px;
+  display: flex;
+  align-items: center;
+}
+
+.skmt-custom-login-url__input {
+  flex: 0 0 200px;
+}
+
+/* Notice warning (pas dans le design system de base) */
+.skmt-notice--warning {
+  background: var(--skmt-warning-bg, #fff8e5);
+  color: var(--skmt-text-secondary);
+  border: 1px solid oklch(0.85 0.1 80 / 0.3);
+}
