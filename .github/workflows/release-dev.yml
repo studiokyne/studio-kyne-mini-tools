@@ -5,12 +5,10 @@ on:
     branches:
       - dev
     paths:
-      - 'studio-kyne-mini-tools.php'
-      - 'includes/**'
-      - 'assets/**'
-      - 'templates/**'
-      - '!.github/**'
-      - '!README.md'
+      - "studio-kyne-mini-tools.php"
+      - "includes/**"
+      - "assets/**"
+      - "templates/**"
   workflow_dispatch:
 
 permissions:
@@ -28,14 +26,14 @@ jobs:
       - name: Checkout dev branch
         uses: actions/checkout@v6
         with:
-          ref: dev
           fetch-depth: 0
+          ref: ${{ github.ref_name }}
 
       - name: Determine dev release version
         id: version
         run: |
           # Extraire la version du plugin
-          PLUGIN_VERSION=$(grep -E "define\s*\(\s*'SKMT_VERSION'\s*,\s*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
+          PLUGIN_VERSION=$(grep -E "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
 
           if [[ -z "$PLUGIN_VERSION" ]]; then
             echo "Unable to detect plugin version"
