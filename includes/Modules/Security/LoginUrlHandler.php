@@ -4,11 +4,13 @@ namespace StudioKyne\MiniTools\Modules\Security;
 /**
  * Gestionnaire de l'URL de connexion.
  *
- * Redirige /wp-login.php vers une URL personnalisée avec tous les paramètres.
+ * Intercepte les requêtes vers l'URL personnalisée et les traite comme wp-login.php
+ * sans dépendre de la configuration du serveur (Nginx, Apache).
  */
 class LoginUrlHandler {
 
 	private string $custom_login_url;
+	private bool $is_custom_login_request = false;
 
 	/**
 	 * Constructeur.
@@ -16,7 +18,81 @@ class LoginUrlHandler {
 	 * @param string $custom_login_url URL de connexion personnalisée (ex: /connexion).
 	 */
 	public function __construct( string $custom_login_url = '/connexion' ) {
-		$this->custom_login_url = $custom_login_url;
+		$this->custom_login_url = ltrim( $custom_login_url, '/' );
+	}
+
+	/**
+	 * Vérifie si l'URI actuelle correspond à la connexion personnalisée.
+	 *
+	 * @param string $uri
+	 * @return bool
+	 */
+	private function is_custom_login_uri( string $uri ): bool {
+		$pattern = '/^\/?' . preg_quote( $this->custom_login_url, '/' ) . '(\/|\?|$)/';
+		return (bool) preg_match( $pattern, $uri );
+	}
+
+	/**
+	 * Hook plugins_loaded pour intercepter les requêtes vers l'URL personnalisée.
+	 *
+	 * @global string $pagenow
+	 * @return void
+	 */
+	public function plugins_loaded(): void {
+		global $pagenow;
+
+		if ( defined( 'WP_CLI' ) || wp_doing_cron() ) {
+			return;
+		}
+
+		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) );
+		$request     = wp_parse_url( rawurldecode( $request_uri ) );
+
+		// Vérifier si c'est une requête vers /wp-login.php ou /wp-register.php
+		if ( ( strpos( rawurldecode( $request_uri ), 'wp-login.php' ) !== false
+		       || ( isset( $request['path'] ) && untrailingslashit( $request['path'] ) === site_url( 'wp-login', 'relative' ) ) )
+		    && ! is_admin() ) {
+			$pagenow = 'index.php';
+			return;
+		}
+
+		// Vérifier si c'est une requête vers l'URL personnalisée de connexion
+		if ( isset( $request['path'] ) && $this->is_custom_login_uri( $request['path'] ) ) {
+			$_SERVER['SCRIPT_NAME'] = '/' . $this->custom_login_url;
+			$pagenow                = 'wp-login.php';
+			$this->is_custom_login_request = true;
+		}
+	}
+
+	/**
+	 * Hook wp_loaded pour charger wp-login.php si c'est une requête personnalisée.
+	 *
+	 * @global string $pagenow
+	 * @return void
+	 */
+	public function wp_loaded(): void {
+		global $pagenow;
+
+		if ( ! $this->is_custom_login_request || $pagenow !== 'wp-login.php' ) {
+			return;
+		}
+
+		if ( is_user_logged_in() ) {
+			$user = wp_get_current_user();
+			/**
+			 * Filtre la redirection après connexion sur l'URL personnalisée.
+			 *
+			 * @param string $redirect_to URL de redirection (par défaut admin).
+			 * @param string $user        Utilisateur connecté.
+			 */
+			$redirect_to = apply_filters( 'skmt_custom_login_redirect', admin_url(), $user );
+			wp_safe_redirect( $redirect_to );
+			die();
+		}
+
+		// Charger wp-login.php réel
+		require_once ABSPATH . 'wp-login.php';
+		die;
 	}
 
 	/**
@@ -25,12 +101,11 @@ class LoginUrlHandler {
 	 * @return void
 	 */
 	public function block_wp_login(): void {
-		// Ne pas bloquer dans WP CLI, cron, ou ajax
 		if ( defined( 'WP_CLI' ) || wp_doing_cron() || wp_doing_ajax() ) {
 			return;
 		}
 
-		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) );
 
 		// Vérifier si on accède directement à /wp-login.php
 		if ( strpos( $request_uri, '/wp-login.php' ) === false ) {
@@ -38,7 +113,7 @@ class LoginUrlHandler {
 		}
 
 		// Rediriger vers l'URL personnalisée avec les paramètres GET
-		$redirect_url = home_url( ltrim( $this->custom_login_url, '/' ) );
+		$redirect_url = home_url( $this->custom_login_url . '/' );
 
 		if ( ! empty( $_GET ) ) {
 			$redirect_url = add_query_arg( array_map( 'sanitize_text_field', wp_unslash( $_GET ) ), $redirect_url );
@@ -49,8 +124,7 @@ class LoginUrlHandler {
 	}
 
 	/**
-	 * Hook login_url pour rediriger les références à wp-login.php vers 404.
-	 * Utile pour les plugins/thèmes qui renvoient wp-login.php en lien.
+	 * Filtre les URLs de connexion pour pointer vers l'URL personnalisée.
 	 *
 	 * @param string $login_url
 	 * @param string $redirect
@@ -58,9 +132,18 @@ class LoginUrlHandler {
 	 * @return string
 	 */
 	public function filter_login_url( string $login_url, string $redirect = '', bool $force_reauth = false ): string {
-		// Remplacer /wp-login.php par la page de connexion du builder
-		// Ici on laisse la page de connexion custom être gérée par le builder
-		// On peut customiser si besoin
+		// Remplacer wp-login.php par la page de connexion personnalisée
+		if ( strpos( $login_url, 'wp-login.php' ) !== false ) {
+			$args = explode( '?', $login_url );
+
+			if ( isset( $args[1] ) ) {
+				parse_str( $args[1], $params );
+				$login_url = add_query_arg( $params, home_url( $this->custom_login_url . '/' ) );
+			} else {
+				$login_url = home_url( $this->custom_login_url . '/' );
+			}
+		}
+
 		return $login_url;
 	}
 }
