@@ -54,7 +54,6 @@ class Module extends AbstractModule {
 
 		// URL personnalisée de connexion
 		if ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) {
-			add_action( 'plugins_loaded', [ $this->login_handler, 'plugins_loaded' ], 9 );
 			add_action( 'wp_loaded', [ $this->login_handler, 'wp_loaded' ], 10 );
 			add_action( 'template_redirect', [ $this->login_handler, 'block_wp_login' ], 10 );
 			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ], 10, 3 );
