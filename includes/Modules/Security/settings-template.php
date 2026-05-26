@@ -15,7 +15,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 $auth      = $module_settings['authentication'] ?? [];
 $hardening = $module_settings['hardening'] ?? [];
-$logging   = $module_settings['logging'] ?? [];
 ?>
 
 <form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -32,31 +31,6 @@ $logging   = $module_settings['logging'] ?? [];
 			<p class="skmt-section__desc"><?php esc_html_e( 'Gérez les règles d\'accès et de connexion.', 'studio-kyne-mini-tools' ); ?></p>
 		</div>
 		<div class="skmt-section__content">
-
-			<!-- Password Strength -->
-			<div class="skmt-option">
-				<div class="skmt-option__content">
-					<label for="skmt_password_strength" class="skmt-option__label">
-						<?php esc_html_e( 'Forcer un mot de passe fort', 'studio-kyne-mini-tools' ); ?>
-					</label>
-					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Minimum 12 caractères avec majuscules, minuscules, chiffres et caractères spéciaux.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-				</div>
-				<div class="skmt-option__control">
-					<label class="skmt-toggle">
-						<input
-							type="checkbox"
-							id="skmt_password_strength"
-							name="skmt_module_settings[password_strength]"
-							value="1"
-							data-security-toggle="password_strength"
-							<?php checked( $auth['password_strength'] ?? true ); ?>
-						/>
-						<span class="skmt-toggle__slider"></span>
-					</label>
-				</div>
-			</div>
 
 			<!-- Rate Limiting -->
 			<div class="skmt-option">
@@ -154,31 +128,6 @@ $logging   = $module_settings['logging'] ?? [];
 						placeholder="192.168.1.1&#10;127.0.0.1"
 					><?php echo esc_textarea( implode( "\n", $auth['rate_limit_whitelist'] ?? [] ) ); ?></textarea>
 					<p class="skmt-form__help"><?php esc_html_e( 'Ces IPs ne seront jamais bloquées par le rate limiting.', 'studio-kyne-mini-tools' ); ?></p>
-				</div>
-			</div>
-
-			<!-- Disable Registration -->
-			<div class="skmt-option">
-				<div class="skmt-option__content">
-					<label for="skmt_disable_registration" class="skmt-option__label">
-						<?php esc_html_e( 'Désactiver l\'inscription publique', 'studio-kyne-mini-tools' ); ?>
-					</label>
-					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Empêcher les utilisateurs de s\'inscrire via le formulaire public.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-				</div>
-				<div class="skmt-option__control">
-					<label class="skmt-toggle">
-						<input
-							type="checkbox"
-							id="skmt_disable_registration"
-							name="skmt_module_settings[disable_registration]"
-							value="1"
-							data-security-toggle="disable_registration"
-							<?php checked( $auth['disable_registration'] ?? true ); ?>
-						/>
-						<span class="skmt-toggle__slider"></span>
-					</label>
 				</div>
 			</div>
 
@@ -322,118 +271,6 @@ $logging   = $module_settings['logging'] ?? [];
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
-			</div>
-
-		</div>
-	</div>
-
-	<div class="skmt-divider"></div>
-
-	<!-- ============================================================
-		 LOGGING
-		 ============================================================ -->
-	<div class="skmt-section">
-		<div class="skmt-section__header">
-			<h2 class="skmt-section__title"><?php esc_html_e( 'Journalisation', 'studio-kyne-mini-tools' ); ?></h2>
-			<p class="skmt-section__desc"><?php esc_html_e( 'Enregistrez les événements de sécurité pour auditer l\'activité.', 'studio-kyne-mini-tools' ); ?></p>
-		</div>
-		<div class="skmt-section__content">
-
-			<!-- Log Connections -->
-			<div class="skmt-option">
-				<div class="skmt-option__content">
-					<label for="skmt_log_connections" class="skmt-option__label">
-						<?php esc_html_e( 'Enregistrer les connexions', 'studio-kyne-mini-tools' ); ?>
-					</label>
-					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Log les tentatives de connexion (réussies et échouées) avec l\'IP.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-				</div>
-				<div class="skmt-option__control">
-					<label class="skmt-toggle">
-						<input
-							type="checkbox"
-							id="skmt_log_connections"
-							name="skmt_module_settings[log_connections]"
-							value="1"
-							data-security-toggle="log_connections"
-							<?php checked( $logging['log_connections'] ?? false ); ?>
-						/>
-						<span class="skmt-toggle__slider"></span>
-					</label>
-				</div>
-			</div>
-
-			<!-- Log User Actions -->
-			<div class="skmt-option">
-				<div class="skmt-option__content">
-					<label for="skmt_log_user_actions" class="skmt-option__label">
-						<?php esc_html_e( 'Enregistrer les actions utilisateurs', 'studio-kyne-mini-tools' ); ?>
-					</label>
-					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Log les créations et suppressions d\'utilisateurs.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-				</div>
-				<div class="skmt-option__control">
-					<label class="skmt-toggle">
-						<input
-							type="checkbox"
-							id="skmt_log_user_actions"
-							name="skmt_module_settings[log_user_actions]"
-							value="1"
-							data-security-toggle="log_user_actions"
-							<?php checked( $logging['log_user_actions'] ?? false ); ?>
-						/>
-						<span class="skmt-toggle__slider"></span>
-					</label>
-				</div>
-			</div>
-
-			<!-- Log Settings Changes -->
-			<div class="skmt-option">
-				<div class="skmt-option__content">
-					<label for="skmt_log_settings_changes" class="skmt-option__label">
-						<?php esc_html_e( 'Enregistrer les changements de configuration', 'studio-kyne-mini-tools' ); ?>
-					</label>
-					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Log les modifications des settings du module Sécurité.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-				</div>
-				<div class="skmt-option__control">
-					<label class="skmt-toggle">
-						<input
-							type="checkbox"
-							id="skmt_log_settings_changes"
-							name="skmt_module_settings[log_settings_changes]"
-							value="1"
-							data-security-toggle="log_settings_changes"
-							<?php checked( $logging['log_settings_changes'] ?? false ); ?>
-						/>
-						<span class="skmt-toggle__slider"></span>
-					</label>
-				</div>
-			</div>
-
-			<!-- Log Retention -->
-			<div class="skmt-form__group">
-				<label for="log_retention_days" class="skmt-form__label">
-					<?php esc_html_e( 'Rétention des logs (jours)', 'studio-kyne-mini-tools' ); ?>
-				</label>
-				<input
-					type="number"
-					id="log_retention_days"
-					name="skmt_module_settings[log_retention_days]"
-					class="skmt-input skmt-input--sm"
-					value="<?php echo esc_attr( $logging['log_retention_days'] ?? 30 ); ?>"
-					min="1"
-					max="365"
-				/>
-				<p class="skmt-form__help"><?php esc_html_e( 'Les logs plus anciens seront supprimés automatiquement.', 'studio-kyne-mini-tools' ); ?></p>
-			</div>
-
-			<!-- Warning about logging -->
-			<div class="skmt-notice skmt-notice--warning">
-				<?php esc_html_e( 'La journalisation augmente la base de données. Utilisez avec modération sur les sites à fort trafic.', 'studio-kyne-mini-tools' ); ?>
 			</div>
 
 		</div>

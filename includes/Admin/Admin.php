@@ -40,6 +40,7 @@ class Admin {
 		add_action( 'admin_post_skmt_toggle_module', [ $this, 'handle_toggle_module' ] );
 		add_action( 'admin_post_skmt_update_modules', [ $this, 'handle_update_modules' ] );
 		add_action( 'admin_post_skmt_check_updates', [ $this, 'handle_check_updates' ] );
+		add_action( 'admin_post_skmt_reset_settings', [ $this, 'handle_reset_settings' ] );
 		add_action( 'admin_head', [ $this, 'output_menu_separator_css' ] );
 		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ] );
 		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], 11 );
@@ -259,6 +260,7 @@ class Admin {
 			'module_deactivated' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
 			'modules_updated'    => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
 			'updates_checked'    => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
+			'settings_reset'     => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -407,6 +409,40 @@ class Admin {
 			'page'             => $this->slug,
 			'tab'              => 'settings',
 			'skmt_notice'      => 'updates_checked',
+			'skmt_notice_type' => 'success',
+		], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Réinitialisation de tous les réglages du plugin aux valeurs par défaut.
+	 */
+	public function handle_reset_settings(): void {
+		if ( ! isset( $_POST['skmt_reset_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['skmt_reset_nonce'] ) ), 'skmt_reset_settings' ) ) {
+			wp_die( esc_html__( 'Nonce invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		// Reset réglages globaux
+		$this->settings->set( 'global', [ 'update_channel' => 'stable', 'auto_updates' => false ] );
+
+		// Reset les options de chaque module enregistré
+		foreach ( $this->modules->get_all() as $module_id => $module ) {
+			if ( ! empty( $module['class'] ) && class_exists( $module['class'] ) ) {
+				$keys = $module['class']::get_uninstall_keys();
+				foreach ( $keys['options'] ?? [] as $option_key ) {
+					delete_option( $option_key );
+				}
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( [
+			'page'             => $this->slug,
+			'tab'              => 'settings',
+			'skmt_notice'      => 'settings_reset',
 			'skmt_notice_type' => 'success',
 		], admin_url( 'admin.php' ) ) );
 		exit;
