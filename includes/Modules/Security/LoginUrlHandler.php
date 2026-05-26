@@ -87,6 +87,33 @@ class LoginUrlHandler {
 	}
 
 	/**
+	 * Filtre site_url() et network_site_url() pour remplacer wp-login.php
+	 * par l'URL personnalisée. Couvre notamment l'action du formulaire de connexion.
+	 *
+	 * @param string $url
+	 * @return string
+	 */
+	public function filter_site_url( string $url ): string {
+		if ( strpos( $url, 'wp-login.php?action=postpass' ) !== false ) {
+			return $url;
+		}
+
+		if ( strpos( $url, 'wp-login.php' ) !== false ) {
+			$parts = explode( '?', $url, 2 );
+			$base  = home_url( $this->custom_login_url . '/' );
+
+			if ( isset( $parts[1] ) ) {
+				parse_str( $parts[1], $params );
+				return add_query_arg( $params, $base );
+			}
+
+			return $base;
+		}
+
+		return $url;
+	}
+
+	/**
 	 * Filtre les URLs de connexion pour pointer vers l'URL personnalisée.
 	 *
 	 * @param string $login_url
@@ -95,18 +122,6 @@ class LoginUrlHandler {
 	 * @return string
 	 */
 	public function filter_login_url( string $login_url, string $redirect = '', bool $force_reauth = false ): string {
-		// Remplacer wp-login.php par la page de connexion personnalisée
-		if ( strpos( $login_url, 'wp-login.php' ) !== false ) {
-			$args = explode( '?', $login_url );
-
-			if ( isset( $args[1] ) ) {
-				parse_str( $args[1], $params );
-				$login_url = add_query_arg( $params, home_url( $this->custom_login_url . '/' ) );
-			} else {
-				$login_url = home_url( $this->custom_login_url . '/' );
-			}
-		}
-
-		return $login_url;
+		return $this->filter_site_url( $login_url );
 	}
 }

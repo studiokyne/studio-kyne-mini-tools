@@ -55,7 +55,10 @@ class Module extends AbstractModule {
 		// URL personnalisée de connexion
 		if ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) {
 			add_action( 'wp_loaded', [ $this->login_handler, 'wp_loaded' ], 10 );
-			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ], 10, 3 );
+			add_filter( 'login_url',          [ $this->login_handler, 'filter_login_url' ], 10, 3 );
+			add_filter( 'site_url',           [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'network_site_url',   [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'wp_redirect',        [ $this->login_handler, 'filter_site_url' ], 10 );
 		}
 
 		// Désactiver inscription publique
