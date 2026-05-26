@@ -1,66 +1,51 @@
-name: Release Plugin
+name: Release Stable Version
 
 on:
   workflow_dispatch:
-    inputs:
-      version:
-        description: "Semantic version X.Y.Z (optional, auto-increment patch if empty)"
-        required: false
-        default: ""
-        type: string
-      prerelease:
-        description: "Mark release as pre-release"
-        required: false
-        default: false
-        type: boolean
-      generate_release_notes:
-        description: "Generate release notes automatically"
-        required: false
-        default: true
-        type: boolean
 
 permissions:
   contents: write
 
 concurrency:
-  group: skmt-release
+  group: skmt-release-stable
   cancel-in-progress: false
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
-      - name: Checkout
+      - name: Checkout main branch
         uses: actions/checkout@v6
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
 
+      - name: Fetch full tag history
+        run: git fetch --tags --force
+
       - name: Determine release version
         id: version
-        env:
-          INPUT_VERSION: ${{ inputs.version }}
         run: |
-          if [[ -n "$INPUT_VERSION" ]]; then
-            if [[ ! "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-              echo "Invalid version: $INPUT_VERSION"
-              exit 1
-            fi
-            TARGET_VERSION="$INPUT_VERSION"
-          else
-            CURRENT_VERSION=$(grep -E "define\s*\(\s*'SKMT_VERSION'\s*,\s*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
-            if [[ -z "$CURRENT_VERSION" ]]; then
-              echo "Unable to detect current version from studio-kyne-mini-tools.php"
-              exit 1
-            fi
+          set -euo pipefail
 
-            IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT_VERSION"
-            TARGET_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))"
+          current_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'/\1/")
+
+          if [[ -z "$current_version" ]]; then
+            echo "Unable to detect current version from studio-kyne-mini-tools.php"
+            exit 1
           fi
 
-          echo "Using release version: $TARGET_VERSION"
-          echo "version=$TARGET_VERSION" >> "$GITHUB_OUTPUT"
+          IFS='.' read -r major minor patch <<< "$current_version"
+          target_version="${major}.${minor}.$((patch + 1))"
+
+          echo "Current version: $current_version"
+          echo "Target version: $target_version"
+          echo "version=$target_version" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git user
         run: |
@@ -71,38 +56,49 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+
           sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" studio-kyne-mini-tools.php
-          sed -E -i "s/(define\s*\(\s*'SKMT_VERSION'\s*,\s*')[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" studio-kyne-mini-tools.php
+          sed -E -i "s/(define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*')[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" studio-kyne-mini-tools.php
 
       - name: Commit release version
         env:
           VERSION: ${{ steps.version.outputs.version }}
           TARGET_BRANCH: ${{ github.event.repository.default_branch }}
         run: |
-          if ! git diff --quiet; then
-            git add studio-kyne-mini-tools.php
-            git commit -m "chore(release): v${VERSION}"
-            git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
-          else
+          set -euo pipefail
+
+          if git diff --quiet; then
             echo "No version changes to commit"
+            exit 0
           fi
+
+          git add studio-kyne-mini-tools.php
+          git commit -m "chore(release): v${VERSION}"
+          git push origin "HEAD:refs/heads/${TARGET_BRANCH}"
 
       - name: Create and push tag
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
-          TAG="v${VERSION}"
-          if git rev-parse "$TAG" >/dev/null 2>&1; then
-            echo "Tag ${TAG} already exists"
+          set -euo pipefail
+
+          tag="v${VERSION}"
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag ${tag} already exists"
             exit 1
           fi
-          git tag "$TAG"
-          git push origin "$TAG"
+
+          git tag -a "$tag" -m "Release ${tag}"
+          git push origin "$tag"
 
       - name: Build release zip
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+
           mkdir -p dist/package/studio-kyne-mini-tools
           rsync -a ./ dist/package/studio-kyne-mini-tools/ \
             --exclude='.git' \
@@ -118,5 +114,5 @@ jobs:
         with:
           tag_name: v${{ steps.version.outputs.version }}
           files: dist/studio-kyne-mini-tools-${{ steps.version.outputs.version }}.zip
-          prerelease: ${{ inputs.prerelease }}
-          generate_release_notes: ${{ inputs.generate_release_notes }}
+          prerelease: false
+          generate_release_notes: true

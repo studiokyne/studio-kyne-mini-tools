@@ -1,15 +1,9 @@
-name: Release Dev Version
+name: Release Dev Pre-release
 
 on:
   push:
     branches:
       - dev
-    paths:
-      - "studio-kyne-mini-tools.php"
-      - "includes/**"
-      - "assets/**"
-      - "templates/**"
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -17,52 +11,62 @@ permissions:
 concurrency:
   group: skmt-release-dev
   cancel-in-progress: false
+  queue: max
 
 jobs:
   release:
     runs-on: ubuntu-latest
 
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - name: Checkout dev branch
         uses: actions/checkout@v6
         with:
+          ref: dev
           fetch-depth: 0
-          ref: ${{ github.ref_name }}
+
+      - name: Fetch full tag history
+        run: git fetch --tags --force
 
       - name: Determine dev release version
         id: version
         run: |
-          # Extraire la version du plugin
-          PLUGIN_VERSION=$(grep -E "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
+          set -euo pipefail
 
-          if [[ -z "$PLUGIN_VERSION" ]]; then
+          file_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'/\1/")
+          if [[ -z "$file_version" ]]; then
             echo "Unable to detect plugin version"
             exit 1
           fi
 
-          echo "Plugin version: $PLUGIN_VERSION"
-
-          # Chercher le dernier dev release pour cette version
-          LATEST_DEV_RELEASE=$(git tag -l "v${PLUGIN_VERSION}-dev.*" --sort=-version:refname | head -n1)
-
-          if [[ -z "$LATEST_DEV_RELEASE" ]]; then
-            DEV_BUILD=1
+          latest_stable_tag=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
+          if [[ -n "$latest_stable_tag" ]]; then
+            base_version="${latest_stable_tag#v}"
           else
-            # Extraire le numéro de build et l'incrémenter
-            DEV_BUILD=$(echo "$LATEST_DEV_RELEASE" | sed -E "s/v${PLUGIN_VERSION}-dev\.([0-9]+)/\1/")
-            DEV_BUILD=$((DEV_BUILD + 1))
+            base_version="$file_version"
           fi
 
-          TARGET_VERSION="${PLUGIN_VERSION}-dev.${DEV_BUILD}"
-          TARGET_TAG="v${TARGET_VERSION}"
+          latest_dev_tag=$(git tag -l "v${base_version}-dev.*" | grep -E "^v${base_version}-dev\.[0-9]+$" | sort -V | tail -n1 || true)
+          if [[ -z "$latest_dev_tag" ]]; then
+            dev_build=1
+          else
+            dev_build=${latest_dev_tag##*.}
+            dev_build=$((dev_build + 1))
+          fi
 
-          echo "Latest dev release: $LATEST_DEV_RELEASE"
-          echo "Dev build number: $DEV_BUILD"
-          echo "Target version: $TARGET_VERSION"
-          echo "Target tag: $TARGET_TAG"
+          target_version="${base_version}-dev.${dev_build}"
+          target_tag="v${target_version}"
 
-          echo "version=$TARGET_VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+          echo "Base version: $base_version"
+          echo "Latest dev tag: ${latest_dev_tag:-none}"
+          echo "Target version: $target_version"
+          echo "Target tag: $target_tag"
+
+          echo "version=$target_version" >> "$GITHUB_OUTPUT"
+          echo "tag=$target_tag" >> "$GITHUB_OUTPUT"
 
       - name: Configure Git user
         run: |
@@ -73,17 +77,22 @@ jobs:
         env:
           TARGET_TAG: ${{ steps.version.outputs.tag }}
         run: |
+          set -euo pipefail
+
           if git rev-parse "$TARGET_TAG" >/dev/null 2>&1; then
             echo "Tag ${TARGET_TAG} already exists"
             exit 1
           fi
-          git tag "$TARGET_TAG"
+
+          git tag -a "$TARGET_TAG" -m "Dev release ${TARGET_TAG}"
           git push origin "$TARGET_TAG"
 
       - name: Build release zip
         env:
           VERSION: ${{ steps.version.outputs.version }}
         run: |
+          set -euo pipefail
+
           mkdir -p dist/package/studio-kyne-mini-tools
           rsync -a ./ dist/package/studio-kyne-mini-tools/ \
             --exclude='.git' \
@@ -102,8 +111,6 @@ jobs:
           prerelease: true
           generate_release_notes: true
           body: |
-            🧪 **DEV Release** - Testing version
+            Automatic dev pre-release for branch dev.
 
-            This is a pre-release version for testing purposes. Use with caution in production environments.
-
-            To enable dev updates in your plugin settings, select "Dev" channel under Settings → Studio Kyne Mini Tools.
+            This release is published on every push to dev so it can be tested through the WordPress updater on a production-like environment.
