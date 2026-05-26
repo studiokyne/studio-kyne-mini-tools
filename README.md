@@ -1,11 +1,5 @@
 # Studio Kyne Mini Tools
 
-[![Release](https://img.shields.io/github/v/release/studiokyne/studio-kyne-mini-tools?include_prereleases=false)](https://github.com/studiokyne/studio-kyne-mini-tools/releases)
-[![Dev Releases](https://img.shields.io/github/v/release/studiokyne/studio-kyne-mini-tools?include_prereleases=true&label=dev)](https://github.com/studiokyne/studio-kyne-mini-tools/releases)
-[![License](https://img.shields.io/github/license/studiokyne/studio-kyne-mini-tools)](LICENSE)
-[![WP Version](https://img.shields.io/badge/wordpress-5.8%2B-blue)](https://wordpress.org)
-[![PHP Version](https://img.shields.io/badge/php-7.4%2B-777bb4)](https://www.php.net)
-
 Plugin WordPress modulaire, leger et performant pour optimiser et ameliorer votre site.
 
 ## Fonctionnalités principales
