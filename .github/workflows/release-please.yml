@@ -33,7 +33,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          current_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'/\1/")
+          current_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'/\1/")
 
           if [[ -z "$current_version" ]]; then
             echo "Unable to detect current version from studio-kyne-mini-tools.php"
