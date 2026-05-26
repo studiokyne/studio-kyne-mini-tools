@@ -49,8 +49,9 @@ class Module extends AbstractModule {
 			add_action( 'wp_authenticate_user', [ $this, 'handle_authentication_result' ], 10, 2 );
 		}
 
-		// Bloquer /wp-login.php si URL personnalisée activée
+		// URL personnalisée de connexion
 		if ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) {
+			add_action( 'init', [ $this, 'register_custom_login_rewrite' ], 10 );
 			add_action( 'template_redirect', [ $this->login_handler, 'block_wp_login' ] );
 		}
 
@@ -206,6 +207,7 @@ class Module extends AbstractModule {
 	 */
 	public function save_settings( array $settings ): bool {
 		$current = $this->get_module_settings( self::get_defaults() );
+		$rewrite_changed = false;
 
 		// Authentication
 		$current['authentication']['password_strength']   = ! empty( $settings['password_strength'] );
@@ -216,6 +218,11 @@ class Module extends AbstractModule {
 		$current['authentication']['disable_registration']  = ! empty( $settings['disable_registration'] );
 		$current['authentication']['enable_custom_login_url'] = ! empty( $settings['enable_custom_login_url'] );
 
+		// Tracker les changements de rewrite
+		$old_url = $this->settings['authentication']['custom_login_url'] ?? '/connexion';
+		$old_enabled = $this->settings['authentication']['enable_custom_login_url'] ?? false;
+		$new_enabled = ! empty( $settings['enable_custom_login_url'] );
+
 		if ( isset( $settings['custom_login_url'] ) ) {
 			$url = sanitize_text_field( wp_unslash( $settings['custom_login_url'] ) );
 			if ( ! empty( $url ) ) {
@@ -223,7 +230,12 @@ class Module extends AbstractModule {
 					$url = '/' . $url;
 				}
 				$current['authentication']['custom_login_url'] = $url;
+				if ( $url !== $old_url || $new_enabled !== $old_enabled ) {
+					$rewrite_changed = true;
+				}
 			}
+		} elseif ( $new_enabled !== $old_enabled ) {
+			$rewrite_changed = true;
 		}
 
 		if ( isset( $settings['rate_limit_whitelist'] ) ) {
@@ -242,7 +254,14 @@ class Module extends AbstractModule {
 		$current['logging']['log_settings_changes'] = ! empty( $settings['log_settings_changes'] );
 		$current['logging']['log_retention_days']   = isset( $settings['log_retention_days'] ) ? min( 365, max( 1, absint( $settings['log_retention_days'] ) ) ) : 30;
 
-		return $this->save_module_settings( $current );
+		$result = $this->save_module_settings( $current );
+
+		// Flush rewrite rules si les paramètres de login custom ont changé
+		if ( $rewrite_changed ) {
+			flush_rewrite_rules();
+		}
+
+		return $result;
 	}
 
 	/**
@@ -282,12 +301,27 @@ class Module extends AbstractModule {
 	}
 
 	/**
+	 * Enregistre la règle de réécriture pour l'URL personnalisée de connexion.
+	 *
+	 * @return void
+	 */
+	public function register_custom_login_rewrite(): void {
+		if ( ! ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) ) {
+			return;
+		}
+
+		$custom_slug = ltrim( $this->settings['authentication']['custom_login_url'] ?? '/connexion', '/' );
+		add_rewrite_rule( "^{$custom_slug}/?(.*)$", 'wp-login.php?$1', 'top' );
+	}
+
+	/**
 	 * Hook d'activation du module.
 	 *
 	 * @return void
 	 */
 	public function on_activate(): void {
-		// Rien à faire à l'activation pour l'instant
+		$this->register_custom_login_rewrite();
+		flush_rewrite_rules();
 	}
 
 	/**
@@ -296,8 +330,7 @@ class Module extends AbstractModule {
 	 * @return void
 	 */
 	public function on_deactivate(): void {
-		// Nettoyer les logs à la désactivation (optionnel)
-		// $this->logger->cleanup_expired_logs();
+		flush_rewrite_rules();
 	}
 
 	/**
