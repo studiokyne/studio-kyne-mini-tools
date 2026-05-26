@@ -182,25 +182,56 @@ $logging   = $module_settings['logging'] ?? [];
 				</div>
 			</div>
 
-			<!-- Custom Login URL -->
-			<div class="skmt-form__group">
-				<label for="custom_login_url" class="skmt-form__label">
-					<?php esc_html_e( 'URL personnalisée de connexion', 'studio-kyne-mini-tools' ); ?>
-				</label>
-				<div class="skmt-custom-login-url">
-					<span class="skmt-custom-login-url__base"><?php echo esc_html( trailingslashit( site_url() ) ); ?></span>
-					<input
-						type="text"
-						id="custom_login_url"
-						name="skmt_module_settings[custom_login_url]"
-						class="skmt-input skmt-custom-login-url__input"
-						value="<?php echo esc_attr( ltrim( $auth['custom_login_url'] ?? '/connexion', '/' ) ); ?>"
-						placeholder="connexion"
-					/>
+			<!-- Custom Login URL Toggle + Input -->
+			<div class="skmt-option">
+				<div class="skmt-option__content">
+					<label for="skmt_enable_custom_login_url" class="skmt-option__label">
+						<?php esc_html_e( 'URL personnalisée de connexion', 'studio-kyne-mini-tools' ); ?>
+					</label>
+					<p class="skmt-option__desc">
+						<?php esc_html_e( 'Remplace /wp-login.php par une URL personnalisée et bloque l\'accès à la page de connexion standard.', 'studio-kyne-mini-tools' ); ?>
+					</p>
 				</div>
-				<p class="skmt-form__help">
-					<?php esc_html_e( 'Remplace /wp-login.php. Exemple : connexion, login, admin, etc.', 'studio-kyne-mini-tools' ); ?>
-				</p>
+				<div class="skmt-option__control">
+					<label class="skmt-toggle">
+						<input
+							type="checkbox"
+							id="skmt_enable_custom_login_url"
+							name="skmt_module_settings[enable_custom_login_url]"
+							value="1"
+							data-security-toggle="enable_custom_login_url"
+							<?php checked( $auth['enable_custom_login_url'] ?? true ); ?>
+						/>
+						<span class="skmt-toggle__slider"></span>
+					</label>
+				</div>
+			</div>
+
+			<!-- Custom Login URL Input (Conditional) -->
+			<div
+				data-depends-on="enable_custom_login_url"
+				class="skmt-security-sub"
+				<?php echo ( $auth['enable_custom_login_url'] ?? true ) ? '' : 'style="display:none;"'; ?>
+			>
+				<div class="skmt-form__group">
+					<label for="custom_login_url" class="skmt-form__label">
+						<?php esc_html_e( 'Slug personnalisé', 'studio-kyne-mini-tools' ); ?>
+					</label>
+					<div class="skmt-custom-login-url">
+						<span class="skmt-custom-login-url__base"><?php echo esc_html( trailingslashit( site_url() ) ); ?></span>
+						<input
+							type="text"
+							id="custom_login_url"
+							name="skmt_module_settings[custom_login_url]"
+							class="skmt-input skmt-custom-login-url__input"
+							value="<?php echo esc_attr( ltrim( $auth['custom_login_url'] ?? '/connexion', '/' ) ); ?>"
+							placeholder="connexion"
+						/>
+					</div>
+					<p class="skmt-form__help">
+						<?php esc_html_e( 'Exemples : connexion, login, admin, etc.', 'studio-kyne-mini-tools' ); ?>
+					</p>
+				</div>
 			</div>
 
 		</div>

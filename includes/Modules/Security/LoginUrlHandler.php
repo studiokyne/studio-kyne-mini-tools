@@ -4,7 +4,7 @@ namespace StudioKyne\MiniTools\Modules\Security;
 /**
  * Gestionnaire de l'URL de connexion.
  *
- * Bloque accès à /wp-login.php en renvoyant 404.
+ * Redirige /wp-login.php vers une URL personnalisée avec tous les paramètres.
  */
 class LoginUrlHandler {
 
@@ -13,14 +13,14 @@ class LoginUrlHandler {
 	/**
 	 * Constructeur.
 	 *
-	 * @param string $custom_login_url URL de connexion personnalisée.
+	 * @param string $custom_login_url URL de connexion personnalisée (ex: /connexion).
 	 */
 	public function __construct( string $custom_login_url = '/connexion' ) {
 		$this->custom_login_url = $custom_login_url;
 	}
 
 	/**
-	 * Hook template_redirect pour bloquer /wp-login.php.
+	 * Hook template_redirect pour rediriger /wp-login.php vers l'URL personnalisée.
 	 *
 	 * @return void
 	 */
@@ -30,14 +30,24 @@ class LoginUrlHandler {
 			return;
 		}
 
-		// Checker si on accède à /wp-login.php
-		if ( strpos( $_SERVER['REQUEST_URI'] ?? '', '/wp-login.php' ) !== false ) {
-			global $wp_query;
-			$wp_query->set_404();
-			status_header( 404 );
-			get_template_part( 404 );
-			exit;
+		$request_uri = $_SERVER['REQUEST_URI'] ?? '';
+
+		// Vérifier si on accède à /wp-login.php
+		if ( strpos( $request_uri, '/wp-login.php' ) === false ) {
+			return;
 		}
+
+		// Construire l'URL de redirection personnalisée
+		$redirect_url = home_url( ltrim( $this->custom_login_url, '/' ) );
+
+		// Préserver tous les paramètres GET (?action=, ?redirect_to=, etc.)
+		if ( ! empty( $_GET ) ) {
+			$redirect_url = add_query_arg( array_map( 'sanitize_text_field', wp_unslash( $_GET ) ), $redirect_url );
+		}
+
+		// Rediriger avec un code 302 (temporaire)
+		wp_safe_redirect( $redirect_url, 302 );
+		exit;
 	}
 
 	/**

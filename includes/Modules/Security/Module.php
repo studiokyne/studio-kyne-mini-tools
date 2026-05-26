@@ -49,8 +49,10 @@ class Module extends AbstractModule {
 			add_action( 'wp_authenticate_user', [ $this, 'handle_authentication_result' ], 10, 2 );
 		}
 
-		// Bloquer /wp-login.php
-		add_action( 'template_redirect', [ $this->login_handler, 'block_wp_login' ] );
+		// Bloquer /wp-login.php si URL personnalisée activée
+		if ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) {
+			add_action( 'template_redirect', [ $this->login_handler, 'block_wp_login' ] );
+		}
 
 		// Désactiver inscription publique
 		if ( $this->settings['authentication']['disable_registration'] ?? false ) {
@@ -210,8 +212,9 @@ class Module extends AbstractModule {
 		$current['authentication']['rate_limiting']       = ! empty( $settings['rate_limiting'] );
 		$current['authentication']['rate_limit_attempts'] = isset( $settings['rate_limit_attempts'] ) ? min( 20, max( 1, absint( $settings['rate_limit_attempts'] ) ) ) : 5;
 		$current['authentication']['rate_limit_window']   = isset( $settings['rate_limit_window'] ) ? max( 60, absint( $settings['rate_limit_window'] ) ) : 900;
-		$current['authentication']['rate_limit_lockout']  = isset( $settings['rate_limit_lockout'] ) ? max( 60, absint( $settings['rate_limit_lockout'] ) ) : 1800;
-		$current['authentication']['disable_registration'] = ! empty( $settings['disable_registration'] );
+		$current['authentication']['rate_limit_lockout']     = isset( $settings['rate_limit_lockout'] ) ? max( 60, absint( $settings['rate_limit_lockout'] ) ) : 1800;
+		$current['authentication']['disable_registration']  = ! empty( $settings['disable_registration'] );
+		$current['authentication']['enable_custom_login_url'] = ! empty( $settings['enable_custom_login_url'] );
 
 		if ( isset( $settings['custom_login_url'] ) ) {
 			$url = sanitize_text_field( wp_unslash( $settings['custom_login_url'] ) );
@@ -305,14 +308,15 @@ class Module extends AbstractModule {
 	public static function get_defaults(): array {
 		return [
 			'authentication' => [
-				'custom_login_url'      => '/connexion',
-				'password_strength'     => true,
-				'rate_limiting'         => false,
-				'rate_limit_attempts'   => 5,
-				'rate_limit_window'     => 900,
-				'rate_limit_lockout'    => 1800,
-				'rate_limit_whitelist'  => [],
-				'disable_registration'  => true,
+				'enable_custom_login_url' => true,
+				'custom_login_url'        => '/connexion',
+				'password_strength'       => true,
+				'rate_limiting'           => false,
+				'rate_limit_attempts'     => 5,
+				'rate_limit_window'       => 900,
+				'rate_limit_lockout'      => 1800,
+				'rate_limit_whitelist'    => [],
+				'disable_registration'    => true,
 			],
 			'hardening'      => [
 				'disable_xmlrpc'       => false,
