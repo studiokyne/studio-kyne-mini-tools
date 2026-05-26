@@ -41,7 +41,7 @@ class Module extends AbstractModule {
 
 		// Rate limiting
 		if ( $this->settings['authentication']['rate_limiting'] ?? false ) {
-			add_action( 'login_form_login', [ $this->rate_limiter, 'check_rate_limit' ] );
+			add_filter( 'authenticate', [ $this->rate_limiter, 'maybe_block_login' ], 999 );
 		}
 
 		// URL personnalisée de connexion
