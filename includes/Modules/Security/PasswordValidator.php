@@ -73,7 +73,7 @@ class PasswordValidator {
 	 * @param ?\WP_User $user
 	 * @return void
 	 */
-	public function validate_user_password( \WP_Error $errors, bool $update, ?\WP_User $user ): void {
+	public function validate_user_password( \WP_Error $errors, bool $update, $user ): void {
 		if ( ! isset( $_POST['user_pass'] ) || empty( $_POST['user_pass'] ) ) {
 			return;
 		}

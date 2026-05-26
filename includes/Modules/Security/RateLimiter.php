@@ -89,7 +89,7 @@ class RateLimiter {
 		$now      = time();
 
 		// Si succès ou réinitialisation de la fenêtre : reset
-		if ( $success || ( $now - $data['last_attempt'] ) > self::RATE_LIMIT_WINDOW ) {
+		if ( $success || ( $data['last_attempt'] > 0 && ( $now - $data['last_attempt'] ) > self::RATE_LIMIT_WINDOW ) ) {
 			update_option( $meta_key, [ 'count' => 0, 'last_attempt' => 0, 'locked_until' => 0 ], false );
 			return;
 		}
