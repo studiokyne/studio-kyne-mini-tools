@@ -32,10 +32,11 @@ class LoginUrlHandler {
 	}
 
 	/**
-	 * Hook wp_loaded pour intercepter et servir l'URL de connexion personnalisée.
+	 * Hook wp_loaded : gère à la fois le blocage de wp-login.php et le service de l'URL personnalisée.
 	 *
-	 * Enregistré sur 'wp_loaded' (qui fire APRÈS 'init') : seul point d'entrée
-	 * possible puisque Module::init() lui-même est appelé depuis le hook 'init'.
+	 * wp_loaded fire dans les deux cas de figure :
+	 * - Requête via index.php (URL custom /connexion)
+	 * - Requête directe wp-login.php (celui-ci charge wp-load.php qui fire tous les hooks)
 	 *
 	 * @return void
 	 */
@@ -46,8 +47,27 @@ class LoginUrlHandler {
 
 		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 		$request     = wp_parse_url( rawurldecode( $request_uri ) );
+		$path        = $request['path'] ?? '';
 
-		if ( empty( $request['path'] ) || ! $this->is_custom_login_uri( $request['path'] ) ) {
+		// Bloquer l'accès direct à wp-login.php : remplacer l'URI par une URL
+		// inexistante et laisser WordPress générer un vrai 404 via son template.
+		if ( strpos( rawurldecode( $request_uri ), 'wp-login.php' ) !== false && ! is_admin() ) {
+			global $pagenow;
+			$pagenow = 'index.php';
+
+			if ( ! defined( 'WP_USE_THEMES' ) ) {
+				define( 'WP_USE_THEMES', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
+			}
+
+			$_SERVER['REQUEST_URI'] = '/' . str_repeat( '-/', 10 );
+
+			wp();
+			require_once ABSPATH . WPINC . '/template-loader.php';
+			die;
+		}
+
+		// Servir l'URL de connexion personnalisée (/connexion)
+		if ( empty( $path ) || ! $this->is_custom_login_uri( $path ) ) {
 			return;
 		}
 
@@ -58,36 +78,12 @@ class LoginUrlHandler {
 			die();
 		}
 
+		global $error, $user_login;
+		$error      = '';
+		$user_login = '';
+
 		require_once ABSPATH . 'wp-login.php';
 		die;
-	}
-
-	/**
-	 * Hook template_redirect pour bloquer l'accès direct à /wp-login.php.
-	 *
-	 * @return void
-	 */
-	public function block_wp_login(): void {
-		if ( defined( 'WP_CLI' ) || wp_doing_cron() || wp_doing_ajax() ) {
-			return;
-		}
-
-		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ?? '' ) );
-
-		// Vérifier si on accède directement à /wp-login.php
-		if ( strpos( $request_uri, '/wp-login.php' ) === false ) {
-			return;
-		}
-
-		// Rediriger vers l'URL personnalisée avec les paramètres GET
-		$redirect_url = home_url( $this->custom_login_url . '/' );
-
-		if ( ! empty( $_GET ) ) {
-			$redirect_url = add_query_arg( array_map( 'sanitize_text_field', wp_unslash( $_GET ) ), $redirect_url );
-		}
-
-		wp_safe_redirect( $redirect_url, 302 );
-		exit;
 	}
 
 	/**
