@@ -33,16 +33,19 @@ jobs:
         run: |
           set -euo pipefail
 
-          current_version=$(grep -Eo "define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*'[0-9]+\.[0-9]+\.[0-9]+'" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'/\1/")
+          # Use the latest stable tag as source of truth (the PHP file may contain a dev suffix)
+          latest_stable_tag=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
 
-          if [[ -z "$current_version" ]]; then
-            echo "Unable to detect current version from studio-kyne-mini-tools.php"
+          if [[ -z "$latest_stable_tag" ]]; then
+            echo "No stable tag found — cannot determine next version"
             exit 1
           fi
 
+          current_version="${latest_stable_tag#v}"
           IFS='.' read -r major minor patch <<< "$current_version"
           target_version="${major}.${minor}.$((patch + 1))"
 
+          echo "Latest stable tag: $latest_stable_tag"
           echo "Current version: $current_version"
           echo "Target version: $target_version"
           echo "version=$target_version" >> "$GITHUB_OUTPUT"
