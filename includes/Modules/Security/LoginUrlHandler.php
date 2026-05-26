@@ -71,7 +71,9 @@ class LoginUrlHandler {
 			return;
 		}
 
-		if ( is_user_logged_in() ) {
+		$action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+
+		if ( is_user_logged_in() && 'logout' !== $action ) {
 			$user        = wp_get_current_user();
 			$redirect_to = apply_filters( 'skmt_custom_login_redirect', admin_url(), $user );
 			wp_safe_redirect( $redirect_to );

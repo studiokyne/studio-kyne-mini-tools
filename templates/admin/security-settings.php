@@ -25,23 +25,6 @@ $logging   = $settings['logging'] ?? [];
 	<div class="skmt-security-section">
 		<h3><?php esc_html_e( 'Authentification', 'studio-kyne-mini-tools' ); ?></h3>
 
-		<!-- Password Strength -->
-		<div class="skmt-security-option">
-			<label>
-				<input
-					type="checkbox"
-					name="password_strength"
-					data-security-setting="authentication.password_strength"
-					data-security-toggle="password_strength"
-					<?php checked( $auth['password_strength'] ?? false ); ?>
-				/>
-				<?php esc_html_e( 'Forcer un mot de passe fort', 'studio-kyne-mini-tools' ); ?>
-			</label>
-			<div class="skmt-security-option-description">
-				<?php esc_html_e( 'Minimum 12 caractères avec majuscules, minuscules, chiffres et caractères spéciaux.', 'studio-kyne-mini-tools' ); ?>
-			</div>
-		</div>
-
 		<!-- Rate Limiting -->
 		<div class="skmt-security-option">
 			<label>

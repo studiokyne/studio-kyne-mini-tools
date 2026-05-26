@@ -12,7 +12,6 @@ use StudioKyne\MiniTools\Core\AbstractModule;
  */
 class Module extends AbstractModule {
 
-	private PasswordValidator $password_validator;
 	private RateLimiter $rate_limiter;
 	private HardeningService $hardening;
 	private LoginUrlHandler $login_handler;
@@ -29,8 +28,7 @@ class Module extends AbstractModule {
 		SecurityLogger::register_post_type();
 
 		// Créer les services avec les settings actuels
-		$this->password_validator = new PasswordValidator();
-		$this->rate_limiter       = new RateLimiter( $this->settings['authentication']['rate_limit_whitelist'] ?? [] );
+		$this->rate_limiter = new RateLimiter( $this->settings['authentication']['rate_limit_whitelist'] ?? [] );
 		$this->hardening          = new HardeningService(
 			$this->settings['hardening']['disable_xmlrpc'] ?? false,
 			$this->settings['hardening']['prevent_user_enum'] ?? false,
@@ -41,15 +39,9 @@ class Module extends AbstractModule {
 
 		// === AUTHENTICATION HOOKS ===
 
-		// Force du mot de passe à la création d'utilisateur
-		if ( $this->settings['authentication']['password_strength'] ?? false ) {
-			add_action( 'user_profile_update_errors', [ $this->password_validator, 'validate_user_password' ], 10, 3 );
-		}
-
 		// Rate limiting
 		if ( $this->settings['authentication']['rate_limiting'] ?? false ) {
 			add_action( 'login_form_login', [ $this->rate_limiter, 'check_rate_limit' ] );
-			add_action( 'wp_authenticate_user', [ $this, 'handle_authentication_result' ], 10, 2 );
 		}
 
 		// URL personnalisée de connexion
@@ -70,23 +62,30 @@ class Module extends AbstractModule {
 
 		if ( $this->settings['hardening']['disable_xmlrpc'] ?? false ) {
 			add_filter( 'xmlrpc_enabled', [ $this->hardening, 'filter_xmlrpc_enabled' ] );
+			add_filter( 'wp_xmlrpc_server_class', [ $this->hardening, 'block_xmlrpc_server_class' ] );
 		}
 
 		if ( $this->settings['hardening']['prevent_user_enum'] ?? false ) {
-			add_action( 'parse_query', [ $this->hardening, 'prevent_user_enumeration' ] );
-			add_filter( 'rest_authentication_errors', [ $this->hardening, 'prevent_rest_user_enumeration' ] );
+			add_action( 'template_redirect', [ $this->hardening, 'prevent_user_enumeration' ] );
+			add_filter( 'rest_request_before_callbacks', [ $this->hardening, 'prevent_rest_user_enumeration' ], 10, 3 );
 		}
 
 		if ( $this->settings['hardening']['hide_wp_version'] ?? false ) {
 			add_filter( 'wp_headers', [ $this->hardening, 'hide_wp_version_headers' ] );
-			add_action( 'wp_head', [ $this->hardening, 'hide_wp_version_meta' ] );
+			add_action( 'init', [ $this->hardening, 'remove_wp_version_generators' ] );
+			add_filter( 'the_generator', '__return_empty_string', PHP_INT_MAX );
+			add_filter( 'script_loader_src', [ $this->hardening, 'obfuscate_version_in_src' ], PHP_INT_MAX );
+			add_filter( 'style_loader_src', [ $this->hardening, 'obfuscate_version_in_src' ], PHP_INT_MAX );
 		}
 
-		// === LOGGING HOOKS ===
+		// === LOGGING & RATE LIMITING HOOKS ===
 
-		if ( $this->settings['logging']['log_connections'] ?? false ) {
+		$needs_login_hooks = ( $this->settings['authentication']['rate_limiting'] ?? false )
+			|| ( $this->settings['logging']['log_connections'] ?? false );
+
+		if ( $needs_login_hooks ) {
 			add_action( 'wp_login', [ $this, 'handle_login_success' ], 10, 2 );
-			add_action( 'wp_authentication_failed', [ $this, 'handle_login_failed' ] );
+			add_action( 'wp_login_failed', [ $this, 'handle_login_failed' ] );
 		}
 
 		if ( $this->settings['logging']['log_user_actions'] ?? false ) {
@@ -117,40 +116,21 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Hook wp_authentication_failed - log les connexions échouées.
+	 * Hook wp_login_failed - log les connexions échouées.
 	 *
-	 * @param \WP_Error|\WP_User $user
+	 * @param string $username
 	 * @return void
 	 */
-	public function handle_login_failed( $user ): void {
-		$username = '';
-		$ip       = $this->get_client_ip();
+	public function handle_login_failed( string $username ): void {
+		$ip = $this->get_client_ip();
 
-		if ( is_wp_error( $user ) ) {
-			// Récupérer le username depuis $_POST si on peut
-			$username = isset( $_POST['log'] ) ? sanitize_text_field( wp_unslash( $_POST['log'] ) ) : 'unknown';
-		} elseif ( $user instanceof \WP_User ) {
-			$username = $user->user_login;
+		if ( $this->settings['logging']['log_connections'] ?? false ) {
+			$this->logger->log_login_failed( $username ?: 'unknown', $ip );
 		}
 
-		$this->logger->log_login_failed( $username, $ip );
-
-		// Incrémenter le rate limit après fail
 		if ( $this->settings['authentication']['rate_limiting'] ?? false ) {
 			$this->rate_limiter->log_failed_attempt( $ip );
 		}
-	}
-
-	/**
-	 * Hook wp_authenticate_user pour tracker authentification en temps réel.
-	 *
-	 * @param \WP_User|\WP_Error $user
-	 * @param string             $password
-	 * @return \WP_User|\WP_Error
-	 */
-	public function handle_authentication_result( $user, string $password ) {
-		// Ne rien faire si c'est une erreur (déjà loggée par wp_authentication_failed)
-		return $user;
 	}
 
 	/**
@@ -215,8 +195,7 @@ class Module extends AbstractModule {
 		$current = $this->get_module_settings( self::get_defaults() );
 
 		// Authentication
-		$current['authentication']['password_strength']   = ! empty( $settings['password_strength'] );
-		$current['authentication']['rate_limiting']       = ! empty( $settings['rate_limiting'] );
+		$current['authentication']['rate_limiting'] = ! empty( $settings['rate_limiting'] );
 		$current['authentication']['rate_limit_attempts'] = isset( $settings['rate_limit_attempts'] ) ? min( 20, max( 1, absint( $settings['rate_limit_attempts'] ) ) ) : 5;
 		$current['authentication']['rate_limit_window']   = isset( $settings['rate_limit_window'] ) ? max( 60, absint( $settings['rate_limit_window'] ) ) : 900;
 		$current['authentication']['rate_limit_lockout']     = isset( $settings['rate_limit_lockout'] ) ? max( 60, absint( $settings['rate_limit_lockout'] ) ) : 1800;
@@ -282,8 +261,7 @@ class Module extends AbstractModule {
 	public function get_admin_js_data(): array {
 		return [
 			'i18n' => [
-				'passwordRequirements' => $this->password_validator->get_requirements_text(),
-				'settings'             => __( 'Paramètres de sécurité mis à jour', 'studio-kyne-mini-tools' ),
+				'settings' => __( 'Paramètres de sécurité mis à jour', 'studio-kyne-mini-tools' ),
 			],
 		];
 	}
@@ -316,7 +294,6 @@ class Module extends AbstractModule {
 			'authentication' => [
 				'enable_custom_login_url' => true,
 				'custom_login_url'        => '/connexion',
-				'password_strength'       => true,
 				'rate_limiting'           => false,
 				'rate_limit_attempts'     => 5,
 				'rate_limit_window'       => 900,
