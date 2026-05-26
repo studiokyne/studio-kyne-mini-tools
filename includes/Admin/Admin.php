@@ -482,6 +482,10 @@ class Admin {
 	 * ================================================================ */
 
 	public function filter_parent_file( ?string $parent_file ): string {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+			return $parent_file ?? '';
+		}
+
 		$tab = $this->get_current_tab();
 
 		if ( strpos( $tab, 'module_' ) === 0 || in_array( $tab, [ 'dashboard', 'modules', 'settings' ], true ) ) {
@@ -492,6 +496,10 @@ class Admin {
 	}
 
 	public function filter_submenu_file( ?string $submenu_file, ?string $parent_file ): string {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+			return $submenu_file ?? '';
+		}
+
 		$tab = $this->get_current_tab();
 
 		if ( in_array( $tab, [ 'dashboard', 'modules', 'settings' ], true ) || strpos( $tab, 'module_' ) === 0 ) {

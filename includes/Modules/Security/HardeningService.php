@@ -101,6 +101,9 @@ class HardeningService {
 	 * Filtre script_loader_src / style_loader_src : remplace la version WP par un hash.
 	 */
 	public function obfuscate_version_in_src( string $src ): string {
+		if ( is_admin() ) {
+			return $src;
+		}
 		$version = get_bloginfo( 'version' );
 		if ( empty( $version ) ) {
 			return $src;

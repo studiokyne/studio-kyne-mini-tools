@@ -41,7 +41,7 @@ class LoginUrlHandler {
 	 * @return void
 	 */
 	public function wp_loaded(): void {
-		if ( defined( 'WP_CLI' ) || wp_doing_cron() || wp_doing_ajax() ) {
+		if ( defined( 'WP_CLI' ) || wp_doing_cron() || wp_doing_ajax() || defined( 'REST_REQUEST' ) ) {
 			return;
 		}
 
