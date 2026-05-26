@@ -122,9 +122,9 @@ class Updater {
 			return true;
 		}
 
-		// Comparer les suffixes dev
+		// Comparer les suffixes dev (comparaison numérique via version_compare)
 		if ( ! empty( $remote_suffix ) && ! empty( $installed_suffix ) ) {
-			return strcmp( $remote_suffix, $installed_suffix ) > 0;
+			return version_compare( $installed_version, $remote_version, '<' );
 		}
 
 		return false;
@@ -229,6 +229,14 @@ class Updater {
 			if ( ! is_array( $body ) ) {
 				return false;
 			}
+
+			// Trier par version décroissante pour garantir la plus récente (indépendamment de l'ordre de l'API)
+			usort( $body, function ( $a, $b ) {
+				return version_compare(
+					ltrim( $b['tag_name'] ?? '', 'v' ),
+					ltrim( $a['tag_name'] ?? '', 'v' )
+				);
+			} );
 
 			foreach ( $body as $release ) {
 				if ( empty( $release['prerelease'] ) ) {
