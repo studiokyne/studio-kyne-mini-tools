@@ -1,0 +1,111 @@
+name: Release Dev Version
+
+on:
+  push:
+    branches:
+      - dev
+    paths:
+      - 'studio-kyne-mini-tools.php'
+      - 'includes/**'
+      - 'assets/**'
+      - 'templates/**'
+      - '!.github/**'
+      - '!README.md'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: skmt-release-dev
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout dev branch
+        uses: actions/checkout@v6
+        with:
+          ref: dev
+          fetch-depth: 0
+
+      - name: Determine dev release version
+        id: version
+        run: |
+          # Extraire la version du plugin
+          PLUGIN_VERSION=$(grep -E "define\s*\(\s*'SKMT_VERSION'\s*,\s*'[0-9]+\.[0-9]+\.[0-9]+" studio-kyne-mini-tools.php | sed -E "s/.*'([0-9]+\.[0-9]+\.[0-9]+)'.*/\1/")
+
+          if [[ -z "$PLUGIN_VERSION" ]]; then
+            echo "Unable to detect plugin version"
+            exit 1
+          fi
+
+          echo "Plugin version: $PLUGIN_VERSION"
+
+          # Chercher le dernier dev release pour cette version
+          LATEST_DEV_RELEASE=$(git tag -l "v${PLUGIN_VERSION}-dev.*" --sort=-version:refname | head -n1)
+
+          if [[ -z "$LATEST_DEV_RELEASE" ]]; then
+            DEV_BUILD=1
+          else
+            # Extraire le numéro de build et l'incrémenter
+            DEV_BUILD=$(echo "$LATEST_DEV_RELEASE" | sed -E "s/v${PLUGIN_VERSION}-dev\.([0-9]+)/\1/")
+            DEV_BUILD=$((DEV_BUILD + 1))
+          fi
+
+          TARGET_VERSION="${PLUGIN_VERSION}-dev.${DEV_BUILD}"
+          TARGET_TAG="v${TARGET_VERSION}"
+
+          echo "Latest dev release: $LATEST_DEV_RELEASE"
+          echo "Dev build number: $DEV_BUILD"
+          echo "Target version: $TARGET_VERSION"
+          echo "Target tag: $TARGET_TAG"
+
+          echo "version=$TARGET_VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TARGET_TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Configure Git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Create and push tag
+        env:
+          TARGET_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          if git rev-parse "$TARGET_TAG" >/dev/null 2>&1; then
+            echo "Tag ${TARGET_TAG} already exists"
+            exit 1
+          fi
+          git tag "$TARGET_TAG"
+          git push origin "$TARGET_TAG"
+
+      - name: Build release zip
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          mkdir -p dist/package/studio-kyne-mini-tools
+          rsync -a ./ dist/package/studio-kyne-mini-tools/ \
+            --exclude='.git' \
+            --exclude='.github' \
+            --exclude='.vscode' \
+            --exclude='node_modules' \
+            --exclude='dist'
+          cd dist/package
+          zip -r "../studio-kyne-mini-tools-${VERSION}.zip" studio-kyne-mini-tools
+
+      - name: Publish GitHub pre-release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          files: dist/studio-kyne-mini-tools-${{ steps.version.outputs.version }}.zip
+          prerelease: true
+          generate_release_notes: true
+          body: |
+            🧪 **DEV Release** - Testing version
+
+            This is a pre-release version for testing purposes. Use with caution in production environments.
+
+            To enable dev updates in your plugin settings, select "Dev" channel under Settings → Studio Kyne Mini Tools.
