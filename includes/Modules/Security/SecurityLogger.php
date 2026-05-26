@@ -18,6 +18,26 @@ class SecurityLogger {
 	}
 
 	/**
+	 * Enregistre le post type custom pour les logs.
+	 * À appeler sur le hook 'init'.
+	 *
+	 * @return void
+	 */
+	public static function register_post_type(): void {
+		register_post_type( self::LOG_POST_TYPE, [
+			'label'               => __( 'Security Logs', 'studio-kyne-mini-tools' ),
+			'public'              => false,
+			'hierarchical'        => false,
+			'show_in_rest'        => false,
+			'capability_type'     => 'post',
+			'map_meta_cap'        => false,
+			'supports'            => [ 'none' ],
+			'has_archive'         => false,
+			'delete_with_user'    => false,
+		] );
+	}
+
+	/**
 	 * Crée un log entry.
 	 *
 	 * @param string $action    Type d'action (login_success, login_fail, user_created, etc.)

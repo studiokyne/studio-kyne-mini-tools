@@ -45,4 +45,18 @@ foreach ( $module_classes as $id => $class ) {
 	foreach ( $keys['meta'] ?? [] as $meta_key ) {
 		delete_post_meta_by_key( $meta_key );
 	}
+
+	// Suppression des post types custom
+	foreach ( $keys['post_type'] ?? [] as $post_type ) {
+		// Récupérer tous les posts du type custom
+		$posts = get_posts( [
+			'post_type'      => $post_type,
+			'numberposts'    => -1,
+			'posts_per_page' => -1,
+		] );
+
+		foreach ( $posts as $post ) {
+			wp_delete_post( $post->ID, true ); // true = hard delete
+		}
+	}
 }

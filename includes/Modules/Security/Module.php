@@ -25,6 +25,9 @@ class Module extends AbstractModule {
 	public function init(): void {
 		$this->settings = $this->get_module_settings( self::get_defaults() );
 
+		// Enregistrer le post type custom pour les logs
+		SecurityLogger::register_post_type();
+
 		// Créer les services avec les settings actuels
 		$this->password_validator = new PasswordValidator();
 		$this->rate_limiter       = new RateLimiter( $this->settings['authentication']['rate_limit_whitelist'] ?? [] );
@@ -343,6 +346,9 @@ class Module extends AbstractModule {
 		return [
 			'options' => [
 				'skmt_module_security',
+			],
+			'post_type' => [
+				'skmt_security_log',
 			],
 		];
 	}
