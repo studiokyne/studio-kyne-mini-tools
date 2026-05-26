@@ -89,7 +89,7 @@ class RateLimiter {
 		$now      = time();
 
 		// Si succès ou réinitialisation de la fenêtre : reset
-		if ( $success || ( $now - $data['last_attempt'] ) > self::RATE_LIMIT_WINDOW ) {
+		if ( $success || ( $data['last_attempt'] > 0 && ( $now - $data['last_attempt'] ) > self::RATE_LIMIT_WINDOW ) ) {
 			update_option( $meta_key, [ 'count' => 0, 'last_attempt' => 0, 'locked_until' => 0 ], false );
 			return;
 		}
@@ -103,34 +103,33 @@ class RateLimiter {
 	}
 
 	/**
-	 * Checker le rate limit avant login.
-	 * Appelé via login_form_login hook.
+	 * Filtre authenticate : bloque la connexion si l'IP est en lockout.
+	 * Retourne un WP_Error pour bloquer, ou $user inchangé pour laisser passer.
 	 *
-	 * @return bool true si OK, false si bloqué
+	 * @param \WP_User|\WP_Error|null $user
+	 * @return \WP_User|\WP_Error|null
 	 */
-	public function check_rate_limit(): bool {
+	public function maybe_block_login( $user ) {
 		if ( $this->is_whitelisted() ) {
-			return true;
+			return $user;
 		}
 
 		$ip   = $this->get_client_ip();
 		$data = $this->get_attempt_data( $ip );
 		$now  = time();
 
-		// Vérifier si l'IP est actuellement bloquée
 		if ( $data['locked_until'] > 0 && $now < $data['locked_until'] ) {
-			$remaining_minutes = ceil( ( $data['locked_until'] - $now ) / 60 );
-			wp_die(
+			$remaining_minutes = (int) ceil( ( $data['locked_until'] - $now ) / 60 );
+			return new \WP_Error(
+				'too_many_attempts',
 				sprintf(
-					esc_html__( 'Trop de tentatives de connexion. Veuillez réessayer dans %d minute(s).', 'studio-kyne-mini-tools' ),
+					__( '<b>Accès bloqué :</b> Trop de tentatives de connexion. Réessayez dans %d minute(s).', 'studio-kyne-mini-tools' ),
 					$remaining_minutes
-				),
-				esc_html__( 'Accès temporairement bloqué', 'studio-kyne-mini-tools' ),
-				[ 'response' => 429 ]
+				)
 			);
 		}
 
-		return true;
+		return $user;
 	}
 
 	/**

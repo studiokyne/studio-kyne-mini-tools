@@ -64,10 +64,8 @@ class Updater {
 
 		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
 
-		$has_update = version_compare( SKMT_VERSION, $remote['version'], '<' );
-		if ( 'dev' === $this->channel && $remote['version'] !== SKMT_VERSION ) {
-			$has_update = true;
-		}
+		// Comparer les versions
+		$has_update = $this->compare_versions( SKMT_VERSION, $remote['version'] );
 
 		if ( $has_update ) {
 			$transient->response[ $plugin_file ] = (object) [
@@ -80,6 +78,56 @@ class Updater {
 		}
 
 		return $transient;
+	}
+
+	/**
+	 * Compare deux versions en tenant compte des suffixes (dev, beta, etc).
+	 *
+	 * @param string $installed_version Version installée.
+	 * @param string $remote_version    Version distante.
+	 * @return bool True si mise à jour disponible.
+	 */
+	private function compare_versions( string $installed_version, string $remote_version ): bool {
+		// Séparer version base et suffixe
+		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $remote_version, $remote_match );
+		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $installed_version, $installed_match );
+
+		$remote_base    = $remote_match[1] ?? $remote_version;
+		$remote_suffix  = $remote_match[2] ?? '';
+		$installed_base = $installed_match[1] ?? $installed_version;
+		$installed_suffix = $installed_match[2] ?? '';
+
+		// Comparer les versions de base
+		$base_cmp = version_compare( $installed_base, $remote_base, '=' );
+
+		if ( 'dev' !== $this->channel ) {
+			// Canal stable : mettre à jour seulement si version base supérieure
+			return version_compare( $installed_base, $remote_base, '<' );
+		}
+
+		// Canal dev
+		if ( ! $base_cmp ) {
+			// Versions de base différentes
+			return version_compare( $installed_base, $remote_base, '<' );
+		}
+
+		// Même version de base
+		if ( empty( $remote_suffix ) && ! empty( $installed_suffix ) ) {
+			// Remote est stable, installed est dev → pas de downgrade
+			return false;
+		}
+
+		if ( ! empty( $remote_suffix ) && empty( $installed_suffix ) ) {
+			// Remote est dev, installed est stable → mettre à jour
+			return true;
+		}
+
+		// Comparer les suffixes dev (comparaison numérique via version_compare)
+		if ( ! empty( $remote_suffix ) && ! empty( $installed_suffix ) ) {
+			return version_compare( $installed_version, $remote_version, '<' );
+		}
+
+		return false;
 	}
 
 	/**
@@ -182,6 +230,14 @@ class Updater {
 				return false;
 			}
 
+			// Trier par version décroissante pour garantir la plus récente (indépendamment de l'ordre de l'API)
+			usort( $body, function ( $a, $b ) {
+				return version_compare(
+					ltrim( $b['tag_name'] ?? '', 'v' ),
+					ltrim( $a['tag_name'] ?? '', 'v' )
+				);
+			} );
+
 			foreach ( $body as $release ) {
 				if ( empty( $release['prerelease'] ) ) {
 					continue;
@@ -227,7 +283,8 @@ class Updater {
 				continue;
 			}
 
-			if ( 'studio-kyne-mini-tools.zip' === $asset['name'] ) {
+			// Chercher un fichier zip nommé studio-kyne-mini-tools-*.zip
+			if ( preg_match( '/^studio-kyne-mini-tools-.*\.zip$/', $asset['name'] ) ) {
 				return $asset['browser_download_url'] ?? '';
 			}
 		}
