@@ -1,0 +1,446 @@
+/*
+ * Notifications — Toasts SKMT + Centre de notifications WP
+ * Chargé sur tout l'admin WordPress.
+ */
+
+/* ================================================================
+ * TOAST CONTAINER (bas-droite, fixed)
+ * ================================================================ */
+
+#skmt-toast-container {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+  width: 380px;
+  max-width: calc(100vw - 48px);
+}
+
+/* ================================================================
+ * TOAST — Structure
+ * ================================================================ */
+
+.skmt-toast {
+  pointer-events: all;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.08),
+    0 10px 24px -4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  opacity: 0;
+  transform: translateX(16px) scale(0.98);
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.skmt-toast.is-visible {
+  opacity: 1;
+  transform: translateX(0) scale(1);
+}
+
+.skmt-toast.is-hiding {
+  opacity: 0;
+  transform: translateX(16px) scale(0.98);
+  transition-duration: 0.18s;
+}
+
+/* Header : icône + titre + ×  */
+.skmt-toast__header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 0 14px;
+}
+
+.skmt-toast__icon {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.skmt-toast__icon svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+.skmt-toast__title {
+  flex: 1;
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  color: #111827;
+}
+
+.skmt-toast__close {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 5px;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+  margin-left: auto;
+}
+
+.skmt-toast__close:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.skmt-toast__close svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+/* Body : message texte */
+.skmt-toast__body {
+  padding: 6px 14px 10px 44px;
+}
+
+.skmt-toast__message {
+  font-size: 13px;
+  color: #6b7280;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Footer : countdown */
+.skmt-toast__footer {
+  padding: 0 14px 10px 44px;
+}
+
+.skmt-toast__countdown {
+  font-size: 11.5px;
+  color: #9ca3af;
+}
+
+.skmt-toast__pause-link {
+  color: #6b7280;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.skmt-toast__pause-link:hover {
+  color: #374151;
+}
+
+/* Barre de progression */
+.skmt-toast__progress-bar {
+  height: 3px;
+  background: #f3f4f6;
+  overflow: hidden;
+}
+
+.skmt-toast__progress-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left center;
+  transform: scaleX(1);
+  transition: none;
+}
+
+/* ================================================================
+ * TOAST — Couleurs par type
+ * ================================================================ */
+
+.skmt-toast--success .skmt-toast__icon { color: #16a34a; }
+.skmt-toast--success .skmt-toast__progress-fill { background: #16a34a; }
+
+.skmt-toast--error .skmt-toast__icon { color: #dc2626; }
+.skmt-toast--error .skmt-toast__progress-fill { background: #dc2626; }
+
+.skmt-toast--warning .skmt-toast__icon { color: #d97706; }
+.skmt-toast--warning .skmt-toast__progress-fill { background: #d97706; }
+
+.skmt-toast--info .skmt-toast__icon { color: #2563eb; }
+.skmt-toast--info .skmt-toast__progress-fill { background: #2563eb; }
+
+/* ================================================================
+ * OVERLAY
+ * ================================================================ */
+
+#skmt-notif-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 99990;
+  background: rgba(0, 0, 0, 0.2);
+  cursor: pointer;
+}
+
+#skmt-notif-overlay.is-open {
+  display: block;
+  animation: skmt-overlay-fade 0.2s ease;
+}
+
+@keyframes skmt-overlay-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ================================================================
+ * DRAWER
+ * ================================================================ */
+
+#skmt-notif-drawer {
+  position: fixed;
+  top: 32px;
+  right: 0;
+  width: 380px;
+  max-width: 100vw;
+  height: calc(100vh - 32px);
+  background: #ffffff;
+  border-left: 1px solid #e5e7eb;
+  z-index: 99991;
+  transform: translateX(100%);
+  transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 40px rgba(0, 0, 0, 0.08);
+}
+
+#skmt-notif-drawer.is-open {
+  transform: translateX(0);
+}
+
+.skmt-notif-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
+}
+
+.skmt-notif-drawer__title {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+  padding: 0;
+  border: none;
+  background: none;
+}
+
+.skmt-notif-drawer__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 6px;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+}
+
+.skmt-notif-drawer__close:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.skmt-notif-drawer__close .skmt-icon,
+.skmt-notif-drawer__close svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block;
+}
+
+.skmt-notif-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* État vide */
+.skmt-notif-drawer__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 40px 20px;
+  color: #9ca3af;
+  font-size: 13px;
+  text-align: center;
+  gap: 10px;
+}
+
+.skmt-notif-drawer__empty svg {
+  width: 36px;
+  height: 36px;
+  opacity: 0.3;
+}
+
+/* Item de notification */
+.skmt-notif-item {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  background: #f9fafb;
+  border: 1px solid #f3f4f6;
+  border-left: 3px solid #e5e7eb;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #374151;
+}
+
+.skmt-notif-item__icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.skmt-notif-item__icon svg {
+  width: 16px;
+  height: 16px;
+}
+
+.skmt-notif-item__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.skmt-notif-item__content p {
+  margin: 0 0 4px;
+}
+
+.skmt-notif-item__content p:last-child {
+  margin-bottom: 0;
+}
+
+.skmt-notif-item__content a {
+  color: #2563eb;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.skmt-notif-item--success {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  border-left-color: #16a34a;
+}
+.skmt-notif-item--success .skmt-notif-item__icon { color: #16a34a; }
+
+.skmt-notif-item--error {
+  background: #fef2f2;
+  border-color: #fecaca;
+  border-left-color: #dc2626;
+}
+.skmt-notif-item--error .skmt-notif-item__icon { color: #dc2626; }
+
+.skmt-notif-item--warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  border-left-color: #d97706;
+}
+.skmt-notif-item--warning .skmt-notif-item__icon { color: #d97706; }
+
+.skmt-notif-item--info {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  border-left-color: #2563eb;
+}
+.skmt-notif-item--info .skmt-notif-item__icon { color: #2563eb; }
+
+/* ================================================================
+ * ADMIN BAR — bouton cloche + badge en overlay
+ * ================================================================ */
+
+#wpadminbar #wp-admin-bar-skmt-notif-center > .ab-item {
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  padding: 0 10px !important;
+  cursor: pointer;
+}
+
+/* Wrapper relatif pour positionner le badge en overlay */
+#wpadminbar .skmt-notif-btn-wrap {
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 28px !important;
+  height: 28px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+#wpadminbar #wp-admin-bar-skmt-notif-center .skmt-notif-bell-icon,
+#wpadminbar #wp-admin-bar-skmt-notif-center .skmt-icon {
+  width: 16px !important;
+  height: 16px !important;
+  flex-shrink: 0;
+  color: currentColor;
+  display: block !important;
+}
+
+/* Pastille rouge positionnée en haut à droite de l'icône */
+#wpadminbar .skmt-notif-badge {
+  position: absolute !important;
+  top: 2px !important;
+  right: 2px !important;
+  left: auto !important;
+  bottom: auto !important;
+  width: 8px !important;
+  min-width: 8px !important;
+  height: 8px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: #dc2626 !important;
+  border-radius: 50% !important;
+  border: 1.5px solid #1d2327 !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  font-size: 0 !important;
+  line-height: 1 !important;
+  color: #ffffff !important;
+  text-indent: 0 !important;
+  float: none !important;
+  overflow: visible !important;
+  z-index: 1 !important;
+}
+
+/* Masquage forcé quand style inline display:none (inline style < !important CSS) */
+#wpadminbar .skmt-notif-badge[style*="display:none"],
+#wpadminbar .skmt-notif-badge[style*="display: none"] {
+  display: none !important;
+}
+
+/* Admin bar highlight quand drawer ouvert */
+#wpadminbar #wp-admin-bar-skmt-notif-center.drawer-open > .ab-item {
+  background: rgba(255, 255, 255, 0.08);
+}

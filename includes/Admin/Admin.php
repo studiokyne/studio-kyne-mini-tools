@@ -25,6 +25,16 @@ class Admin {
 	private Settings $settings;
 
 	/**
+	 * HTML des notices WP capturées via output buffering.
+	 */
+	private string $captured_wp_notices = '';
+
+	/**
+	 * Données du toast SKMT à afficher (message + type).
+	 */
+	private ?array $skmt_toast = null;
+
+	/**
 	 * Constructeur.
 	 */
 	public function __construct( Modules $modules, Settings $settings ) {
@@ -35,15 +45,23 @@ class Admin {
 		add_filter( 'parent_file', [ $this, 'filter_parent_file' ] );
 		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ], 10, 2 );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_action( 'admin_init', [ $this, 'ensure_auto_updates_enabled' ] );
 		add_action( 'admin_post_skmt_save_settings', [ $this, 'handle_save_settings' ] );
 		add_action( 'admin_post_skmt_toggle_module', [ $this, 'handle_toggle_module' ] );
+		add_action( 'wp_ajax_skmt_ajax_toggle_module', [ $this, 'handle_ajax_toggle_module' ] );
 		add_action( 'admin_post_skmt_update_modules', [ $this, 'handle_update_modules' ] );
 		add_action( 'admin_post_skmt_check_updates', [ $this, 'handle_check_updates' ] );
 		add_action( 'admin_post_skmt_reset_settings', [ $this, 'handle_reset_settings' ] );
+		add_action( 'admin_post_skmt_export_settings', [ $this, 'handle_export_settings' ] );
+		add_action( 'admin_post_skmt_import_settings', [ $this, 'handle_import_settings' ] );
 		add_action( 'admin_head', [ $this, 'output_menu_separator_css' ] );
+		add_action( 'admin_footer', [ $this, 'render_modal' ] );
 		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ] );
 		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], 11 );
+		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_start' ], 0 );
+		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_end' ],   PHP_INT_MAX );
+		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
+		add_action( 'admin_footer',          [ $this, 'render_notification_drawer' ] );
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_notification_assets' ] );
 	}
 
 	/* ================================================================
@@ -147,11 +165,11 @@ class Admin {
 			return;
 		}
 
-		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [],                                                              SKMT_VERSION );
-		wp_enqueue_style( 'skmt-layout-css',     SKMT_ASSETS_URL . 'admin/css/layout.css',     [ 'skmt-reset-css' ],                                            SKMT_VERSION );
-		wp_enqueue_style( 'skmt-sidebar-css',    SKMT_ASSETS_URL . 'admin/css/sidebar.css',    [ 'skmt-layout-css' ],                                           SKMT_VERSION );
-		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-reset-css' ],                                            SKMT_VERSION );
-		wp_enqueue_style( 'skmt-buttons-css',    SKMT_ASSETS_URL . 'admin/css/buttons.css',    [ 'skmt-components-css' ],                                       SKMT_VERSION );
+		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [],                    SKMT_VERSION );
+		wp_enqueue_style( 'skmt-layout-css',     SKMT_ASSETS_URL . 'admin/css/layout.css',     [ 'skmt-reset-css' ],  SKMT_VERSION );
+		wp_enqueue_style( 'skmt-sidebar-css',    SKMT_ASSETS_URL . 'admin/css/sidebar.css',    [ 'skmt-layout-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-reset-css' ],  SKMT_VERSION );
+		wp_enqueue_style( 'skmt-buttons-css',    SKMT_ASSETS_URL . 'admin/css/buttons.css',    [ 'skmt-components-css' ], SKMT_VERSION );
 
 		wp_enqueue_script( 'skmt-admin-js', SKMT_ASSETS_URL . 'admin/js/admin.js', [], SKMT_VERSION, true );
 
@@ -172,6 +190,14 @@ class Admin {
 				'saveError'   => __( 'Une erreur est survenue.', 'studio-kyne-mini-tools' ),
 			],
 		] );
+	}
+
+	/**
+	 * Charge les assets du centre de notifications sur tout l'admin WP.
+	 */
+	public function enqueue_global_notification_assets(): void {
+		wp_enqueue_style( 'skmt-notifications-css', SKMT_ASSETS_URL . 'admin/css/notifications.css', [], SKMT_VERSION );
+		wp_enqueue_script( 'skmt-notifications-js', SKMT_ASSETS_URL . 'admin/js/notifications.js',   [], SKMT_VERSION, true );
 	}
 
 	/**
@@ -244,15 +270,19 @@ class Admin {
 	}
 
 	/**
-	 * Affiche les notices de feedback (via query string).
+	 * Prépare le toast de feedback SKMT (via query string) pour injection JS.
+	 * N'affiche plus rien directement — les données sont consommées par render_notification_drawer().
 	 */
 	private function display_notices(): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( ! isset( $_GET['skmt_notice'] ) ) {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$notice = sanitize_key( $_GET['skmt_notice'] );
-		$type   = isset( $_GET['skmt_notice_type'] ) ? sanitize_key( $_GET['skmt_notice_type'] ) : 'success';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$type = isset( $_GET['skmt_notice_type'] ) ? sanitize_key( $_GET['skmt_notice_type'] ) : 'success';
 
 		$messages = [
 			'settings_saved'     => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
@@ -260,14 +290,115 @@ class Admin {
 			'module_deactivated' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
 			'modules_updated'    => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
 			'updates_checked'    => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
-			'settings_reset'     => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
+			'settings_reset'      => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
+			'settings_imported'   => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
+			'import_error_file'   => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
+			'import_error_invalid' => __( 'Le fichier JSON est invalide ou incompatible.', 'studio-kyne-mini-tools' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {
-			echo '<div class="skmt-notice skmt-notice--' . esc_attr( $type ) . '">';
-			echo '<p>' . esc_html( $messages[ $notice ] ) . '</p>';
-			echo '</div>';
+			$this->skmt_toast = [
+				'message' => $messages[ $notice ],
+				'type'    => $type,
+			];
 		}
+	}
+
+	/* ================================================================
+	 * CENTRE DE NOTIFICATIONS
+	 * ================================================================ */
+
+	/**
+	 * Démarre la capture des notices WP via output buffering (tout l'admin).
+	 */
+	public function capture_wp_notices_start(): void {
+		ob_start();
+	}
+
+	/**
+	 * Termine la capture et stocke le HTML des notices WP.
+	 */
+	public function capture_wp_notices_end(): void {
+		$this->captured_wp_notices = ob_get_clean() ?: '';
+	}
+
+	/**
+	 * Ajoute le bouton cloche "Notifications" dans la barre d'admin WP (tout l'admin).
+	 */
+	public function register_notification_center( \WP_Admin_Bar $wp_admin_bar ): void {
+		if ( ! is_admin() ) {
+			return;
+		}
+
+		$bell = $this->render_icon( 'bell', 'sm', 'skmt-notif-bell-icon' );
+
+		$wp_admin_bar->add_node( [
+			'id'     => 'skmt-notif-center',
+			'parent' => 'top-secondary',
+			'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
+			'href'   => '#skmt-notif-drawer',
+			'meta'   => [
+				'class' => 'skmt-notif-trigger',
+				'title' => esc_attr__( 'Notifications', 'studio-kyne-mini-tools' ),
+			],
+		] );
+	}
+
+	/**
+	 * Rend la modal réutilisable sur les pages du plugin.
+	 */
+	public function render_modal(): void {
+		if ( ! $this->is_plugin_screen() ) {
+			return;
+		}
+		?>
+		<div id="skmt-modal-overlay" class="skmt-modal-overlay" role="dialog" aria-modal="true" aria-hidden="true">
+			<div class="skmt-modal">
+				<div class="skmt-modal__header">
+					<h2 class="skmt-modal__title"></h2>
+				</div>
+				<div class="skmt-modal__body">
+					<p class="skmt-modal__message"></p>
+				</div>
+				<div class="skmt-modal__footer">
+					<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary skmt-modal__cancel">
+						<?php esc_html_e( 'Annuler', 'studio-kyne-mini-tools' ); ?>
+					</button>
+					<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary skmt-modal__confirm">
+						<?php esc_html_e( 'Confirmer', 'studio-kyne-mini-tools' ); ?>
+					</button>
+				</div>
+			</div>
+		</div>
+		<?php
+	}
+
+	/**
+	 * Rend le drawer de notifications + le conteneur de toasts + les données JSON pour JS.
+	 * Appelé via admin_footer sur tout l'admin, après capture des notices WP.
+	 */
+	public function render_notification_drawer(): void {
+
+		$close_icon    = $this->render_icon( 'x', 'sm' );
+		$notices_json  = wp_json_encode( $this->captured_wp_notices );
+		$toast_json    = wp_json_encode( $this->skmt_toast );
+		?>
+		<div id="skmt-notif-drawer" class="skmt-notif-drawer" role="dialog" aria-label="<?php esc_attr_e( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?>" aria-hidden="true">
+			<div class="skmt-notif-drawer__header">
+				<h2 class="skmt-notif-drawer__title"><?php esc_html_e( 'Notifications', 'studio-kyne-mini-tools' ); ?></h2>
+				<button class="skmt-notif-drawer__close" id="skmt-notif-close" type="button" aria-label="<?php esc_attr_e( 'Fermer', 'studio-kyne-mini-tools' ); ?>">
+					<?php echo $close_icon; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				</button>
+			</div>
+			<div class="skmt-notif-drawer__body" id="skmt-notif-body"></div>
+		</div>
+		<div id="skmt-notif-overlay" class="skmt-notif-overlay" aria-hidden="true"></div>
+		<div id="skmt-toast-container" class="skmt-toast-container" role="region" aria-live="polite" aria-label="<?php esc_attr_e( 'Notifications', 'studio-kyne-mini-tools' ); ?>"></div>
+		<script>
+		window.skmtWpNoticesHtml = <?php echo $notices_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		window.skmtToastData     = <?php echo $toast_json;   // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		</script>
+		<?php
 	}
 
 	/* ================================================================
@@ -295,6 +426,7 @@ class Admin {
 				'auto_updates'   => ! empty( $_POST['skmt_global']['auto_updates'] ),
 			];
 			$this->settings->set( 'global', $global );
+			$this->ensure_auto_updates_enabled();
 		}
 
 		// Réglages d'un module
@@ -352,6 +484,47 @@ class Admin {
 			'skmt_notice_type' => 'success',
 		], admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/**
+	 * Toggle AJAX d'un module (réponse JSON — pas de redirect).
+	 */
+	public function handle_ajax_toggle_module(): void {
+		if ( ! isset( $_POST['nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['nonce'] ) ), 'skmt_admin_nonce' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Nonce invalide.', 'studio-kyne-mini-tools' ) ], 403 );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ], 403 );
+		}
+
+		$module_id = isset( $_POST['module'] ) ? sanitize_key( $_POST['module'] ) : '';
+		$action    = isset( $_POST['skmt_action'] ) ? sanitize_key( $_POST['skmt_action'] ) : '';
+
+		if ( empty( $module_id ) || ! in_array( $action, [ 'activate', 'deactivate' ], true ) ) {
+			wp_send_json_error( [ 'message' => __( 'Paramètres invalides.', 'studio-kyne-mini-tools' ) ], 400 );
+		}
+
+		if ( 'activate' === $action ) {
+			$this->modules->activate( $module_id );
+			$notice      = __( 'Module activé.', 'studio-kyne-mini-tools' );
+			$new_state   = true;
+		} else {
+			$this->modules->deactivate( $module_id );
+			$notice      = __( 'Module désactivé.', 'studio-kyne-mini-tools' );
+			$new_state   = false;
+		}
+
+		$configure_url = add_query_arg( [
+			'page' => $this->slug,
+			'tab'  => 'module_' . $module_id,
+		], admin_url( 'admin.php' ) );
+
+		wp_send_json_success( [
+			'notice'        => $notice,
+			'active'        => $new_state,
+			'configure_url' => esc_url( $configure_url ),
+		] );
 	}
 
 	/**
@@ -443,6 +616,94 @@ class Admin {
 			'page'             => $this->slug,
 			'tab'              => 'settings',
 			'skmt_notice'      => 'settings_reset',
+			'skmt_notice_type' => 'success',
+		], admin_url( 'admin.php' ) ) );
+		exit;
+	}
+
+	/**
+	 * Export de tous les réglages du plugin en JSON.
+	 */
+	public function handle_export_settings(): void {
+		if ( ! isset( $_POST['skmt_export_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['skmt_export_nonce'] ) ), 'skmt_export_settings' ) ) {
+			wp_die( esc_html__( 'Nonce invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$data = [
+			'version'  => SKMT_VERSION,
+			'exported' => current_time( 'c' ),
+			'global'   => get_option( 'skmt_settings', [] ),
+			'modules'  => [],
+		];
+
+		foreach ( $this->modules->get_all() as $module_id => $module ) {
+			$data['modules'][ $module_id ] = get_option( 'skmt_module_' . $module_id, [] );
+		}
+
+		$filename = 'skmt-settings-' . gmdate( 'Y-m-d' ) . '.json';
+		header( 'Content-Type: application/json; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
+		echo wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
+		exit;
+	}
+
+	/**
+	 * Import des réglages depuis un fichier JSON.
+	 */
+	public function handle_import_settings(): void {
+		if ( ! isset( $_POST['skmt_import_nonce'] ) || ! wp_verify_nonce( sanitize_text_field( wp_unslash( $_POST['skmt_import_nonce'] ) ), 'skmt_import_settings' ) ) {
+			wp_die( esc_html__( 'Nonce invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$file = $_FILES['skmt_import_file'] ?? null;
+		if ( ! $file || empty( $file['tmp_name'] ) || $file['error'] !== UPLOAD_ERR_OK ) {
+			wp_safe_redirect( add_query_arg( [
+				'page'             => $this->slug,
+				'tab'              => 'settings',
+				'skmt_notice'      => 'import_error_file',
+				'skmt_notice_type' => 'error',
+			], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
+		$raw  = file_get_contents( $file['tmp_name'] );
+		$data = json_decode( $raw, true );
+
+		if ( ! is_array( $data ) || ! isset( $data['global'] ) ) {
+			wp_safe_redirect( add_query_arg( [
+				'page'             => $this->slug,
+				'tab'              => 'settings',
+				'skmt_notice'      => 'import_error_invalid',
+				'skmt_notice_type' => 'error',
+			], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		update_option( 'skmt_settings', $data['global'] );
+
+		if ( isset( $data['modules'] ) && is_array( $data['modules'] ) ) {
+			$registered_modules = $this->modules->get_all();
+			foreach ( $data['modules'] as $module_id => $module_settings ) {
+				if ( isset( $registered_modules[ $module_id ] ) && is_array( $module_settings ) ) {
+					update_option( 'skmt_module_' . $module_id, $module_settings );
+				}
+			}
+		}
+
+		wp_safe_redirect( add_query_arg( [
+			'page'             => $this->slug,
+			'tab'              => 'settings',
+			'skmt_notice'      => 'settings_imported',
 			'skmt_notice_type' => 'success',
 		], admin_url( 'admin.php' ) ) );
 		exit;
@@ -545,6 +806,10 @@ class Admin {
 			'check-circle'     => '<circle cx="12" cy="12" r="10"></circle><path d="m9 12 2 2 4-4"></path>',
 			'info'             => '<circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path>',
 			'shield'           => '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/>',
+			'bell'             => '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/>',
+			'x'                => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
+			'log-in'           => '<path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
+		'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
 		];
 	}
 
@@ -554,6 +819,15 @@ class Admin {
 
 	private function get_current_tab(): string {
 		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+	}
+
+	/**
+	 * Vérifie si la page courante est une page du plugin (via $_GET['page']).
+	 * Utilisable tôt dans le cycle de vie WP, avant que get_current_screen() soit disponible.
+	 */
+	private function is_skmt_page(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET['page'] ) && sanitize_key( $_GET['page'] ) === $this->slug;
 	}
 
 	private function is_plugin_screen(): bool {

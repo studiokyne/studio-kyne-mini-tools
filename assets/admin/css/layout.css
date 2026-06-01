@@ -12,7 +12,7 @@
 .skmt-admin-main {
   flex: 1;
   padding: 0;
-  max-width: 900px;
+  max-width: 1200px;
 }
 
 .skmt-page {
@@ -24,7 +24,8 @@
 }
 
 .skmt-page__header {
-  padding: 24px 28px 20px;
+  padding: 28px 28px;
+  background: var(--skmt-n50);
   border-bottom: 1px solid var(--skmt-border);
   display: flex;
   align-items: flex-start;
@@ -35,9 +36,6 @@
 .skmt-page__header-content {
   flex: 1;
   min-width: 0;
-  background: var(--skmt-n100);
-  padding: 20px 28px;
-  border-radius: var(--skmt-radius-sm);
 }
 
 .skmt-page__title {
@@ -51,6 +49,14 @@
   font-size: 14px;
   color: var(--skmt-text-secondary);
   margin-top: 2px;
+}
+
+.skmt-page__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .skmt-page__body {
@@ -99,6 +105,11 @@
 
 .skmt-section + .skmt-divider {
   margin-top: 0;
+}
+
+/* Divider à l'intérieur d'un skmt-section__content (annule le margin horizontal) */
+.skmt-divider--inner {
+  margin: 8px 0;
 }
 
 @media screen and (max-width: 782px) {

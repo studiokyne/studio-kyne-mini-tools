@@ -248,7 +248,7 @@ class BulkProcessor {
 	private function base_query_args(): array {
 		return [
 			'post_type'      => 'attachment',
-			'post_mime_type' => 'image',
+			'post_mime_type' => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ],
 			'post_status'    => 'inherit',
 			'fields'         => 'ids',
 			'meta_query'     => [

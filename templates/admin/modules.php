@@ -14,7 +14,7 @@ $modules = $this->modules->get_all();
 	</div>
 
 	<div>
-		<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form">
+		<form id="skmt-modules-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form">
 			<?php wp_nonce_field( 'skmt_update_modules', 'skmt_modules_nonce' ); ?>
 			<input type="hidden" name="action" value="skmt_update_modules">
 
@@ -31,6 +31,7 @@ $modules = $this->modules->get_all();
 								<input type="checkbox"
 									   name="skmt_modules[]"
 									   value="<?php echo esc_attr( $module_id ); ?>"
+									   data-module-id="<?php echo esc_attr( $module_id ); ?>"
 									   <?php checked( $is_active, true ); ?>>
 								<span class="skmt-toggle__slider"></span>
 							</label>

@@ -10,7 +10,7 @@ $preview = $instance->get_bulk_preview();
 $estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 ?>
 
-<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">

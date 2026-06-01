@@ -19,6 +19,11 @@ $module_settings = $instance->get_settings();
 			<h1 class="skmt-page__title"><?php echo esc_html( $module['name'] ); ?></h1>
 			<p class="skmt-page__subtitle"><?php echo esc_html( $module['description'] ); ?></p>
 		</div>
+		<div class="skmt-page__header-actions">
+			<button type="submit" form="skmt-module-form" class="skmt-btn skmt-btn--primary skmt-btn--sm">
+				<?php echo esc_html__( 'Enregistrer', 'studio-kyne-mini-tools' ); ?>
+			</button>
+		</div>
 	</div>
 
 	<?php

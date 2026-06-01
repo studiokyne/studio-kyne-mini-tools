@@ -17,7 +17,7 @@ $auth      = $module_settings['authentication'] ?? [];
 $hardening = $module_settings['hardening'] ?? [];
 ?>
 
-<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
@@ -91,10 +91,9 @@ $hardening = $module_settings['hardening'] ?? [];
 							value="<?php echo esc_attr( $auth['rate_limit_window'] ?? 900 ); ?>"
 							min="60"
 							step="60"
+							data-seconds-field="rate_limit_window_help"
 						/>
-						<p class="skmt-form__help">
-							<?php echo esc_html( sprintf( __( '%d minutes', 'studio-kyne-mini-tools' ), (int) ( ( $auth['rate_limit_window'] ?? 900 ) / 60 ) ) ); ?>
-						</p>
+						<p class="skmt-form__help"><span id="rate_limit_window_help"></span></p>
 					</div>
 
 					<div class="skmt-form__group">
@@ -109,10 +108,9 @@ $hardening = $module_settings['hardening'] ?? [];
 							value="<?php echo esc_attr( $auth['rate_limit_lockout'] ?? 1800 ); ?>"
 							min="60"
 							step="60"
+							data-seconds-field="rate_limit_lockout_help"
 						/>
-						<p class="skmt-form__help">
-							<?php echo esc_html( sprintf( __( '%d minutes', 'studio-kyne-mini-tools' ), (int) ( ( $auth['rate_limit_lockout'] ?? 1800 ) / 60 ) ) ); ?>
-						</p>
+						<p class="skmt-form__help"><span id="rate_limit_lockout_help"></span></p>
 					</div>
 				</div>
 
@@ -202,10 +200,10 @@ $hardening = $module_settings['hardening'] ?? [];
 			<div class="skmt-option">
 				<div class="skmt-option__content">
 					<label for="skmt_disable_xmlrpc" class="skmt-option__label">
-						<?php esc_html_e( 'Désactiver XML-RPC', 'studio-kyne-mini-tools' ); ?>
+						<?php esc_html_e( 'Désactiver XML-RPC.', 'studio-kyne-mini-tools' ); ?>
 					</label>
 					<p class="skmt-option__desc">
-						<?php esc_html_e( 'Désactive l\'API XML-RPC (rarement utilisée, peut présenter des risques).', 'studio-kyne-mini-tools' ); ?>
+						<?php esc_html_e( 'Désactive l\'API XML-RPC', 'studio-kyne-mini-tools' ); ?>
 					</p>
 				</div>
 				<div class="skmt-option__control">
