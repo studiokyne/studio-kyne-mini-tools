@@ -3,7 +3,7 @@
  * Plugin Name: Studio Kyne Mini Tools
  * Plugin URI:  https://github.com/studiokyne/studio-kyne-mini-tools
  * Description: Suite d'outils modulaires pour optimiser et améliorer votre site WordPress.
- * Version:     1.0.3-dev.3
+ * Version:     1.0.4
  * Author:      Studio Kyne
  * Author URI:  https://studiokyne.com
  * License:     GPL-2.0+
@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Constantes de base
-define( 'SKMT_VERSION', '1.0.3-dev.3' );
+define( 'SKMT_VERSION', '1.0.4-dev.3' );
 define( 'SKMT_PLUGIN_FILE', __FILE__ );
 define( 'SKMT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SKMT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
