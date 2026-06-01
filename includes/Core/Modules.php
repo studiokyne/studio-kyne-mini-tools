@@ -54,6 +54,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Security\\Module',
 				'icon'        => 'shield',
 			],
+			'login'           => [
+				'name'        => __( 'Connexion', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Personnalisez le design et le branding de la page de connexion WordPress.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Connexion', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Page de connexion', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Login\\Module',
+				'icon'        => 'log-in',
+			],
 		];
 
 		/**

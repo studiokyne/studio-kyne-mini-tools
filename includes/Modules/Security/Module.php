@@ -22,7 +22,13 @@ class Module extends AbstractModule {
 	public function init(): void {
 		$this->settings = $this->get_module_settings( self::get_defaults() );
 
-		$this->rate_limiter  = new RateLimiter( $this->settings['authentication']['rate_limit_whitelist'] ?? [] );
+		$auth = $this->settings['authentication'];
+		$this->rate_limiter  = new RateLimiter(
+			$auth['rate_limit_whitelist'] ?? [],
+			$auth['rate_limit_attempts']  ?? 5,
+			$auth['rate_limit_window']    ?? 900,
+			$auth['rate_limit_lockout']   ?? 1800
+		);
 		$this->hardening     = new HardeningService(
 			$this->settings['hardening']['disable_xmlrpc'] ?? false,
 			$this->settings['hardening']['prevent_user_enum'] ?? false,
@@ -38,7 +44,7 @@ class Module extends AbstractModule {
 			add_action( 'wp_login_failed', [ $this, 'handle_login_failed' ] );
 		}
 
-		if ( $this->settings['authentication']['enable_custom_login_url'] ?? false ) {
+		if ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) {
 			add_action( 'wp_loaded',          [ $this->login_handler, 'wp_loaded' ], 10 );
 			add_filter( 'login_url',          [ $this->login_handler, 'filter_login_url' ], 10, 3 );
 			add_filter( 'site_url',           [ $this->login_handler, 'filter_site_url' ], 10 );
@@ -66,9 +72,7 @@ class Module extends AbstractModule {
 			add_filter( 'style_loader_src', [ $this->hardening, 'obfuscate_version_in_src' ], PHP_INT_MAX );
 		}
 
-		// === CRON & CLEANUP ===
-
-		add_action( 'wp_scheduled_delete', [ $this, 'cleanup_rate_limits' ] );
+		// Les transients du rate limiter expirent automatiquement — pas besoin de cron.
 	}
 
 	/**
@@ -175,7 +179,7 @@ class Module extends AbstractModule {
 	 */
 	public function get_admin_css(): array {
 		return [
-			SKMT_PLUGIN_URL . 'assets/css/modules/security-admin.css',
+			SKMT_ASSETS_URL . 'admin/css/modules/security-admin.css',
 		];
 	}
 
@@ -186,7 +190,7 @@ class Module extends AbstractModule {
 	 */
 	public function get_admin_js(): array {
 		return [
-			SKMT_PLUGIN_URL . 'assets/js/modules/security-admin.js',
+			SKMT_ASSETS_URL . 'admin/js/modules/security-admin.js',
 		];
 	}
 

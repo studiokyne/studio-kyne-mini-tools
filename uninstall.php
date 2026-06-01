@@ -23,6 +23,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Core/Autoloader.php';
 $module_classes = [
 	'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
 	'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
+	'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
 ];
 
 // Suppression de l'option globale.

@@ -20,11 +20,15 @@
     const remainingEl = document.getElementById("skmt-bulk-remaining");
     const potentialEl = document.getElementById("skmt-bulk-potential");
 
-    let isRunning = false;
+    var POLL_MIN = 2000;
+    var POLL_MAX = 5000;
+    var pollInterval = POLL_MIN;
+    var isRunning = false;
 
     startBtn.addEventListener("click", function () {
       if (isRunning) return;
       isRunning = true;
+      pollInterval = POLL_MIN;
 
       startBtn.disabled = true;
       startBtn.textContent =
@@ -98,7 +102,8 @@
             return;
           }
 
-          setTimeout(pollStatus, 1000);
+          setTimeout(pollStatus, pollInterval);
+          pollInterval = Math.min(pollInterval + 500, POLL_MAX);
         })
         .catch(function (err) {
           showError(err.message || "Erreur réseau");
