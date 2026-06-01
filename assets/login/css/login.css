@@ -572,8 +572,8 @@ body.login.skmt-login-split .success {
 
 .skmt-login-panel {
   flex: 1;
-  margin: 12px 12px 12px 0;
-  border-radius: var(--skmt-radius) !important;
+  margin: 24px 24px 24px 0;
+  border-radius: 32px !important;
   overflow: hidden;
   background-color: var(--skmt-l-panel-bg);
   background-image: var(--skmt-l-panel-img);
@@ -598,6 +598,7 @@ body.login.skmt-login-split .success {
     margin: 0 auto !important;
     padding: 48px 24px !important;
     min-height: auto;
+    height: 100%;
   }
 
   .skmt-login-panel {
