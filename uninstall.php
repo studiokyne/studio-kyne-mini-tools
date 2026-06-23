@@ -24,6 +24,7 @@ $module_classes = [
 	'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
 	'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
 	'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
+	'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
 ];
 
 // Suppression de l'option globale.

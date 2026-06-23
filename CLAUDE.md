@@ -103,3 +103,95 @@ add_filter( 'skmt_module_definitions', function( array $modules ) {
 ## CSS class conventions
 
 Admin UI uses BEM-style classes prefixed with `skmt-`. Key patterns: `skmt-section`, `skmt-section__header`, `skmt-option`, `skmt-option__control`, `skmt-toggle`, `skmt-form__group`, `skmt-badge` (modifiers: `--success`, `--warning`, `--danger`, `--info`, `--inactive`), `skmt-btn` (modifiers: `--primary`, `--secondary`, `--sm`).
+
+## Design system — composants réutilisables
+
+All reusable components are defined in `assets/admin/css/components.css` and `assets/admin/js/admin.js`. **Always use these; never roll custom equivalents.**
+
+### Modals
+
+Two complementary systems, both defined in `components.css` + `admin.js`:
+
+**1. Programmatic confirmation modal** — for simple confirm/cancel flows with no form input:
+```javascript
+window.skmtModal.open({
+  title:        "Titre",
+  message:      "Message explicatif.",
+  confirmLabel: "Confirmer",
+  cancelLabel:  "Annuler",
+  danger:       true,           // bouton rouge au lieu de bleu
+  onConfirm:    function() {},  // callback si l'utilisateur confirme
+});
+window.skmtModal.close(); // fermeture programmatique
+```
+Uses the singleton `#skmt-modal-overlay` in `templates/admin/layout.php`.
+
+**2. Named modal (HTML persistant)** — for modals with form fields (inputs, selects, etc.):
+```javascript
+window.skmtModalOpen('my-modal-id');   // ajoute .is-open
+window.skmtModalClose('my-modal-id');  // retire .is-open
+```
+HTML structure requise (copier ce template) :
+```html
+<div class="skmt-modal-overlay" id="my-modal-id" role="dialog" aria-modal="true" aria-labelledby="my-modal-title">
+  <div class="skmt-modal">
+    <div class="skmt-modal__header">
+      <h3 id="my-modal-title" class="skmt-modal__title">Titre</h3>
+    </div>
+    <div class="skmt-modal__body">
+      <!-- contenu, inputs, etc. -->
+    </div>
+    <div class="skmt-modal__footer">
+      <!-- .skmt-modal-close sur le bouton Annuler → fermeture automatique -->
+      <button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary skmt-modal-close">Annuler</button>
+      <button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary" id="my-confirm-btn">Valider</button>
+    </div>
+  </div>
+</div>
+```
+La classe `.skmt-modal-close` et le clic hors-boîte sont gérés automatiquement par `admin.js`. Idem pour la touche Échap.
+
+### Formulaires
+
+```html
+<!-- Groupe label + input -->
+<div class="skmt-form__group">
+  <label class="skmt-form__label" for="my-input">Label</label>
+  <input type="text" class="skmt-input" id="my-input">
+  <p class="skmt-form__help">Texte d'aide optionnel.</p>
+</div>
+
+<!-- Select standard -->
+<select class="skmt-select">...</select>
+<select class="skmt-select skmt-select--sm">...</select>  <!-- petit -->
+
+<!-- Toggle -->
+<label class="skmt-toggle">
+  <input type="checkbox" name="...">
+  <span class="skmt-toggle__slider"></span>
+</label>
+```
+
+### Boutons
+
+```html
+<button class="skmt-btn skmt-btn--primary">Principal</button>
+<button class="skmt-btn skmt-btn--secondary">Secondaire</button>
+<button class="skmt-btn skmt-btn--danger">Danger</button>
+<!-- Tailles : ajouter --sm pour petit -->
+```
+
+### Toasts / notifications
+
+```javascript
+window.skmtShowToast("Message", "success"); // success | error | info | warning
+```
+Défini dans `assets/admin/js/notifications.js`, chargé globalement.
+
+### Design tokens (CSS custom properties)
+
+Définis dans `assets/admin/css/reset.css` :
+- Couleurs : `--skmt-accent`, `--skmt-success`, `--skmt-danger`, `--skmt-warning`
+- Neutres : `--skmt-n50` … `--skmt-n950`, `--skmt-surface`, `--skmt-border`, `--skmt-text`, `--skmt-text-secondary`
+- Rayons : `--skmt-radius`, `--skmt-radius-sm`, `--skmt-radius-xs`
+- Ombres : `--skmt-shadow`, `--skmt-shadow-md`, `--skmt-shadow-lg`

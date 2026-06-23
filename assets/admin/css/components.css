@@ -685,8 +685,12 @@ details[open] .skmt-section__chevron {
 }
 
 @keyframes skmt-modal-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .skmt-modal {
@@ -704,8 +708,14 @@ details[open] .skmt-section__chevron {
 }
 
 @keyframes skmt-modal-slide {
-  from { transform: translateY(-8px) scale(0.98); opacity: 0; }
-  to   { transform: translateY(0)    scale(1);    opacity: 1; }
+  from {
+    transform: translateY(-8px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
 }
 
 .skmt-modal__header {
@@ -762,6 +772,10 @@ details[open] .skmt-section__chevron {
   text-align: center;
   padding: 48px 20px;
   color: var(--skmt-text-muted);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .skmt-empty .skmt-icon,

@@ -6,6 +6,8 @@
 (function () {
   "use strict";
 
+  var isDirty = false;
+
   document.addEventListener("DOMContentLoaded", function () {
     initToggles();
     initFormValidation();
@@ -158,7 +160,6 @@
    * ================================================================ */
 
   function initUnsavedWarning() {
-    var isDirty = false;
     var forms   = document.querySelectorAll(
       ".skmt-form, #skmt-save-settings-form, #skmt-module-form",
     );
@@ -231,14 +232,6 @@
     var moduleGrid = document.querySelector(".skmt-module-grid");
     if (!moduleGrid || typeof skmtAdmin === "undefined") return;
 
-    // Masquer le bouton de soumission batch si JS dispo
-    var batchSubmit = document.querySelector(
-      '.skmt-page__footer [type="submit"]',
-    );
-    if (batchSubmit) {
-      batchSubmit.style.display = "none";
-    }
-
     moduleGrid.addEventListener("change", function (e) {
       var checkbox = e.target.closest(
         '.skmt-module-card .skmt-toggle input[type="checkbox"]',
@@ -304,6 +297,7 @@
           }
 
           // Recharger la page pour mettre à jour la navigation latérale
+          isDirty = false;
           setTimeout(function () {
             window.location.reload();
           }, 1200);
@@ -326,4 +320,61 @@
         "Êtes-vous sûr ?",
     );
   };
+
+  /* ================================================================
+   * MODALS NOMMÉES — skmtModalOpen / skmtModalClose
+   * Pour les modals avec HTML persistant (form, etc.).
+   * Complément à skmtModal.open() qui est programmatique.
+   * Usage : skmtModalOpen('mon-modal-id')
+   * ================================================================ */
+
+  window.skmtModalOpen = function (id) {
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.classList.add("is-open");
+    // Focaliser le premier champ texte si présent
+    var input = el.querySelector("input[type='text'], input[type='number'], textarea");
+    if (input) {
+      setTimeout(function () {
+        input.select();
+        input.focus();
+      }, 60);
+    }
+  };
+
+  window.skmtModalClose = function (id) {
+    var el = document.getElementById(id);
+    if (el) el.classList.remove("is-open");
+  };
+
+  // Délégation globale : click hors du .skmt-modal ou sur .skmt-modal-close
+  document.addEventListener("click", function (e) {
+    // Clic sur l'overlay lui-même (hors de la boîte)
+    if (
+      e.target.classList.contains("skmt-modal-overlay") &&
+      e.target.id !== "skmt-modal-overlay" // géré par initModal()
+    ) {
+      e.target.classList.remove("is-open");
+      return;
+    }
+    // Bouton de fermeture explicite
+    var closeBtn = e.target.closest && e.target.closest(".skmt-modal-close");
+    if (closeBtn) {
+      var overlay = closeBtn.closest(".skmt-modal-overlay");
+      if (overlay && overlay.id !== "skmt-modal-overlay") {
+        overlay.classList.remove("is-open");
+      }
+    }
+  });
+
+  // Échap ferme toutes les modals nommées ouvertes (sauf la principale)
+  document.addEventListener("keydown", function (e) {
+    if (e.key !== "Escape") return;
+    var open = document.querySelectorAll(
+      ".skmt-modal-overlay.is-open:not(#skmt-modal-overlay)",
+    );
+    open.forEach(function (el) {
+      el.classList.remove("is-open");
+    });
+  });
 })();

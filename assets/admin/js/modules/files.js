@@ -1,0 +1,978 @@
+/**
+ * Studio Kyne Mini Tools — Module Fichiers
+ * Gestionnaire de fichiers vanilla JS.
+ */
+(function () {
+  "use strict";
+
+  if (typeof skmtAdmin === "undefined") return;
+
+  /* ================================================================
+   * ÉTAT GLOBAL
+   * ================================================================ */
+
+  var fm = {
+    path: "",
+    selected: [],
+    ajaxUrl: skmtAdmin.ajaxUrl,
+    nonce: "",
+    i18n: skmtAdmin.i18n || {},
+    downloadUrl: "",
+    downloadNonce: "",
+    editorCm: null,
+    editorPath: null,
+    editorDirty: false,
+    editorAutoMode: "text/plain",
+    editorSuppressChange: false,
+    movePath: null,
+    renamePath: null,
+    dragCounter: 0,
+  };
+
+  /* ================================================================
+   * INITIALISATION
+   * ================================================================ */
+
+  document.addEventListener("DOMContentLoaded", function () {
+    var container = document.getElementById("skmt-files-manager");
+    if (!container) return;
+
+    fm.nonce        = container.dataset.nonce || "";
+    fm.downloadUrl  = fm.i18n.downloadUrl || "";
+    fm.downloadNonce = fm.i18n.downloadNonce || "";
+
+    // Masquer le bouton "Enregistrer" du header (pas de form dans ce module)
+    var headerSave = document.querySelector('.skmt-page__header-actions [form="skmt-module-form"]');
+    if (headerSave) headerSave.style.display = "none";
+
+    loadDirectory("");
+    initCheckAll();
+    initSelectionBar();
+    initToolbar();
+    initUpload();
+    initDropZone();
+    initEditor();
+    initModals();
+  });
+
+  /* ================================================================
+   * AJAX
+   * ================================================================ */
+
+  function ajax(action, data, cb) {
+    var form = new FormData();
+    form.append("action", action);
+    form.append("nonce", fm.nonce);
+
+    for (var k in data) {
+      if (!Object.prototype.hasOwnProperty.call(data, k)) continue;
+      if (Array.isArray(data[k])) {
+        data[k].forEach(function (v) { form.append(k + "[]", v); });
+      } else {
+        form.append(k, data[k]);
+      }
+    }
+
+    fetch(fm.ajaxUrl, { method: "POST", credentials: "same-origin", body: form })
+      .then(function (r) { return r.json(); })
+      .then(cb)
+      .catch(function () { showToast("Erreur réseau.", "error"); });
+  }
+
+  /* ================================================================
+   * NAVIGATION / CHARGEMENT
+   * ================================================================ */
+
+  function loadDirectory(path) {
+    fm.path = path;
+    fm.selected = [];
+    updateSelectionBar();
+    renderBreadcrumb(path);
+    renderLoading();
+
+    ajax("skmt_files_list", { path: path }, function (data) {
+      if (!data.success) {
+        showToast((data.data && data.data.message) || "Erreur", "error");
+        renderEmpty();
+        return;
+      }
+      renderTable(data.data.items);
+    });
+  }
+
+  /* ================================================================
+   * BREADCRUMB
+   * ================================================================ */
+
+  function renderBreadcrumb(path) {
+    var bc = document.getElementById("skmt-files-breadcrumb");
+    // Garder uniquement le bouton home
+    while (bc.children.length > 1) bc.removeChild(bc.lastChild);
+
+    if (!path) return;
+
+    var parts = path.split("/").filter(Boolean);
+    var built = "";
+
+    parts.forEach(function (segment) {
+      built = built ? built + "/" + segment : segment;
+
+      var sep = document.createElement("span");
+      sep.className = "skmt-files__bc-sep";
+      sep.textContent = "/";
+      bc.appendChild(sep);
+
+      var btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "skmt-files__bc-item";
+      btn.textContent = segment;
+      (function (p) {
+        btn.addEventListener("click", function () { loadDirectory(p); });
+      })(built);
+      bc.appendChild(btn);
+    });
+  }
+
+  /* Bouton home */
+  document.addEventListener("DOMContentLoaded", function () {
+    var homeBtn = document.querySelector(".skmt-files__bc-home");
+    if (homeBtn) {
+      homeBtn.addEventListener("click", function () { loadDirectory(""); });
+    }
+  });
+
+  /* ================================================================
+   * RENDU TABLE
+   * ================================================================ */
+
+  function renderLoading() {
+    var tbody = document.getElementById("skmt-files-tbody");
+    if (!tbody) return;
+    tbody.innerHTML =
+      '<tr class="skmt-files__row-empty"><td colspan="7">' +
+      escHtml(fm.i18n.loading || "Chargement...") +
+      "</td></tr>";
+  }
+
+  function renderEmpty() {
+    var tbody = document.getElementById("skmt-files-tbody");
+    if (!tbody) return;
+    tbody.innerHTML =
+      '<tr class="skmt-files__row-empty"><td colspan="7">' +
+      escHtml(fm.i18n.emptyFolder || "Ce dossier est vide.") +
+      "</td></tr>";
+  }
+
+  function renderTable(items) {
+    var tbody = document.getElementById("skmt-files-tbody");
+    var checkAll = document.getElementById("skmt-files-check-all");
+    if (!tbody) return;
+
+    if (checkAll) { checkAll.checked = false; checkAll.indeterminate = false; }
+    fm.selected = [];
+
+    if (!items || items.length === 0) {
+      renderEmpty();
+      return;
+    }
+
+    tbody.innerHTML = "";
+    items.forEach(function (item) {
+      tbody.appendChild(buildRow(item));
+    });
+  }
+
+  function buildRow(item) {
+    var tr = document.createElement("tr");
+    tr.className = "skmt-files__row" + (item.type === "dir" ? " skmt-files__row--dir" : "");
+    tr.setAttribute("data-path", item.path);
+
+    // Checkbox
+    var tdCb = document.createElement("td");
+    tdCb.className = "skmt-files__col-check";
+    var cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.className = "skmt-files__row-check";
+    cb.setAttribute("data-path", item.path);
+    cb.addEventListener("change", onRowCheckChange);
+    tdCb.appendChild(cb);
+    tr.appendChild(tdCb);
+
+    // Nom
+    var tdName = document.createElement("td");
+    tdName.className = "skmt-files__col-name";
+    var nameBtn = document.createElement("button");
+    nameBtn.type = "button";
+    nameBtn.className = "skmt-files__name-btn";
+    nameBtn.innerHTML =
+      getFileIcon(item) +
+      '<span class="skmt-files__name-text">' + escHtml(item.name) + "</span>";
+    if (item.type === "dir") {
+      nameBtn.addEventListener("click", function () { loadDirectory(item.path); });
+    } else {
+      nameBtn.addEventListener("click", function () {
+        if (isEditable(item.ext)) openEditor(item.path, item.name);
+        else triggerDownload(item.path, "file");
+      });
+    }
+    tdName.appendChild(nameBtn);
+    tr.appendChild(tdName);
+
+    // Taille
+    tr.appendChild(cell("skmt-files__col-size", item.size_fmt || (item.type === "dir" ? "—" : "")));
+
+    // Modifié
+    tr.appendChild(cell("skmt-files__col-modified", item.modified_fmt || ""));
+
+    // Droits
+    var tdPerms = document.createElement("td");
+    tdPerms.className = "skmt-files__col-perms";
+    if (item.perms) {
+      tdPerms.innerHTML = '<span class="skmt-files__perms">' + escHtml(item.perms) + "</span>";
+    }
+    tr.appendChild(tdPerms);
+
+    // Propriétaire
+    tr.appendChild(cell("skmt-files__col-owner", item.owner || ""));
+
+    // Actions
+    var tdAct = document.createElement("td");
+    tdAct.className = "skmt-files__col-actions";
+    tdAct.innerHTML = buildActions(item);
+    bindActions(tdAct, item);
+    tr.appendChild(tdAct);
+
+    return tr;
+  }
+
+  function cell(cls, text) {
+    var td = document.createElement("td");
+    td.className = cls;
+    td.textContent = text;
+    return td;
+  }
+
+  /* ================================================================
+   * ACTIONS PAR LIGNE
+   * ================================================================ */
+
+  function buildActions(item) {
+    var btns = "";
+    if (item.type === "file" && isEditable(item.ext)) {
+      btns += actionBtn("edit", "Éditer", ICON_EDIT, "");
+    }
+    btns += actionBtn("download", "Télécharger", ICON_DOWNLOAD, "");
+    btns += actionBtn("copy-link", "Copier le lien", ICON_LINK, "");
+    btns += actionBtn("rename", "Renommer", ICON_RENAME, "");
+    btns += actionBtn("move", "Déplacer", ICON_MOVE, "");
+    if (item.ext === "zip" || item.ext === "gz" || item.ext === "tar") {
+      btns += actionBtn("extract", "Extraire", ICON_EXTRACT, "");
+    }
+    btns += actionBtn("delete", "Supprimer", ICON_DELETE, "skmt-files__action-btn--danger");
+    return '<div class="skmt-files__actions">' + btns + "</div>";
+  }
+
+  function actionBtn(action, title, icon, extra) {
+    return (
+      '<button type="button" class="skmt-files__action-btn ' +
+      extra +
+      '" data-action="' +
+      action +
+      '" title="' +
+      escHtml(title) +
+      '">' +
+      icon +
+      "</button>"
+    );
+  }
+
+  function bindActions(td, item) {
+    td.addEventListener("click", function (e) {
+      var btn = e.target.closest("[data-action]");
+      if (!btn) return;
+      switch (btn.dataset.action) {
+        case "edit":      openEditor(item.path, item.name); break;
+        case "download":  triggerDownload(item.path, item.type); break;
+        case "copy-link": copyLink(item.path); break;
+        case "rename":    openRenameModal(item.path, item.name); break;
+        case "move":      openMoveModal(item.path); break;
+        case "extract":   extractZip(item.path); break;
+        case "delete":    deleteItems([item.path]); break;
+      }
+    });
+  }
+
+  /* ================================================================
+   * OPÉRATIONS FICHIER
+   * ================================================================ */
+
+  function deleteItems(paths) {
+    var msg = fm.i18n.confirmDelete || "Supprimer ce(s) élément(s) ? Cette action est irréversible.";
+    if (!window.confirm(msg)) return;
+
+    ajax("skmt_files_delete", { paths: paths }, function (data) {
+      if (!data.success) {
+        showToast((data.data && data.data.message) || "Erreur", "error");
+        return;
+      }
+      showToast("Supprimé avec succès.", "success");
+      loadDirectory(fm.path);
+    });
+  }
+
+  function extractZip(path) {
+    ajax("skmt_files_extract", { path: path }, function (data) {
+      if (!data.success) {
+        showToast((data.data && data.data.message) || "Erreur", "error");
+        return;
+      }
+      showToast("Archive extraite.", "success");
+      loadDirectory(fm.path);
+    });
+  }
+
+  function triggerDownload(path, itemType) {
+    if (itemType === "dir") {
+      var name = path.split("/").filter(Boolean).pop() || "dossier";
+      downloadDirAsZip(path, name);
+      return;
+    }
+    var url =
+      fm.downloadUrl +
+      "&path=" + encodeURIComponent(path) +
+      "&_wpnonce=" + encodeURIComponent(fm.downloadNonce);
+    window.location.href = url;
+  }
+
+  function downloadDirAsZip(path, name) {
+    setRowDownloadLoading(path, true);
+    showToast("Compression de « " + name + " » en cours…", "info");
+
+    var url =
+      fm.downloadUrl +
+      "&path=" + encodeURIComponent(path) +
+      "&_wpnonce=" + encodeURIComponent(fm.downloadNonce);
+
+    fetch(url, { credentials: "same-origin" })
+      .then(function (r) {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.blob();
+      })
+      .then(function (blob) {
+        var objUrl = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = objUrl;
+        a.download = name + ".zip";
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        setTimeout(function () { URL.revokeObjectURL(objUrl); }, 1000);
+        setRowDownloadLoading(path, false);
+        showToast("« " + name + ".zip » téléchargé.", "success");
+      })
+      .catch(function () {
+        setRowDownloadLoading(path, false);
+        showToast("Erreur lors de la compression de « " + name + " ».", "error");
+      });
+  }
+
+  function setRowDownloadLoading(path, loading) {
+    var tbody = document.getElementById("skmt-files-tbody");
+    if (!tbody) return;
+    var rows = tbody.querySelectorAll("tr[data-path]");
+    for (var i = 0; i < rows.length; i++) {
+      if (rows[i].getAttribute("data-path") === path) {
+        var dlBtn = rows[i].querySelector('[data-action="download"]');
+        if (!dlBtn) break;
+        dlBtn.innerHTML = loading ? ICON_SPINNER : ICON_DOWNLOAD;
+        dlBtn.disabled  = loading;
+        break;
+      }
+    }
+  }
+
+  function copyLink(path) {
+    var url =
+      fm.downloadUrl +
+      "&path=" + encodeURIComponent(path) +
+      "&_wpnonce=" + encodeURIComponent(fm.downloadNonce);
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(url).then(function () {
+        showToast("Lien copié.", "success");
+      });
+    } else {
+      var ta = document.createElement("textarea");
+      ta.value = url;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try { document.execCommand("copy"); showToast("Lien copié.", "success"); }
+      catch (_) { showToast("Impossible de copier.", "error"); }
+      document.body.removeChild(ta);
+    }
+  }
+
+  /* ================================================================
+   * SÉLECTION
+   * ================================================================ */
+
+  function initCheckAll() {
+    var checkAll = document.getElementById("skmt-files-check-all");
+    if (!checkAll) return;
+
+    checkAll.addEventListener("change", function () {
+      var all = document.querySelectorAll(".skmt-files__row-check");
+      fm.selected = [];
+      all.forEach(function (cb) {
+        cb.checked = checkAll.checked;
+        cb.closest("tr").classList.toggle("skmt-files__row--selected", checkAll.checked);
+        if (checkAll.checked) fm.selected.push(cb.getAttribute("data-path"));
+      });
+      updateSelectionBar();
+    });
+  }
+
+  function onRowCheckChange() {
+    var all = document.querySelectorAll(".skmt-files__row-check");
+    fm.selected = [];
+    all.forEach(function (cb) {
+      cb.closest("tr").classList.toggle("skmt-files__row--selected", cb.checked);
+      if (cb.checked) fm.selected.push(cb.getAttribute("data-path"));
+    });
+
+    var checkAll = document.getElementById("skmt-files-check-all");
+    if (checkAll) {
+      checkAll.checked = fm.selected.length > 0 && fm.selected.length === all.length;
+      checkAll.indeterminate = fm.selected.length > 0 && fm.selected.length < all.length;
+    }
+    updateSelectionBar();
+  }
+
+  function updateSelectionBar() {
+    var bar   = document.getElementById("skmt-files-selection-bar");
+    var count = document.getElementById("skmt-files-selection-count");
+    if (!bar) return;
+
+    if (fm.selected.length > 0) {
+      bar.style.display = "";
+      if (count) count.textContent = fm.selected.length + " sélectionné(s)";
+    } else {
+      bar.style.display = "none";
+    }
+  }
+
+  /* ================================================================
+   * BARRE DE SÉLECTION (ZIP / SUPPRIMER EN MASSE)
+   * ================================================================ */
+
+  function initSelectionBar() {
+    var zipBtn = document.getElementById("skmt-files-zip-btn");
+    var delBtn = document.getElementById("skmt-files-delete-btn");
+
+    if (zipBtn) {
+      zipBtn.addEventListener("click", function () {
+        if (!fm.selected.length) return;
+        var name = "archive-" + Date.now() + ".zip";
+        zipBtn.disabled = true;
+        ajax("skmt_files_zip", { paths: fm.selected, name: name, parent: fm.path }, function (data) {
+          zipBtn.disabled = false;
+          if (!data.success) {
+            showToast((data.data && data.data.message) || "Erreur", "error");
+            return;
+          }
+          showToast("Archive créée. Téléchargement en cours...", "success");
+          triggerDownload(data.data.path);
+          loadDirectory(fm.path);
+        });
+      });
+    }
+
+    if (delBtn) {
+      delBtn.addEventListener("click", function () {
+        if (!fm.selected.length) return;
+        deleteItems(fm.selected.slice());
+      });
+    }
+  }
+
+  /* ================================================================
+   * TOOLBAR (NOUVEAU DOSSIER)
+   * ================================================================ */
+
+  function initToolbar() {
+    var mkdirBtn     = document.getElementById("skmt-files-mkdir-btn");
+    var mkdirConfirm = document.getElementById("skmt-mkdir-confirm");
+    var mkdirInput   = document.getElementById("skmt-mkdir-input");
+
+    if (mkdirBtn) {
+      mkdirBtn.addEventListener("click", function () {
+        if (mkdirInput) mkdirInput.value = "";
+        window.skmtModalOpen("skmt-modal-mkdir");
+      });
+    }
+
+    if (mkdirConfirm && mkdirInput) {
+      function doMkdir() {
+        var name = mkdirInput.value.trim();
+        if (!name) return;
+        ajax("skmt_files_mkdir", { parent: fm.path, name: name }, function (data) {
+          if (!data.success) {
+            showToast((data.data && data.data.message) || "Erreur", "error");
+            return;
+          }
+          window.skmtModalClose("skmt-modal-mkdir");
+          showToast("Dossier créé.", "success");
+          loadDirectory(fm.path);
+        });
+      }
+
+      mkdirConfirm.addEventListener("click", doMkdir);
+      mkdirInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") doMkdir();
+      });
+    }
+  }
+
+  /* ================================================================
+   * UPLOAD
+   * ================================================================ */
+
+  function initUpload() {
+    var input = document.getElementById("skmt-files-upload-input");
+    if (!input) return;
+
+    input.addEventListener("change", function () {
+      if (!this.files || !this.files.length) return;
+      uploadFiles(this.files);
+      this.value = "";
+    });
+  }
+
+  function uploadFiles(files) {
+    var form = new FormData();
+    form.append("action", "skmt_files_upload");
+    form.append("nonce", fm.nonce);
+    form.append("path", fm.path);
+
+    for (var i = 0; i < files.length; i++) {
+      form.append("files[]", files[i], files[i].name);
+    }
+
+    showToast(fm.i18n.uploading || "Upload en cours...", "info");
+
+    fetch(fm.ajaxUrl, { method: "POST", credentials: "same-origin", body: form })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (!data.success) {
+          showToast((data.data && data.data.message) || "Erreur d'upload.", "error");
+          return;
+        }
+        showToast(data.data.message, "success");
+        loadDirectory(fm.path);
+      })
+      .catch(function () { showToast("Erreur d'upload.", "error"); });
+  }
+
+  /* ================================================================
+   * DRAG & DROP
+   * ================================================================ */
+
+  function initDropZone() {
+    var overlay = document.getElementById("skmt-files-drop-overlay");
+    if (!overlay) return;
+
+    document.addEventListener("dragenter", function (e) {
+      if (!e.dataTransfer || !e.dataTransfer.types) return;
+      var hasFiles = Array.prototype.indexOf.call(e.dataTransfer.types, "Files") !== -1;
+      if (!hasFiles) return;
+      fm.dragCounter++;
+      overlay.style.display = "";
+    });
+
+    document.addEventListener("dragleave", function () {
+      fm.dragCounter = Math.max(0, fm.dragCounter - 1);
+      if (fm.dragCounter === 0) overlay.style.display = "none";
+    });
+
+    document.addEventListener("dragover", function (e) { e.preventDefault(); });
+
+    document.addEventListener("drop", function (e) {
+      e.preventDefault();
+      fm.dragCounter = 0;
+      overlay.style.display = "none";
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) {
+        uploadFiles(e.dataTransfer.files);
+      }
+    });
+  }
+
+  /* ================================================================
+   * ÉDITEUR DE CODE
+   * ================================================================ */
+
+  function updateSaveBtn() {
+    var btn = document.getElementById("skmt-editor-save");
+    if (btn) btn.disabled = !fm.editorDirty;
+  }
+
+  function initEditor() {
+    var editorEl   = document.getElementById("skmt-files-editor");
+    var closeBtn   = document.getElementById("skmt-editor-close");
+    var saveBtn    = document.getElementById("skmt-editor-save");
+    var langSelect = document.getElementById("skmt-editor-lang");
+    if (!closeBtn || !saveBtn) return;
+
+    if (saveBtn) saveBtn.disabled = true;
+
+    closeBtn.addEventListener("click", closeEditor);
+    saveBtn.addEventListener("click", saveEditorContent);
+
+    // Clic sur le backdrop (hors panel) → fermer
+    if (editorEl) {
+      editorEl.addEventListener("click", function (e) {
+        if (e.target === editorEl) closeEditor();
+      });
+    }
+
+    if (langSelect) langSelect.addEventListener("change", function () {
+      if (!fm.editorCm) return;
+      var mode = langSelect.value || fm.editorAutoMode;
+      fm.editorCm.setOption("mode", mode);
+    });
+
+    document.addEventListener("keydown", function (e) {
+      if (!editorEl || editorEl.style.display === "none") return;
+
+      if (e.key === "Escape") {
+        e.preventDefault();
+        closeEditor();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
+        e.preventDefault();
+        if (!fm.editorDirty) return;
+        saveEditorContent();
+      }
+    });
+  }
+
+  function openEditor(path, name) {
+    ajax("skmt_files_get_content", { path: path }, function (data) {
+      if (!data.success) {
+        showToast((data.data && data.data.message) || "Erreur", "error");
+        return;
+      }
+
+      fm.editorPath = path;
+      var editorEl   = document.getElementById("skmt-files-editor");
+      var filenameEl = document.getElementById("skmt-editor-filename");
+      var textarea   = document.getElementById("skmt-editor-textarea");
+      var langSelect = document.getElementById("skmt-editor-lang");
+      var ext        = name.split(".").pop().toLowerCase();
+      var mode       = getModeForExt(ext);
+      var content    = data.data.content;
+
+      fm.editorAutoMode = mode;
+
+      if (filenameEl) filenameEl.textContent = name;
+      editorEl.style.display = "";
+
+      // Sync dropdown — sélectionner l'option correspondant au mode détecté
+      if (langSelect) {
+        var found = false;
+        for (var i = 0; i < langSelect.options.length; i++) {
+          if (langSelect.options[i].value === mode) {
+            langSelect.value = mode;
+            found = true;
+            break;
+          }
+        }
+        if (!found) langSelect.value = "";
+      }
+
+      if (fm.editorCm) {
+        // Réutiliser l'instance — setValue déclenche "change", on le supprime
+        fm.editorSuppressChange = true;
+        fm.editorCm.setOption("mode", mode);
+        fm.editorCm.setValue(content);
+        fm.editorCm.clearHistory();
+        fm.editorSuppressChange = false;
+        fm.editorDirty = false;
+        updateSaveBtn();
+        setTimeout(function () { fm.editorCm.refresh(); }, 30);
+      } else if (window.CodeMirror) {
+        textarea.value = content;
+        try {
+          fm.editorCm = window.CodeMirror.fromTextArea(textarea, {
+            lineNumbers:  true,
+            mode:         mode,
+            lineWrapping: true,
+            indentUnit:   2,
+            tabSize:      2,
+            theme:        "skmt-dark",
+            matchBrackets: true,
+          });
+          fm.editorCm.setSize(null, "calc(100vh - 81px)");
+
+          // Tracker les modifications
+          fm.editorCm.on("change", function () {
+            if (fm.editorSuppressChange) return;
+            if (!fm.editorDirty) {
+              fm.editorDirty = true;
+              updateSaveBtn();
+            }
+          });
+
+          fm.editorDirty = false;
+          updateSaveBtn();
+          setTimeout(function () { fm.editorCm && fm.editorCm.refresh(); }, 30);
+        } catch (e) {
+          fm.editorCm = null;
+          if (textarea) {
+            textarea.style.display = "";
+            textarea.addEventListener("input", function () {
+              if (!fm.editorDirty) {
+                fm.editorDirty = true;
+                updateSaveBtn();
+              }
+            });
+          }
+        }
+      } else {
+        textarea.value = content;
+        textarea.style.display = "";
+      }
+    });
+  }
+
+  function closeEditor() {
+    if (fm.editorDirty && typeof window.skmtModal !== "undefined") {
+      window.skmtModal.open({
+        title:        "Modifications non enregistrées",
+        message:      "Voulez-vous quitter sans enregistrer vos modifications ?",
+        confirmLabel: "Quitter sans enregistrer",
+        cancelLabel:  "Rester",
+        danger:       true,
+        onConfirm:    doCloseEditor,
+      });
+      return;
+    }
+    doCloseEditor();
+  }
+
+  function doCloseEditor() {
+    var editorEl = document.getElementById("skmt-files-editor");
+    if (editorEl) editorEl.style.display = "none";
+    fm.editorPath  = null;
+    fm.editorDirty = false;
+    updateSaveBtn();
+  }
+
+  function saveEditorContent() {
+    if (!fm.editorPath) return;
+
+    var content;
+    if (fm.editorCm) {
+      content = fm.editorCm.getValue();
+    } else {
+      var ta = document.getElementById("skmt-editor-textarea");
+      content = ta ? ta.value : "";
+    }
+
+    var saveBtn = document.getElementById("skmt-editor-save");
+    if (saveBtn) saveBtn.disabled = true;
+
+    ajax("skmt_files_save_content", { path: fm.editorPath, content: content }, function (data) {
+      if (!data.success) {
+        showToast((data.data && data.data.message) || "Erreur", "error");
+        // Réactiver le bouton en cas d'erreur
+        if (saveBtn) saveBtn.disabled = false;
+        return;
+      }
+      fm.editorDirty = false;
+      updateSaveBtn();
+      showToast("Fichier enregistré.", "success");
+    });
+  }
+
+  function getModeForExt(ext) {
+    var map = {
+      php:   "application/x-httpd-php",
+      js:    "text/javascript",
+      ts:    "text/typescript",
+      css:   "text/css",
+      html:  "text/html",
+      htm:   "text/html",
+      xml:   "text/xml",
+      svg:   "text/xml",
+      json:  "application/json",
+      sh:    "text/x-sh",
+      bash:  "text/x-sh",
+      sql:   "text/x-sql",
+    };
+    return map[ext] || "text/plain";
+  }
+
+  function isEditable(ext) {
+    var list = [
+      "php", "js", "ts", "css", "html", "htm", "xml", "svg",
+      "json", "txt", "md", "sh", "bash", "sql", "htaccess", "env",
+      "yml", "yaml", "ini", "conf", "config", "lock", "log", "htpasswd",
+    ];
+    return list.indexOf(ext) !== -1;
+  }
+
+  /* ================================================================
+   * MODAL RENOMMER
+   * ================================================================ */
+
+  function initModals() {
+    var renameConfirm = document.getElementById("skmt-rename-confirm");
+    var renameInput   = document.getElementById("skmt-rename-input");
+    var moveConfirm   = document.getElementById("skmt-move-confirm");
+    var moveInput     = document.getElementById("skmt-move-input");
+
+    if (renameConfirm) {
+      renameConfirm.addEventListener("click", function () {
+        var newName = (renameInput && renameInput.value.trim()) || "";
+        if (!newName || !fm.renamePath) return;
+        ajax("skmt_files_rename", { path: fm.renamePath, new_name: newName }, function (data) {
+          if (!data.success) { showToast((data.data && data.data.message) || "Erreur", "error"); return; }
+          showToast("Renommé avec succès.", "success");
+          window.skmtModalClose("skmt-modal-rename");
+          loadDirectory(fm.path);
+        });
+      });
+    }
+
+    if (renameInput) {
+      renameInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") renameConfirm && renameConfirm.click();
+      });
+    }
+
+    if (moveConfirm) {
+      moveConfirm.addEventListener("click", function () {
+        var dst = (moveInput && moveInput.value.trim()) || "";
+        if (!fm.movePath) return;
+        ajax("skmt_files_move", { src: fm.movePath, dst: dst }, function (data) {
+          if (!data.success) { showToast((data.data && data.data.message) || "Erreur", "error"); return; }
+          showToast("Déplacé avec succès.", "success");
+          window.skmtModalClose("skmt-modal-move");
+          loadDirectory(fm.path);
+        });
+      });
+    }
+
+    if (moveInput) {
+      moveInput.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") moveConfirm && moveConfirm.click();
+      });
+    }
+  }
+
+  function openRenameModal(path, name) {
+    fm.renamePath = path;
+    var input = document.getElementById("skmt-rename-input");
+    if (input) input.value = name || "";
+    window.skmtModalOpen("skmt-modal-rename");
+  }
+
+  function openMoveModal(path) {
+    fm.movePath = path;
+    var input = document.getElementById("skmt-move-input");
+    if (input) input.value = fm.path;
+    window.skmtModalOpen("skmt-modal-move");
+  }
+
+  /* ================================================================
+   * ICÔNES FICHIERS (SVG inline)
+   * ================================================================ */
+
+  var ICON_FOLDER  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>';
+  var ICON_CODE    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><polyline points="10,15 8,17 10,19"/><polyline points="14,15 16,17 14,19"/></svg>';
+  var ICON_IMAGE_F = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg>';
+  var ICON_ARCHIVE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="12" y1="12" x2="12" y2="18"/><polyline points="9,15 12,18 15,15"/></svg>';
+  var ICON_TEXT    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10,9 9,9 8,9"/></svg>';
+  var ICON_FILE    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>';
+  var ICON_SPINNER = '<svg class="skmt-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 2a10 10 0 1 0 10 10"/></svg>';
+
+  // Map extension → classe CSS (couleur par langage)
+  var EXT_CLASS = {
+    php: "php",    phtml: "php",
+    js: "js",      mjs: "js",   cjs: "js",
+    ts: "ts",      tsx: "ts",
+    css: "css",    scss: "css", sass: "css", less: "css",
+    html: "html",  htm: "html",
+    json: "json",  jsonc: "json",
+    xml: "xml",
+    svg: "svg",
+    md: "md",      mdx: "md",
+    sql: "sql",
+    sh: "sh",      bash: "sh",  zsh: "sh",
+    yml: "yaml",   yaml: "yaml",
+    py: "py",      rb: "rb",
+  };
+
+  function getFileIcon(item) {
+    if (item.type === "dir") {
+      return '<span class="skmt-files__icon skmt-files__icon--folder">' + ICON_FOLDER + "</span>";
+    }
+    var imgs  = ["jpg", "jpeg", "png", "gif", "svg", "webp", "ico", "bmp", "avif"];
+    var arch  = ["zip", "tar", "gz", "bz2", "7z", "rar"];
+    var texts = ["txt", "log", "ini", "conf", "env", "htaccess", "htpasswd", "lock"];
+    var ext   = item.ext || "";
+    var icon, cls;
+
+    if (EXT_CLASS[ext]) {
+      icon = ICON_CODE;
+      cls  = "skmt-files__icon--lang-" + EXT_CLASS[ext];
+    } else if (imgs.indexOf(ext) !== -1) {
+      icon = ICON_IMAGE_F;
+      cls  = "skmt-files__icon--image";
+    } else if (arch.indexOf(ext) !== -1) {
+      icon = ICON_ARCHIVE;
+      cls  = "skmt-files__icon--archive";
+    } else if (texts.indexOf(ext) !== -1) {
+      icon = ICON_TEXT;
+      cls  = "skmt-files__icon--text";
+    } else {
+      icon = ICON_FILE;
+      cls  = "";
+    }
+
+    return '<span class="skmt-files__icon ' + cls + '">' + icon + "</span>";
+  }
+
+  /* ================================================================
+   * ICÔNES ACTIONS
+   * ================================================================ */
+
+  var ICON_EDIT    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>';
+  var ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>';
+  var ICON_LINK     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>';
+  var ICON_RENAME   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>';
+  var ICON_MOVE     = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="5,9 2,12 5,15"/><polyline points="9,5 12,2 15,5"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="12" y1="2" x2="12" y2="22"/></svg>';
+  var ICON_EXTRACT  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12H19"/><path d="m12 5 7 7-7 7"/></svg>';
+  var ICON_DELETE   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>';
+
+  /* ================================================================
+   * UTILITAIRES
+   * ================================================================ */
+
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;");
+  }
+
+  function showToast(message, type) {
+    if (typeof window.skmtShowToast === "function") {
+      window.skmtShowToast(message, type || "success");
+    }
+  }
+})();

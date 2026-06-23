@@ -50,7 +50,7 @@ $modules = $this->modules->get_all();
 			</div>
 
 			<div class="skmt-page__footer">
-				<button type="submit" class="skmt-btn skmt-btn--primary">
+				<button type="submit" class="skmt-btn skmt-btn--primary" style="display:none">
 					<?php echo esc_html__( 'Enregistrer les modules', 'studio-kyne-mini-tools' ); ?>
 				</button>
 			</div>

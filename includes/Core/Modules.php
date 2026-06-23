@@ -62,6 +62,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Login\\Module',
 				'icon'        => 'log-in',
 			],
+			'files'           => [
+				'name'        => __( 'Fichiers', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Explorateur et gestionnaire de fichiers WordPress.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Fichiers', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Gérer les fichiers du site', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Files\\Module',
+				'icon'        => 'folder',
+			],
 		];
 
 		/**
