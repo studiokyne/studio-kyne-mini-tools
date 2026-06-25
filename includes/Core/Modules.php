@@ -70,6 +70,22 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Files\\Module',
 				'icon'        => 'folder',
 			],
+			'white_label'     => [
+				'name'        => __( 'Marque Blanche', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Personnalisez l\'interface d\'administration WordPress pour vos clients.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Marque Blanche', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Personnaliser l\'admin WP', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\WhiteLabel\\Module',
+				'icon'        => 'palette',
+			],
+			'menu_creator'    => [
+				'name'        => __( 'Créateur de menu', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Personnalisez la navigation WordPress pour vos rôles et utilisateurs.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Créateur de menu', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Personnaliser les menus admin', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\MenuCreator\\Module',
+				'icon'        => 'menu',
+			],
 		];
 
 		/**

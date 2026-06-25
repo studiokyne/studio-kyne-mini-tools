@@ -31,6 +31,8 @@
   var BELL_EMPTY_SVG =
     '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>';
 
+  var notifCount = 0;
+
   /* ================================================================
    * TOAST
    * ================================================================ */
@@ -46,7 +48,6 @@
     if (!container) return;
 
     type = type || "success";
-    var title = TITLES[type] || TITLES.success;
 
     var toast = document.createElement("div");
     toast.className = "skmt-toast skmt-toast--" + type;
@@ -54,26 +55,10 @@
     toast.setAttribute("aria-live", "assertive");
 
     toast.innerHTML =
-      '<div class="skmt-toast__header">' +
-      '<span class="skmt-toast__icon">' +
-      (ICONS[type] || ICONS.info) +
-      "</span>" +
-      '<span class="skmt-toast__title">' +
-      escapeHtml(title) +
-      "</span>" +
-      '<button class="skmt-toast__close" type="button" aria-label="Fermer">' +
-      CLOSE_SVG +
-      "</button>" +
-      "</div>" +
-      '<div class="skmt-toast__body">' +
-      '<p class="skmt-toast__message">' +
-      escapeHtml(message) +
-      "</p>" +
-      "</div>" +
-      '<div class="skmt-toast__footer">' +
-      '<span class="skmt-toast__countdown">Ce message se ferme dans <strong class="skmt-toast__seconds">' +
-      Math.ceil(TOAST_DURATION / 1000) +
-      "</strong> s. <a href=\"#\" class=\"skmt-toast__pause-link\">Arrêter</a>.</span>" +
+      '<div class="skmt-toast__inner">' +
+      '<span class="skmt-toast__dot"></span>' +
+      '<p class="skmt-toast__message">' + escapeHtml(message) + "</p>" +
+      '<button class="skmt-toast__close" type="button" aria-label="Fermer">' + CLOSE_SVG + "</button>" +
       "</div>" +
       '<div class="skmt-toast__progress-bar"><span class="skmt-toast__progress-fill"></span></div>';
 
@@ -81,8 +66,6 @@
 
     var closeBtn = toast.querySelector(".skmt-toast__close");
     var fill = toast.querySelector(".skmt-toast__progress-fill");
-    var secondsEl = toast.querySelector(".skmt-toast__seconds");
-    var pauseLink = toast.querySelector(".skmt-toast__pause-link");
 
     var dismissed = false;
     var paused = false;
@@ -99,8 +82,6 @@
     function updateProgress() {
       var pct = Math.max(0, 1 - elapsed / TOAST_DURATION);
       fill.style.transform = "scaleX(" + pct + ")";
-      var secsLeft = Math.ceil((TOAST_DURATION - elapsed) / 1000);
-      if (secondsEl) secondsEl.textContent = secsLeft;
     }
 
     var raf;
@@ -117,7 +98,6 @@
       raf = requestAnimationFrame(tick);
     }
 
-    // Démarre le ticker après l'animation d'entrée
     setTimeout(function () {
       lastTick = Date.now();
       raf = requestAnimationFrame(tick);
@@ -140,22 +120,9 @@
 
     closeBtn.addEventListener("click", dismiss);
 
-    if (pauseLink) {
-      pauseLink.addEventListener("click", function (e) {
-        e.preventDefault();
-        paused = true;
-        cancelAnimationFrame(raf);
-        fill.style.transform = "scaleX(" + (1 - elapsed / TOAST_DURATION) + ")";
-        var footer = toast.querySelector(".skmt-toast__footer");
-        if (footer) footer.style.display = "none";
-      });
-    }
-
     // Pause au survol
     toast.addEventListener("mouseenter", function () {
-      if (!paused) {
-        cancelAnimationFrame(raf);
-      }
+      if (!paused) cancelAnimationFrame(raf);
     });
     toast.addEventListener("mouseleave", function () {
       if (!paused && !dismissed) {
@@ -166,7 +133,7 @@
   }
 
   /* ================================================================
-   * CENTRE DE NOTIFICATIONS WP
+   * CENTRE DE NOTIFICATIONS
    * ================================================================ */
 
   function initNotificationCenter() {
@@ -176,19 +143,22 @@
       "#wp-admin-bar-skmt-notif-center > a",
     );
     var closeBtn = document.getElementById("skmt-notif-close");
-    var badge = document.getElementById("skmt-notif-badge");
     var body = document.getElementById("skmt-notif-body");
 
     if (!drawer) return;
 
-    var notices = parseWpNotices(window.skmtWpNoticesHtml || "");
+    // Notices SKMT persistantes en premier, puis notices WP éphémères
+    var skmtNotices = (window.skmtPersistentNotices || []).map(function (n) {
+      return { id: n.id, type: n.type || "info", message: n.message, source: "skmt" };
+    });
+    var wpNotices = parseWpNotices(window.skmtWpNoticesHtml || "").map(function (n) {
+      return { type: n.type, html: n.html, source: "wp" };
+    });
+    var allNotices = skmtNotices.concat(wpNotices);
 
-    populateDrawer(body, notices);
-
-    if (notices.length > 0 && badge) {
-      badge.setAttribute("data-count", notices.length);
-      badge.style.display = "";
-    }
+    notifCount = allNotices.length;
+    updateBadge(notifCount);
+    populateDrawer(body, allNotices);
 
     function openDrawer() {
       drawer.classList.add("is-open");
@@ -219,6 +189,17 @@
         closeDrawer();
       }
     });
+  }
+
+  function updateBadge(count) {
+    var badge = document.getElementById("skmt-notif-badge");
+    if (!badge) return;
+    if (count > 0) {
+      badge.setAttribute("data-count", count);
+      badge.style.display = "";
+    } else {
+      badge.style.display = "none";
+    }
   }
 
   function parseWpNotices(html) {
@@ -252,21 +233,83 @@
         "</div>";
       return;
     }
+
     var html = "";
     notices.forEach(function (n) {
+      var sourceLabel = n.source === "skmt" ? "SKMT" : "WP";
+      var sourceClass = "skmt-notif-item--" + n.source;
+      var content = n.source === "skmt" ? n.message : n.html;
+      var idAttr = n.id ? ' data-notice-id="' + n.id + '"' : "";
+
       html +=
         '<div class="skmt-notif-item skmt-notif-item--' +
         sanitizeClass(n.type) +
-        '">' +
+        " " +
+        sourceClass +
+        '" data-source="' +
+        n.source +
+        '"' +
+        idAttr +
+        ">" +
         '<span class="skmt-notif-item__icon">' +
         (ICONS[n.type] || ICONS.info) +
         "</span>" +
         '<div class="skmt-notif-item__content">' +
-        n.html +
+        '<span class="skmt-notif-item__source">' +
+        sourceLabel +
+        "</span>" +
+        '<div class="skmt-notif-item__body">' +
+        content +
         "</div>" +
+        "</div>" +
+        '<button class="skmt-notif-item__dismiss" type="button" aria-label="Fermer">' +
+        CLOSE_SVG +
+        "</button>" +
         "</div>";
     });
     body.innerHTML = html;
+
+    body.querySelectorAll(".skmt-notif-item").forEach(function (item) {
+      var btn = item.querySelector(".skmt-notif-item__dismiss");
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        var source = item.getAttribute("data-source");
+        var noticeId = item.getAttribute("data-notice-id");
+        if (source === "skmt" && noticeId) {
+          var notifData = window.skmtNotifData || window.skmtAdmin || {};
+          var formData = new FormData();
+          formData.append("action", "skmt_dismiss_notice");
+          formData.append("nonce", notifData.nonce || "");
+          formData.append("notice_id", noticeId);
+          fetch(notifData.ajaxUrl || "", {
+            method: "POST",
+            credentials: "same-origin",
+            body: formData,
+          })
+            .then(function (r) { return r.json(); })
+            .then(function (resp) {
+              if (resp.success) {
+                removeNotifItem(item, body);
+              }
+            });
+        } else {
+          removeNotifItem(item, body);
+        }
+      });
+    });
+  }
+
+  function removeNotifItem(item, body) {
+    if (item.parentNode) item.parentNode.removeChild(item);
+    notifCount = Math.max(0, notifCount - 1);
+    updateBadge(notifCount);
+    if (body && body.querySelectorAll(".skmt-notif-item").length === 0) {
+      body.innerHTML =
+        '<div class="skmt-notif-drawer__empty">' +
+        BELL_EMPTY_SVG +
+        "<span>Aucune notification</span>" +
+        "</div>";
+    }
   }
 
   /* ================================================================

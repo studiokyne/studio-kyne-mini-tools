@@ -62,6 +62,7 @@ class Admin {
 		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
 		add_action( 'admin_footer',          [ $this, 'render_notification_drawer' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_notification_assets' ] );
+		add_action( 'wp_ajax_skmt_dismiss_notice', [ $this, 'handle_dismiss_notice' ] );
 	}
 
 	/* ================================================================
@@ -239,15 +240,20 @@ class Admin {
 			$handle = 'skmt-module-' . $module_id . '-js-' . $index;
 			wp_enqueue_script( $handle, $script_url, [ 'skmt-admin-js' ], SKMT_VERSION, true );
 
-			// Injection des données JS spécifiques au module (i18n, etc.)
+			// Injection des données JS spécifiques au module dans skmtAdmin
 			$js_data = $instance->get_admin_js_data();
-			if ( ! empty( $js_data['i18n'] ) ) {
-				$i18n_json = wp_json_encode( $js_data['i18n'] );
-				wp_add_inline_script(
-					$handle,
-					'window.skmtAdmin=window.skmtAdmin||{};window.skmtAdmin.i18n=Object.assign(window.skmtAdmin.i18n||{},' . $i18n_json . ');',
-					'before'
-				);
+			if ( ! empty( $js_data ) ) {
+				$inline = 'window.skmtAdmin=window.skmtAdmin||{};';
+				if ( ! empty( $js_data['i18n'] ) ) {
+					$inline .= 'window.skmtAdmin.i18n=Object.assign(window.skmtAdmin.i18n||{},' . wp_json_encode( $js_data['i18n'] ) . ');';
+				}
+				foreach ( $js_data as $key => $value ) {
+					if ( 'i18n' === $key ) {
+						continue;
+					}
+					$inline .= 'window.skmtAdmin[' . wp_json_encode( $key ) . ']=' . wp_json_encode( $value ) . ';';
+				}
+				wp_add_inline_script( $handle, $inline, 'before' );
 			}
 		}
 	}
@@ -382,6 +388,23 @@ class Admin {
 		$close_icon    = $this->render_icon( 'x', 'sm' );
 		$notices_json  = wp_json_encode( $this->captured_wp_notices );
 		$toast_json    = wp_json_encode( $this->skmt_toast );
+
+		$user_id         = get_current_user_id();
+		$raw_notices     = $user_id ? get_user_meta( $user_id, 'skmt_notices', true ) : [];
+		$raw_notices     = is_array( $raw_notices ) ? $raw_notices : [];
+		$persistent_list = [];
+		foreach ( $raw_notices as $notice_id => $notice ) {
+			$persistent_list[] = [
+				'id'      => $notice_id,
+				'message' => $notice['message'] ?? '',
+				'type'    => $notice['type'] ?? 'info',
+			];
+		}
+		$persistent_json = wp_json_encode( $persistent_list );
+		$notif_data_json = wp_json_encode( [
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+		] );
 		?>
 		<div id="skmt-notif-drawer" class="skmt-notif-drawer" role="dialog" aria-label="<?php esc_attr_e( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?>" aria-hidden="true">
 			<div class="skmt-notif-drawer__header">
@@ -395,10 +418,62 @@ class Admin {
 		<div id="skmt-notif-overlay" class="skmt-notif-overlay" aria-hidden="true"></div>
 		<div id="skmt-toast-container" class="skmt-toast-container" role="region" aria-live="polite" aria-label="<?php esc_attr_e( 'Notifications', 'studio-kyne-mini-tools' ); ?>"></div>
 		<script>
-		window.skmtWpNoticesHtml = <?php echo $notices_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
-		window.skmtToastData     = <?php echo $toast_json;   // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		window.skmtWpNoticesHtml     = <?php echo $notices_json;    // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		window.skmtToastData         = <?php echo $toast_json;      // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		window.skmtPersistentNotices = <?php echo $persistent_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
+		window.skmtNotifData         = <?php echo $notif_data_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>;
 		</script>
 		<?php
+	}
+
+	/**
+	 * Ajoute une notice persistante pour l'utilisateur courant (survit aux rechargements).
+	 */
+	public static function add_persistent_notice( string $id, string $message, string $type = 'info' ): void {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return;
+		}
+		$notices        = get_user_meta( $user_id, 'skmt_notices', true );
+		$notices        = is_array( $notices ) ? $notices : [];
+		$notices[ $id ] = [
+			'message'   => $message,
+			'type'      => $type,
+			'timestamp' => time(),
+		];
+		update_user_meta( $user_id, 'skmt_notices', $notices );
+	}
+
+	/**
+	 * Supprime une notice persistante de l'utilisateur courant.
+	 */
+	public static function dismiss_persistent_notice( string $id ): void {
+		$user_id = get_current_user_id();
+		if ( ! $user_id ) {
+			return;
+		}
+		$notices = get_user_meta( $user_id, 'skmt_notices', true );
+		if ( ! is_array( $notices ) ) {
+			return;
+		}
+		unset( $notices[ $id ] );
+		update_user_meta( $user_id, 'skmt_notices', $notices );
+	}
+
+	/**
+	 * Endpoint AJAX : dismiss d'une notice persistante SKMT.
+	 */
+	public function handle_dismiss_notice(): void {
+		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ] );
+		}
+		$id = isset( $_POST['notice_id'] ) ? sanitize_key( $_POST['notice_id'] ) : '';
+		if ( empty( $id ) ) {
+			wp_send_json_error( [ 'message' => __( 'ID invalide.', 'studio-kyne-mini-tools' ) ] );
+		}
+		self::dismiss_persistent_notice( $id );
+		wp_send_json_success();
 	}
 
 	/* ================================================================
@@ -811,6 +886,8 @@ class Admin {
 			'log-in'           => '<path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
 			'folder'           => '<path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/>',
 		'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
+		'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
+		'menu'             => '<path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/>',
 		];
 	}
 

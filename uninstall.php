@@ -25,6 +25,8 @@ $module_classes = [
 	'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
 	'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
 	'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
+	'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
+	'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
 ];
 
 // Suppression de l'option globale.

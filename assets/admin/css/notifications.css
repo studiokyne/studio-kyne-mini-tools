@@ -9,15 +9,15 @@
 
 #skmt-toast-container {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 20px;
+  right: 20px;
   z-index: 999999;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 7px;
   pointer-events: none;
-  width: 380px;
-  max-width: calc(100vw - 48px);
+  width: 300px;
+  max-width: calc(100vw - 40px);
 }
 
 /* ================================================================
@@ -26,18 +26,18 @@
 
 .skmt-toast {
   pointer-events: all;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
-  border-radius: 10px;
+  background: var(--skmt-n900, oklch(0.205 0 0));
+  border: 1px solid var(--skmt-n700, oklch(0.371 0 0));
+  border-radius: 12px;
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.08),
-    0 10px 24px -4px rgba(0, 0, 0, 0.1);
+    0 8px 24px oklch(0 0 0 / 0.32),
+    0 2px 6px oklch(0 0 0 / 0.18);
   overflow: hidden;
   opacity: 0;
-  transform: translateX(16px) scale(0.98);
+  transform: translateX(8px) scale(0.97);
   transition:
-    opacity 0.22s ease,
-    transform 0.22s ease;
+    opacity 0.2s ease,
+    transform 0.2s ease;
 }
 
 .skmt-toast.is-visible {
@@ -47,106 +47,69 @@
 
 .skmt-toast.is-hiding {
   opacity: 0;
-  transform: translateX(16px) scale(0.98);
-  transition-duration: 0.18s;
+  transform: translateX(8px) scale(0.97);
+  transition-duration: 0.16s;
 }
 
-/* Header : icône + titre + ×  */
-.skmt-toast__header {
+/* Corps principal */
+.skmt-toast__inner {
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 14px 14px 0 14px;
+  padding: 11px 12px;
 }
 
-.skmt-toast__icon {
+/* Pastille colorée */
+.skmt-toast__dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
 }
 
-.skmt-toast__icon svg {
-  width: 20px;
-  height: 20px;
-  display: block;
-}
-
-.skmt-toast__title {
+/* Message */
+.skmt-toast__message {
   flex: 1;
-  font-size: 13.5px;
-  font-weight: 600;
-  line-height: 1.3;
-  color: #111827;
+  font-size: 12.5px;
+  color: var(--skmt-n100, oklch(0.97 0 0));
+  line-height: 1.45;
+  margin: 0;
 }
 
+/* Bouton fermer */
 .skmt-toast__close {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
-  border-radius: 5px;
+  color: var(--skmt-n500, oklch(0.556 0 0));
+  border-radius: 4px;
   padding: 0;
-  transition: color 0.15s, background 0.15s;
-  margin-left: auto;
+  transition:
+    color 0.12s,
+    background 0.12s;
 }
 
 .skmt-toast__close:hover {
-  color: #374151;
-  background: #f3f4f6;
+  color: var(--skmt-n200, oklch(0.922 0 0));
+  background: oklch(1 0 0 / 0.08);
 }
 
 .skmt-toast__close svg {
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   display: block;
-}
-
-/* Body : message texte */
-.skmt-toast__body {
-  padding: 6px 14px 10px 44px;
-}
-
-.skmt-toast__message {
-  font-size: 13px;
-  color: #6b7280;
-  line-height: 1.5;
-  margin: 0;
-}
-
-/* Footer : countdown */
-.skmt-toast__footer {
-  padding: 0 14px 10px 44px;
-}
-
-.skmt-toast__countdown {
-  font-size: 11.5px;
-  color: #9ca3af;
-}
-
-.skmt-toast__pause-link {
-  color: #6b7280;
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.skmt-toast__pause-link:hover {
-  color: #374151;
 }
 
 /* Barre de progression */
 .skmt-toast__progress-bar {
-  height: 3px;
-  background: #f3f4f6;
+  height: 2px;
+  background: oklch(1 0 0 / 0.07);
   overflow: hidden;
 }
 
@@ -163,17 +126,33 @@
  * TOAST — Couleurs par type
  * ================================================================ */
 
-.skmt-toast--success .skmt-toast__icon { color: #16a34a; }
-.skmt-toast--success .skmt-toast__progress-fill { background: #16a34a; }
+.skmt-toast--success .skmt-toast__dot {
+  background: var(--skmt-success, oklch(0.696 0.17 162.48));
+}
+.skmt-toast--success .skmt-toast__progress-fill {
+  background: var(--skmt-success, oklch(0.696 0.17 162.48));
+}
 
-.skmt-toast--error .skmt-toast__icon { color: #dc2626; }
-.skmt-toast--error .skmt-toast__progress-fill { background: #dc2626; }
+.skmt-toast--error .skmt-toast__dot {
+  background: var(--skmt-danger, oklch(0.637 0.237 25.331));
+}
+.skmt-toast--error .skmt-toast__progress-fill {
+  background: var(--skmt-danger, oklch(0.637 0.237 25.331));
+}
 
-.skmt-toast--warning .skmt-toast__icon { color: #d97706; }
-.skmt-toast--warning .skmt-toast__progress-fill { background: #d97706; }
+.skmt-toast--warning .skmt-toast__dot {
+  background: var(--skmt-warning, oklch(0.769 0.188 70.08));
+}
+.skmt-toast--warning .skmt-toast__progress-fill {
+  background: var(--skmt-warning, oklch(0.769 0.188 70.08));
+}
 
-.skmt-toast--info .skmt-toast__icon { color: #2563eb; }
-.skmt-toast--info .skmt-toast__progress-fill { background: #2563eb; }
+.skmt-toast--info .skmt-toast__dot {
+  background: var(--skmt-accent, oklch(0.585 0.233 277.117));
+}
+.skmt-toast--info .skmt-toast__progress-fill {
+  background: var(--skmt-accent, oklch(0.585 0.233 277.117));
+}
 
 /* ================================================================
  * OVERLAY
@@ -194,8 +173,12 @@
 }
 
 @keyframes skmt-overlay-fade {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 /* ================================================================
@@ -254,7 +237,9 @@
   color: #9ca3af;
   border-radius: 6px;
   padding: 0;
-  transition: color 0.15s, background 0.15s;
+  transition:
+    color 0.15s,
+    background 0.15s;
 }
 
 .skmt-notif-drawer__close:hover {
@@ -300,6 +285,7 @@
 
 /* Item de notification */
 .skmt-notif-item {
+  position: relative;
   display: flex;
   gap: 10px;
   padding: 12px 14px;
@@ -350,28 +336,97 @@
   border-color: #bbf7d0;
   border-left-color: #16a34a;
 }
-.skmt-notif-item--success .skmt-notif-item__icon { color: #16a34a; }
+.skmt-notif-item--success .skmt-notif-item__icon {
+  color: #16a34a;
+}
 
 .skmt-notif-item--error {
   background: #fef2f2;
   border-color: #fecaca;
   border-left-color: #dc2626;
 }
-.skmt-notif-item--error .skmt-notif-item__icon { color: #dc2626; }
+.skmt-notif-item--error .skmt-notif-item__icon {
+  color: #dc2626;
+}
 
 .skmt-notif-item--warning {
   background: #fffbeb;
   border-color: #fde68a;
   border-left-color: #d97706;
 }
-.skmt-notif-item--warning .skmt-notif-item__icon { color: #d97706; }
+.skmt-notif-item--warning .skmt-notif-item__icon {
+  color: #d97706;
+}
 
 .skmt-notif-item--info {
   background: #eff6ff;
   border-color: #bfdbfe;
   border-left-color: #2563eb;
 }
-.skmt-notif-item--info .skmt-notif-item__icon { color: #2563eb; }
+.skmt-notif-item--info .skmt-notif-item__icon {
+  color: #2563eb;
+}
+
+/* Badge source (SKMT / WP) */
+.skmt-notif-item__source {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  border-radius: var(--skmt-radius-xs, 3px);
+  padding: 1px 5px;
+  line-height: 1.4;
+  margin-bottom: 4px;
+}
+
+.skmt-notif-item--skmt .skmt-notif-item__source {
+  background: var(--skmt-accent, #2563eb);
+  color: #ffffff;
+}
+
+.skmt-notif-item--wp .skmt-notif-item__source {
+  background: var(--skmt-n300, #d1d5db);
+  color: #374151;
+}
+
+/* Bouton dismiss (×) — visible au survol de l'item */
+.skmt-notif-item__dismiss {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #9ca3af;
+  border-radius: 4px;
+  padding: 0;
+  opacity: 0;
+  transition:
+    opacity 0.15s,
+    color 0.15s,
+    background 0.15s;
+}
+
+.skmt-notif-item:hover .skmt-notif-item__dismiss {
+  opacity: 1;
+}
+
+.skmt-notif-item__dismiss:hover {
+  color: #374151;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.skmt-notif-item__dismiss svg {
+  width: 12px;
+  height: 12px;
+  display: block;
+}
 
 /* ================================================================
  * ADMIN BAR — bouton cloche + badge en overlay
@@ -381,7 +436,7 @@
   display: flex !important;
   align-items: center;
   justify-content: center;
-  padding: 0 10px !important;
+  padding: 0 4px !important;
   cursor: pointer;
 }
 

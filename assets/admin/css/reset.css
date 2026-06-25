@@ -75,7 +75,8 @@
   line-height: 1.5;
   color: var(--skmt-text);
   background: var(--skmt-bg);
-  min-height: calc(100vh - 32px);
+  height: calc(100vh - 32px);
+  overflow: hidden;
 }
 
 .skmt-admin-wrap *,
