@@ -27,6 +27,7 @@ $module_classes = [
 	'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
 	'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
 	'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
+	'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
 ];
 
 // Suppression de l'option globale.

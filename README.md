@@ -7,7 +7,7 @@ Plugin WordPress modulaire, leger et performant pour optimiser et ameliorer votr
 - Architecture modulaire, modules activables a la demande
 - Interface admin custom moderne et rapide
 - Mises a jour via GitHub (canal Stable et Dev)
-- Module Image Optimizer (AVIF/WebP, compression, resize, bulk)
+- Modules : Image Optimizer, Security, White Label, Menu Creator, Login, Files, Database
 
 ## Installation
 
@@ -23,7 +23,9 @@ Dans Reglages > Mises a jour GitHub :
 - Choisissez le canal Stable (main) ou Dev (pre-release).
 - Cliquez sur Verifier les mises a jour pour forcer un check.
 
-## Image Optimizer
+## Modules
+
+### Image Optimizer
 
 - Conversion AVIF/WebP (auto)
 - Qualite configurable
@@ -31,6 +33,39 @@ Dans Reglages > Mises a jour GitHub :
 - Suppression EXIF
 - Alt text auto
 - Optimisation en masse
+
+### Security
+
+- Limitation des tentatives de connexion (rate limiting)
+- URL de connexion personnalisee
+- Durcissement (anti-enumeration des utilisateurs, endpoint REST users)
+
+### White Label
+
+- Nettoyage de la barre d'admin et du footer
+- Profils de menu (stockage/resolution par utilisateur, role ou global)
+
+### Menu Creator
+
+- Reorganisation et masquage des entrees du menu wp-admin (drag & drop)
+- Renommage, separateurs, liens personnalises, icones (bibliotheque Lucide)
+
+### Login
+
+- Personnalisation de la page de connexion (logo, couleurs, panneau lateral)
+- Masquage optionnel : langue, mot de passe oublie, retour au site
+
+### Files
+
+- Gestionnaire de fichiers (liste, renommer, deplacer, supprimer)
+- Upload, zip/dezip, edition et telechargement, racine `ABSPATH`
+
+### Database
+
+- Explorateur/editeur de tables sur `$wpdb` (donnees, structure)
+- Edition, insertion et suppression de lignes typees (avec support NULL)
+- Editeur SQL libre securise (mots-cles interdits, confirmation des ecritures, plafond de lignes)
+- Export `.sql` type, historique des requetes (local au navigateur)
 
 ## Architecture
 

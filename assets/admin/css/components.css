@@ -707,6 +707,15 @@ details[open] .skmt-section__chevron {
   overflow: hidden;
 }
 
+/* Modale large + corps défilant (formulaires longs). */
+.skmt-modal--lg {
+  max-width: 560px;
+}
+.skmt-modal--lg .skmt-modal__body {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
 @keyframes skmt-modal-slide {
   from {
     transform: translateY(-8px) scale(0.98);
@@ -789,6 +798,61 @@ details[open] .skmt-section__chevron {
 .skmt-empty p {
   margin-bottom: 16px;
   font-size: 14px;
+}
+
+/* ================================================================
+ * SEARCH — champ de recherche réutilisable (wrapper + icône).
+ * Neutralise les styles WordPress natifs des <input> pour un rendu
+ * cohérent dans tous les modules. Structure :
+ *   <div class="skmt-search"><svg…/><input class="skmt-search__input"></div>
+ * Modificateur : --sm (compact).
+ * ================================================================ */
+.skmt-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  min-height: 34px;
+  border: 1px solid var(--skmt-border);
+  border-radius: var(--skmt-radius-sm);
+  background: var(--skmt-surface);
+  transition: border-color 0.12s, box-shadow 0.12s;
+}
+
+.skmt-search--sm {
+  min-height: 30px;
+  padding: 0 8px;
+}
+
+.skmt-search:focus-within {
+  border-color: var(--skmt-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--skmt-accent) 15%, transparent);
+}
+
+.skmt-search > svg {
+  color: var(--skmt-n400);
+  flex-shrink: 0;
+}
+
+.skmt-admin-wrap .skmt-search__input,
+.skmt-search__input {
+  flex: 1 !important;
+  min-width: 0 !important;
+  width: auto !important;
+  height: auto !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  font-size: 13px !important;
+  font-family: inherit !important;
+  line-height: 1.4 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: var(--skmt-text) !important;
+  outline: none !important;
+  box-shadow: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
 }
 
 @media screen and (max-width: 782px) {

@@ -86,6 +86,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\MenuCreator\\Module',
 				'icon'        => 'menu',
 			],
+			'database'        => [
+				'name'        => __( 'Base de données', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Explorez, éditez et exportez vos tables WordPress.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Base de données', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Gérer la base de données', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Database\\Module',
+				'icon'        => 'database',
+			],
 		];
 
 		/**

@@ -127,6 +127,21 @@ Customizes the WordPress login page via `login_*` hooks (`login_enqueue_scripts`
 
 `FileManager.php` is a standalone filesystem service rooted at `ABSPATH`; `Module.php` is a thin AJAX/admin-post wrapper (`ajax_list`, `ajax_delete`, `ajax_rename`, `ajax_move`, `ajax_mkdir`, `ajax_zip`, `ajax_extract`, `ajax_get_content`, `ajax_save_content`, `ajax_upload`, plus a `admin_post_skmt_files_download` streaming download handler). All path input goes through `get_post_path()` (`sanitize_text_field` + `rawurldecode`) before reaching `FileManager` — never trust a client-supplied path directly.
 
+### Database
+
+Table explorer/editor over `$wpdb`. `Module.php` is a thin AJAX layer (no settings — `get_settings()`/`save_settings()`/`get_defaults()` are no-ops); the whole UI is built client-side in `assets/admin/js/modules/database.js` from a two-pane template (`settings-template.php`: sidebar table list + main Données/Structure/Requête SQL tabs).
+
+AJAX actions: `skmt_db_get_tables`, `skmt_db_get_rows`, `skmt_db_get_structure`, `skmt_db_update_row`, `skmt_db_delete_row`, `skmt_db_insert_row`, `skmt_db_truncate`, `skmt_db_drop_table`, `skmt_db_export_sql`, `skmt_db_run_query`.
+
+Safety model (all server-side, never trust the client):
+- **Table/column names** go through `read_table()` → `validate_table()` (checks against `information_schema.tables` for the current DB) and are whitelisted against `get_columns_map()` (`SHOW COLUMNS`). Uses `sanitize_text_field` (NOT `sanitize_key`) so mixed-case identifiers survive.
+- **Typing**: `column_format()` maps each column to `%d`/`%f`/`%s` for `$wpdb->update`/`insert`/`delete`; NULL is explicit (a `set_null` flag / null value), rejected server-side if the column is `NOT NULL`.
+- **Free SQL editor** (`ajax_run_query`): rejects `FORBIDDEN_KEYWORDS` (server-level destructive ops); any write query requires `$_POST['confirm']` (JS pre-confirms via `window.skmtModal` and mirrors the read/write test) else returns `needs_confirm`; a `SELECT` with no explicit `LIMIT` is capped at `QUERY_ROW_CAP` (1000) rows and flagged `truncated`.
+- `friendly_db_error()` translates common MySQL errors (duplicate entry, FK constraint, NOT NULL, incorrect value) into readable messages.
+- **Export** (`ajax_export_sql`): type-aware value emission (unquoted numerics, `0x…` hex for binary, `NULL`, explicit column list, `SET NAMES utf8mb4`).
+
+Layout height is pure CSS via the `.skmt-admin-main:has(.skmt-db)` flex chain (no JS resize handler). SQL history is browser-local (`localStorage`, with a clear button) — not persisted server-side. All user-facing JS strings route through `skmtAdmin.i18n` (populated by `get_admin_js_data()`). There is no Structure-tab editing and no CSV export.
+
 ## Adding a new module
 
 1. Create `includes/Modules/MyModule/Module.php` extending `AbstractModule`
