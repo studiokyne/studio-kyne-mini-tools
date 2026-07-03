@@ -17,7 +17,6 @@
     profile:     null,
     dirty:       false,
     selectedUid: null,
-    dragSrcUid:  null,
   };
 
   var expandedUids = new Set();
@@ -69,13 +68,29 @@
           !iconPickerEl.classList.contains("is-hidden") &&
           !iconPickerEl.contains(e.target) &&
           !e.target.closest(".skmt-wl-icon-btn")) {
-        iconPickerEl.classList.add("is-hidden");
+        hideIconPicker();
       }
     }, true);
+
+    // Fermer le dropdown avec Échap
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape" && iconPickerEl && !iconPickerEl.classList.contains("is-hidden")) {
+        hideIconPicker();
+      }
+    });
 
     renderProfilesSidebar();
     bindProfilesSidebar();
     showPlaceholder();
+
+    try {
+      var lastOpenId = sessionStorage.getItem("skmt_mc_open_profile");
+      if (lastOpenId) {
+        sessionStorage.removeItem("skmt_mc_open_profile");
+        var profileToRestore = findProfileById(lastOpenId);
+        if (profileToRestore) { loadProfile(profileToRestore); }
+      }
+    } catch (e) {}
 
     window.addEventListener("beforeunload", function (e) {
       if (ed.dirty) { e.preventDefault(); e.returnValue = ""; }
@@ -129,6 +144,7 @@
    * ================================================================ */
 
   function loadProfile(profile) {
+    hideIconPicker();
     ed.profile     = deepCopy(profile);
     ed.selectedUid = null;
     expandedUids.clear();
@@ -142,10 +158,14 @@
   }
 
   function startNewProfile() {
+    hideIconPicker();
     ed.profile     = blankProfile();
     ed.selectedUid = null;
     expandedUids.clear();
-    setDirty(false);
+    // Un menu tout juste créé n'existe pas encore côté serveur : le bouton
+    // Enregistrer doit être utilisable immédiatement, sans exiger que
+    // l'utilisateur modifie un champ au préalable.
+    setDirty(true);
 
     ensureUids(ed.profile.items);
     mergeWpMenu();
@@ -183,6 +203,7 @@
 
     var profiles  = skmtAdmin.mcProfiles || [];
     var currentId = ed.profile ? ed.profile.id : null;
+    var isDraft   = !!(ed.profile && ed.profile.id === "__new__");
 
     var filtered = profiles.filter(function (p) {
       var matchF = sidebarState.filter === "all" || p.status === sidebarState.filter;
@@ -191,7 +212,7 @@
       return matchF && matchS;
     });
 
-    if (!filtered.length) {
+    if (!filtered.length && !isDraft) {
       container.innerHTML = '<p class="skmt-wl-ep-profiles-empty">' +
         esc(profiles.length === 0
           ? "Aucun menu. Cliquez sur « + » pour créer."
@@ -199,7 +220,9 @@
       return;
     }
 
-    container.innerHTML = filtered.map(function (p) {
+    var draftHtml = isDraft ? buildDraftRowHtml(ed.profile) : "";
+
+    container.innerHTML = draftHtml + filtered.map(function (p) {
       var isActive  = p.status === "active";
       var dotClass  = isActive ? "skmt-mc-dot--active" : "skmt-mc-dot--draft";
       var isCurrent = p.id === currentId;
@@ -238,6 +261,22 @@
     });
   }
 
+  /**
+   * Ligne représentant le menu en cours de création, pas encore enregistré
+   * côté serveur (donc absent de skmtAdmin.mcProfiles) : sans actions
+   * dupliquer/supprimer, qui exigent un id réel.
+   */
+  function buildDraftRowHtml(p) {
+    return (
+      '<div class="skmt-wl-ep-profile-item is-active" data-id="__new__">' +
+        '<span class="skmt-mc-dot skmt-mc-dot--draft" title="Brouillon"></span>' +
+        '<span class="skmt-wl-ep-profile-item__name">' +
+          esc(p.name || "Menu sans nom") + "</span>" +
+        '<span class="skmt-badge skmt-badge--warning">Non enregistré</span>' +
+      "</div>"
+    );
+  }
+
   function bindProfilesSidebar() {
     var searchEl = document.getElementById("skmt-wl-ep-search");
     if (searchEl) {
@@ -270,12 +309,17 @@
       message: 'Supprimer « ' + name + ' » ? Cette action est irréversible.',
       confirmLabel: "Supprimer", cancelLabel: "Annuler", danger: true,
       onConfirm: function () {
+        // Un menu actif applique ses personnalisations au menu WP réel :
+        // après suppression il faut recharger la page pour que la barre
+        // latérale WP revienne à son état natif (sinon résidus à l'écran).
+        var wasActive = !!(p && p.status === "active");
         ajaxPost("skmt_wl_delete_profile", { profile_id: profileId }, function (data) {
           if (data && data.success) {
             skmtAdmin.mcProfiles = (skmtAdmin.mcProfiles || []).filter(function (x) { return x.id !== profileId; });
             if (ed.profile && ed.profile.id === profileId) { ed.profile = null; showPlaceholder(); }
             renderProfilesSidebar();
             toast("Menu supprimé.", "success");
+            if (wasActive) { setTimeout(function () { window.location.reload(); }, 600); }
           } else { toast("Erreur lors de la suppression.", "error"); }
         });
       },
@@ -340,19 +384,34 @@
       ed.profile.items = wpMenu.map(function (m) { return wpItemToEditorItem(m); }).filter(Boolean);
     } else {
       var seen = {};
-      ed.profile.items.forEach(function (item) {
+      // On ne purge les références WP disparues que si l'on connaît réellement
+      // le menu WP courant : sans wpMenu (donnée absente), on ne supprime rien.
+      var wpKnown = wpMenu.length > 0;
+      ed.profile.items = ed.profile.items.filter(function (item) {
         if (!item._uid) item._uid = genUid();
-        if (item.type === "separator") { seen[item.slug] = true; return; }
+        // Séparateurs et liens personnalisés n'existent pas dans le menu WP :
+        // ils sont propres au profil, toujours conservés.
+        if (item.type === "separator" || item.type === "custom_link") {
+          seen[item.slug] = true;
+          return true;
+        }
         var wp = findWpItem(item.slug);
+        // Élément WP qui ne correspond à plus rien dans le menu réel (plugin
+        // désactivé, fonctionnalité coupée comme le Gestionnaire de liens, ou
+        // résidu d'un ancien profil) : on l'écarte au lieu de le traîner.
+        if (!wp && wpKnown) { return false; }
         item._wpLabel = wp ? stripTags(wp.label) : (item._wpLabel || item.slug);
         item._wpIcon  = wp ? (wp.icon || "") : (item._wpIcon || "");
         seen[item.slug] = true;
-        (item.children || []).forEach(function (c) {
+        item.children = (item.children || []).filter(function (c) {
           if (!c._uid) c._uid = genUid();
           var sub = findWpSub(item.slug, c.slug);
+          if (!sub && wpKnown) { return false; }
           c._wpLabel = sub ? stripTags(sub.label) : (c._wpLabel || c.slug);
           c._wpIcon  = "";
+          return true;
         });
+        return true;
       });
       wpMenu.forEach(function (m) {
         if (m.slug && !seen[m.slug]) {
@@ -419,6 +478,7 @@
    * ================================================================ */
 
   function showProfilePanel() {
+    hideIconPicker();
     ed.selectedUid = null;
     setDisplay("skmt-mc-back-btn", "none");
     var titleEl = document.getElementById("skmt-mc-panel-title");
@@ -429,17 +489,30 @@
   }
 
   function showItemPanel(item) {
+    hideIconPicker();
     ed.selectedUid = item._uid;
     setDisplay("skmt-mc-back-btn", "");
     var titleEl = document.getElementById("skmt-mc-panel-title");
     if (titleEl) {
-      titleEl.textContent = item.label || item._wpLabel || item.slug || "Élément";
+      titleEl.textContent = item.label || item._wpLabel || prettifySlug(item.slug) || "Élément";
     }
     hide("skmt-wl-profile-settings");
     show("skmt-wl-item-settings");
+    var isChild = isChildItem(item._uid);
     var fields = document.getElementById("skmt-wl-item-fields");
-    if (fields) { fields.innerHTML = buildItemFields(item); bindItemFields(item); }
+    if (fields) { fields.innerHTML = buildItemFields(item, isChild); bindItemFields(item); }
     renderTree();
+  }
+
+  /**
+   * Un enfant n'a jamais d'icône WP (WordPress ne fournit aucune icône
+   * pour les sous-menus dans $submenu, contrairement à $menu) : on masque
+   * donc le picker d'icône pour ces items plutôt que de laisser un
+   * contrôle qui ne peut jamais rien afficher de pertinent.
+   */
+  function isChildItem(uid) {
+    if (!ed.profile) return false;
+    return !ed.profile.items.some(function (i) { return i._uid === uid; });
   }
 
   /* ================================================================
@@ -479,7 +552,7 @@
     }
 
     /* --- ITEM NORMAL --- */
-    var label    = item.label || item._wpLabel || item.slug;
+    var label    = item.label || item._wpLabel || prettifySlug(item.slug);
     var hidden   = item.visible === false;
     var selected = ed.selectedUid === uid;
     var hasChild = item.children && item.children.length > 0;
@@ -528,7 +601,7 @@
 
   function buildChildHtml(c, ci, total, parentUid) {
     var uid    = c._uid;
-    var label  = c.label || c._wpLabel || c.slug;
+    var label  = c.label || c._wpLabel || prettifySlug(c.slug);
     var hidden = c.visible === false;
     var selected = ed.selectedUid === uid;
     return (
@@ -579,53 +652,7 @@
    * ================================================================ */
 
   function bindTree(tree) {
-    /* --- DRAG & DROP : drag uniquement depuis le handle --- */
-    tree.querySelectorAll(
-      ".skmt-wl-tree-item:not(.skmt-wl-tree-item--child)"
-    ).forEach(function (el) {
-      // Activer draggable SEULEMENT si mousedown sur le handle
-      el.addEventListener("mousedown", function (e) {
-        var onHandle = !!e.target.closest(".skmt-wl-tree-item__handle");
-        el.draggable = onHandle;
-      });
-      el.addEventListener("mouseup", function () {
-        el.draggable = false;
-      });
-      el.addEventListener("dragstart", function (e) {
-        if (!el.draggable) { e.preventDefault(); return; }
-        ed.dragSrcUid = el.dataset.uid;
-        el.classList.add("is-dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", el.dataset.uid);
-      });
-      el.addEventListener("dragend", function () {
-        el.draggable = false;
-        el.classList.remove("is-dragging");
-        tree.querySelectorAll(".is-drag-over").forEach(function (t) { t.classList.remove("is-drag-over"); });
-        ed.dragSrcUid = null;
-      });
-      el.addEventListener("dragover", function (e) {
-        e.preventDefault();
-        if (!ed.dragSrcUid || el.dataset.uid === ed.dragSrcUid) return;
-        // N'appliquer que sur la row directe (pas les enfants)
-        var childrenEl = el.querySelector(".skmt-wl-tree-item__children");
-        if (childrenEl && childrenEl.contains(e.target)) return;
-        tree.querySelectorAll(".is-drag-over").forEach(function (t) { t.classList.remove("is-drag-over"); });
-        el.classList.add("is-drag-over");
-      });
-      el.addEventListener("dragleave", function (e) {
-        if (!el.contains(e.relatedTarget)) el.classList.remove("is-drag-over");
-      });
-      el.addEventListener("drop", function (e) {
-        e.preventDefault();
-        e.stopPropagation();
-        el.classList.remove("is-drag-over");
-        var srcUid = ed.dragSrcUid, tgtUid = el.dataset.uid;
-        if (srcUid && tgtUid && srcUid !== tgtUid) moveItem(srcUid, tgtUid);
-        ed.dragSrcUid = null;
-        el.draggable  = false;
-      });
-    });
+    initTreeSortable(tree);
 
     /* --- CLIC SUR ROW → sélection --- */
     tree.querySelectorAll(
@@ -705,21 +732,54 @@
   }
 
   /* ================================================================
-   * DÉPLACEMENT D&D — index correct dans toutes les directions
+   * DRAG & DROP (SortableJS) — un instance par niveau, aucun
+   * croisement racine ↔ enfants (pas de "group" partagé)
    * ================================================================ */
 
-  function moveItem(srcUid, tgtUid) {
-    var items  = ed.profile.items;
-    var srcIdx = items.findIndex(function (i) { return i._uid === srcUid; });
-    var tgtIdx = items.findIndex(function (i) { return i._uid === tgtUid; });
-    if (srcIdx === -1 || tgtIdx === -1 || srcIdx === tgtIdx) return;
-    var srcItem = items[srcIdx];
-    var without = items.filter(function (_, i) { return i !== srcIdx; });
-    var newTgt  = without.findIndex(function (i) { return i._uid === tgtUid; });
-    without.splice(newTgt, 0, srcItem);
-    ed.profile.items = without;
-    setDirty(true);
-    renderTree();
+  function initTreeSortable(tree) {
+    if (typeof Sortable === "undefined") return;
+
+    var sortableOpts = {
+      handle:     ".skmt-wl-tree-item__handle",
+      animation:  150,
+      chosenClass: "is-dragging",
+      ghostClass:  "skmt-mc-sortable-ghost",
+    };
+
+    // "tree" (#skmt-wl-tree) est un noeud persistant entre les rendus
+    // (seul son innerHTML change) : n'instancier Sortable dessus qu'une fois,
+    // sinon chaque renderTree() empilerait une nouvelle instance dessus.
+    if (!tree._skmtSortable) {
+      tree._skmtSortable = new Sortable(tree, Object.assign({}, sortableOpts, {
+        onEnd: function (evt) {
+          if (evt.oldIndex === evt.newIndex) return;
+          var moved = ed.profile.items.splice(evt.oldIndex, 1)[0];
+          ed.profile.items.splice(evt.newIndex, 0, moved);
+          setDirty(true);
+          renderTree();
+        },
+      }));
+    }
+
+    // Les conteneurs d'enfants, eux, sont recréés à chaque rendu (innerHTML
+    // remplacé) : une nouvelle instance à chaque fois est donc correcte.
+
+    tree.querySelectorAll(".skmt-wl-tree-item__children").forEach(function (childrenEl) {
+      var parentEl  = childrenEl.closest(".skmt-wl-tree-item");
+      var parentUid = parentEl ? parentEl.dataset.uid : "";
+
+      new Sortable(childrenEl, Object.assign({}, sortableOpts, {
+        onEnd: function (evt) {
+          if (evt.oldIndex === evt.newIndex) return;
+          var parent = findByUid(parentUid);
+          if (!parent || !parent.children) return;
+          var moved = parent.children.splice(evt.oldIndex, 1)[0];
+          parent.children.splice(evt.newIndex, 0, moved);
+          setDirty(true);
+          renderTree();
+        },
+      }));
+    });
   }
 
   /* ================================================================
@@ -818,11 +878,10 @@
    * CHAMPS D'ITEM
    * ================================================================ */
 
-  function buildItemFields(item) {
+  function buildItemFields(item, isChild) {
     if (item.type === "separator") {
       return '<p class="skmt-wl-note" style="padding:16px">Séparateur — aucun paramètre.</p>';
     }
-    var iconBtnHtml = buildIconBtnHtml(item);
     var html = "";
     if (item.type === "custom_link") {
       html += settingsRow("URL",
@@ -830,22 +889,29 @@
     }
     html += settingsRow("Label",
       '<input type="text" class="skmt-input" id="skmt-wl-item-label" value="' + esc(item.label || "") + '" ' +
-        'placeholder="' + esc(item._wpLabel || item.slug) + '">',
+        'placeholder="' + esc(item._wpLabel || prettifySlug(item.slug)) + '">',
       "Laisser vide pour conserver le label d'origine.");
-    html += (
-      '<div class="skmt-wl-settings-row skmt-wl-settings-row--inline">' +
-        '<div class="skmt-wl-settings-row__label"><span>Icône</span></div>' +
-        iconBtnHtml +
-      "</div>"
-    );
+    if (!isChild) {
+      html += (
+        '<div class="skmt-wl-settings-row skmt-wl-settings-row--inline">' +
+          '<div class="skmt-wl-settings-row__label"><span>Icône</span></div>' +
+          buildIconBtnHtml(item) +
+        "</div>"
+      );
+    }
     html += settingsRow("Visible",
       '<label class="skmt-toggle">' +
         '<input type="checkbox" id="skmt-wl-item-visible"' + (item.visible !== false ? " checked" : "") + '>' +
         '<span class="skmt-toggle__slider"></span></label>', "", true);
-    html += settingsRow("Ouvrir dans un nouvel onglet",
-      '<label class="skmt-toggle">' +
-        '<input type="checkbox" id="skmt-wl-item-target"' + (item.target_blank ? " checked" : "") + '>' +
-        '<span class="skmt-toggle__slider"></span></label>', "", true);
+    // "Nouvel onglet" n'a de sens que pour un item de premier niveau : les
+    // sous-menus pointent vers des pages admin WP, aucun intérêt à les ouvrir
+    // dans un onglet séparé (et l'attribut target n'y est pas appliqué).
+    if (!isChild) {
+      html += settingsRow("Ouvrir dans un nouvel onglet",
+        '<label class="skmt-toggle">' +
+          '<input type="checkbox" id="skmt-wl-item-target"' + (item.target_blank ? " checked" : "") + '>' +
+          '<span class="skmt-toggle__slider"></span></label>', "", true);
+    }
     if (item.type === "wp_item") {
       html += (
         '<div class="skmt-wl-settings-row skmt-wl-item-reset-row">' +
@@ -871,7 +937,7 @@
 
   function buildIconBtnHtml(item) {
     var icon  = item.icon;
-    var thumb = buildIconThumbInner(icon);
+    var thumb = buildIconThumbInner(icon, item._wpIcon);
     return (
       '<button type="button" class="skmt-wl-icon-btn" id="skmt-wl-icon-open">' +
         '<span class="skmt-wl-icon-btn-thumb">' + thumb + "</span>" +
@@ -880,8 +946,13 @@
     );
   }
 
-  function buildIconThumbInner(icon) {
-    if (!icon) return "";
+  function buildIconThumbInner(icon, fallbackWpIcon) {
+    if (!icon) {
+      if (fallbackWpIcon && fallbackWpIcon.indexOf("dashicons-") === 0) {
+        return '<span class="dashicons ' + esc(fallbackWpIcon) + '"></span>';
+      }
+      return "";
+    }
     if (icon.indexOf("dashicons-") === 0) return '<span class="dashicons ' + esc(icon) + '"></span>';
     var src = icon.indexOf("svg:") === 0 ? "data:image/svg+xml;base64," + icon.slice(4) : icon;
     return '<img src="' + esc(src) + '" alt="">';
@@ -896,7 +967,7 @@
       item.label = lblEl.value || null;
       setDirty(true);
       var titleEl = document.getElementById("skmt-mc-panel-title");
-      if (titleEl) titleEl.textContent = item.label || item._wpLabel || item.slug || "Élément";
+      if (titleEl) titleEl.textContent = item.label || item._wpLabel || prettifySlug(item.slug) || "Élément";
       renderTree();
     });
 
@@ -911,7 +982,7 @@
       item.label = null; item.icon = null; item.visible = true; item.target_blank = false;
       setDirty(true);
       showItemPanel(item);
-      renderTree();
+      toast("Élément réinitialisé.", "success");
     });
 
     var iconBtn = document.getElementById("skmt-wl-icon-open");
@@ -924,6 +995,17 @@
   /* ================================================================
    * FLOATING ICON PICKER
    * ================================================================ */
+
+  /**
+   * Ferme le picker explicitement lors de toute navigation (changement
+   * d'item, de panel, de profil) : ne pas se reposer uniquement sur le
+   * mousedown document-level, qui peut laisser le picker ouvert et bloquer
+   * l'UX si la navigation est déclenchée par autre chose qu'un simple clic
+   * en dehors (ex. sélection d'un autre item, changement de menu).
+   */
+  function hideIconPicker() {
+    if (iconPickerEl) iconPickerEl.classList.add("is-hidden");
+  }
 
   function createFloatingIconPicker() {
     iconPickerEl = document.createElement("div");
@@ -962,7 +1044,7 @@
             var b64 = btoa(unescape(encodeURIComponent(lib[k])));
             return (
               '<button type="button" class="skmt-wl-icon-grid-item" ' +
-                'data-icon-val="svg:' + esc(k) + '" title="' + esc(k) + '">' +
+                'data-icon-val="svg:' + esc(b64) + '" title="' + esc(k) + '">' +
                 '<img src="data:image/svg+xml;base64,' + b64 + '" alt="' + esc(k) + '">' +
               "</button>"
             );
@@ -1038,7 +1120,7 @@
     if (!btn) return;
     var thumb = btn.querySelector(".skmt-wl-icon-btn-thumb");
     var label = btn.querySelector("span:last-child");
-    if (thumb) thumb.innerHTML = buildIconThumbInner(item.icon);
+    if (thumb) thumb.innerHTML = buildIconThumbInner(item.icon, item._wpIcon);
     if (label) label.textContent = item.icon ? "Modifier" : "Choisir une icône";
   }
 
@@ -1071,6 +1153,9 @@
         }
         renderProfilesSidebar();
         toast("Menu enregistré.", "success");
+
+        try { sessionStorage.setItem("skmt_mc_open_profile", saved.id); } catch (e) {}
+        setTimeout(function () { window.location.reload(); }, 800);
       } else {
         if (saveBtn) saveBtn.disabled = false;
         toast("Erreur lors de la sauvegarde.", "error");
@@ -1318,6 +1403,37 @@
   function genUid() { return "u" + (++_uid); }
   function deepCopy(o) { return JSON.parse(JSON.stringify(o)); }
   function stripTags(s) { return String(s || "").replace(/<[^>]*>/g, "").trim(); }
+
+  /**
+   * Fallback lisible quand ni label ni _wpLabel ne sont disponibles
+   * (item masqué et mergeWpMenu pas encore passé, ou menu WP introuvable) :
+   * extrait le morceau utile du slug ("edit.php?post_type=product" → "Product")
+   * plutôt que d'afficher la chaîne technique brute.
+   */
+  function prettifySlug(slug) {
+    var raw = String(slug || "");
+    if (!raw) return "";
+
+    var qIndex = raw.indexOf("?");
+    var base   = qIndex === -1 ? raw : raw.slice(0, qIndex);
+    var query  = qIndex === -1 ? ""  : raw.slice(qIndex + 1);
+    var label  = base.replace(/\.php$/, "");
+
+    if (query) {
+      var params = {};
+      query.split("&").forEach(function (pair) {
+        var kv = pair.split("=");
+        if (kv[0]) params[decodeURIComponent(kv[0])] = decodeURIComponent(kv[1] || "");
+      });
+      if (params.post_type) label = params.post_type;
+      else if (params.page) label = params.page;
+    }
+
+    label = label.replace(/[-_]+/g, " ").trim();
+    if (!label) label = raw;
+
+    return label.replace(/\b\w/g, function (c) { return c.toUpperCase(); });
+  }
   function esc(s) {
     return String(s || "")
       .replace(/&/g, "&amp;").replace(/</g, "&lt;")

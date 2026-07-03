@@ -104,7 +104,10 @@ $svg = [
 
 			<div class="skmt-wl-settings-row">
 				<div class="skmt-wl-settings-row__label">
-					<span><?php esc_html_e( 'Statut', 'studio-kyne-mini-tools' ); ?></span>
+					<span class="skmt-mc-status-label-wrap">
+						<?php esc_html_e( 'Statut', 'studio-kyne-mini-tools' ); ?>
+						<span class="skmt-mc-status-badge" id="skmt-mc-status-badge"></span>
+					</span>
 					<p class="skmt-form__help"><?php esc_html_e( 'Activez ce menu pour qu\'il s\'applique aux utilisateurs ciblés.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-mc-status-group">
@@ -112,7 +115,6 @@ $svg = [
 						<button type="button" class="skmt-wl-seg__btn" data-value="draft"  id="skmt-wl-status-draft"><?php  esc_html_e( 'Brouillon', 'studio-kyne-mini-tools' ); ?></button>
 						<button type="button" class="skmt-wl-seg__btn" data-value="active" id="skmt-wl-status-active"><?php esc_html_e( 'Actif', 'studio-kyne-mini-tools' ); ?></button>
 					</div>
-					<span class="skmt-mc-status-badge" id="skmt-mc-status-badge"></span>
 				</div>
 			</div>
 

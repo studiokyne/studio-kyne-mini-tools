@@ -41,6 +41,31 @@
       startBulk();
     });
 
+    // Resync : si un bulk tourne déjà côté serveur (lancé avant un
+    // rechargement/une fermeture de page), on reprend l'affichage et le
+    // polling au lieu de laisser la page paraître inactive.
+    var initialState = skmtAdmin.bulkState;
+    if (initialState && initialState.running) {
+      isRunning = true;
+      pollInterval = POLL_MIN;
+
+      startBtn.disabled = true;
+      startBtn.textContent =
+        skmtAdmin.i18n.bulkRunning || "Optimisation en cours…";
+
+      if (progressEl) {
+        progressEl.style.display = "flex";
+      }
+
+      updateStatus({
+        processed: initialState.processed,
+        remaining: initialState.remaining,
+        total: initialState.total,
+      });
+
+      pollStatus();
+    }
+
     function startBulk() {
       const formData = new FormData();
       formData.append("action", "skmt_image_optimizer_bulk");
@@ -139,14 +164,19 @@
       startBtn.disabled = false;
       startBtn.textContent = skmtAdmin.i18n.bulkDone || "Optimisation terminée";
 
+      var completeMsg =
+        skmtAdmin.i18n.bulkComplete || "Toutes les images ont été optimisées.";
+
       if (messageEl) {
-        messageEl.textContent =
-          skmtAdmin.i18n.bulkComplete ||
-          "Toutes les images ont été optimisées.";
+        messageEl.textContent = completeMsg;
       }
 
       if (barEl) {
         barEl.style.width = "100%";
+      }
+
+      if (typeof window.skmtShowToast === "function") {
+        window.skmtShowToast(completeMsg, "success");
       }
     }
 

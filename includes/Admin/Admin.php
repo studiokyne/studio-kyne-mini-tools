@@ -427,10 +427,12 @@ class Admin {
 	}
 
 	/**
-	 * Ajoute une notice persistante pour l'utilisateur courant (survit aux rechargements).
+	 * Ajoute une notice persistante (survit aux rechargements).
+	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
+	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
 	 */
-	public static function add_persistent_notice( string $id, string $message, string $type = 'info' ): void {
-		$user_id = get_current_user_id();
+	public static function add_persistent_notice( string $id, string $message, string $type = 'info', int $user_id = 0 ): void {
+		$user_id = $user_id ?: get_current_user_id();
 		if ( ! $user_id ) {
 			return;
 		}

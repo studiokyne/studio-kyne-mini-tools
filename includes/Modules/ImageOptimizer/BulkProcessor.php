@@ -28,14 +28,22 @@ class BulkProcessor {
 	 */
 	private \Closure $get_stats_fn;
 
+	/**
+	 * Callable optionnel : appelé une fois quand le bulk passe de "running" à "terminé".
+	 * Signature : function( int $user_id ): void
+	 */
+	private ?\Closure $on_complete_fn;
+
 	public function __construct(
 		string $state_key,
 		\Closure $process_fn,
-		\Closure $get_stats_fn
+		\Closure $get_stats_fn,
+		?\Closure $on_complete_fn = null
 	) {
-		$this->state_key    = $state_key;
-		$this->process_fn   = $process_fn;
-		$this->get_stats_fn = $get_stats_fn;
+		$this->state_key      = $state_key;
+		$this->process_fn     = $process_fn;
+		$this->get_stats_fn   = $get_stats_fn;
+		$this->on_complete_fn = $on_complete_fn;
 	}
 
 	/* ================================================================
@@ -62,6 +70,7 @@ class BulkProcessor {
 				'processed'  => 0,
 				'remaining'  => $total,
 				'updated_at' => time(),
+				'user_id'    => get_current_user_id(),
 			];
 			$this->set_state( $state );
 		}
@@ -136,6 +145,9 @@ class BulkProcessor {
 			$state['remaining']  = 0;
 			$state['updated_at'] = time();
 			$this->set_state( $state );
+			if ( $this->on_complete_fn ) {
+				( $this->on_complete_fn )( (int) ( $state['user_id'] ?? 0 ) );
+			}
 			return;
 		}
 
@@ -162,6 +174,8 @@ class BulkProcessor {
 
 		if ( $state['running'] ) {
 			$this->schedule_next( $batch_size );
+		} elseif ( $this->on_complete_fn ) {
+			( $this->on_complete_fn )( (int) ( $state['user_id'] ?? 0 ) );
 		}
 	}
 
@@ -180,6 +194,7 @@ class BulkProcessor {
 			'processed'  => 0,
 			'remaining'  => 0,
 			'updated_at' => 0,
+			'user_id'    => 0,
 		];
 		return wp_parse_args( is_array( $stored ) ? $stored : [], $defaults );
 	}

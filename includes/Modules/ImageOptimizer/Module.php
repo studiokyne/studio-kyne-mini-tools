@@ -2,6 +2,7 @@
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
 use StudioKyne\MiniTools\Core\AbstractModule;
+use StudioKyne\MiniTools\Admin\Admin;
 
 /**
  * Module Image Optimizer — orchestrateur.
@@ -46,7 +47,8 @@ class Module extends AbstractModule {
 		$this->bulk = new BulkProcessor(
 			$this->get_module_option_key() . self::BULK_STATE_SUFFIX,
 			fn( int $id ) => $this->process_and_update_attachment( $id, true ),
-			fn(): array   => $this->get_stats()
+			fn(): array   => $this->get_stats(),
+			fn( int $user_id ) => $this->notify_bulk_complete( $user_id )
 		);
 
 		$this->media_library = new MediaLibrary( $this, $this->processor );
@@ -121,6 +123,7 @@ class Module extends AbstractModule {
 
 	public function get_admin_js_data(): array {
 		return [
+			'bulkState' => $this->bulk->get_state(),
 			'i18n' => [
 				'bulkRunning'   => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
 				'bulkProcessed' => __( 'Traité :', 'studio-kyne-mini-tools' ),
@@ -133,6 +136,23 @@ class Module extends AbstractModule {
 				'singleError'   => __( 'Erreur', 'studio-kyne-mini-tools' ),
 			],
 		];
+	}
+
+	/**
+	 * Ajoute une notice persistante à l'utilisateur qui a lancé le bulk,
+	 * pour qu'il soit informé même si le lot s'est terminé pendant qu'il
+	 * avait quitté la page (ou via une reprise cron en arrière-plan).
+	 */
+	private function notify_bulk_complete( int $user_id ): void {
+		if ( ! $user_id ) {
+			return;
+		}
+		Admin::add_persistent_notice(
+			'image_optimizer_bulk_done',
+			__( 'Optimisation en masse des images terminée.', 'studio-kyne-mini-tools' ),
+			'success',
+			$user_id
+		);
 	}
 
 	/* ================================================================

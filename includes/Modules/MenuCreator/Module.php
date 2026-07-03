@@ -9,6 +9,27 @@ use StudioKyne\MiniTools\Modules\WhiteLabel\MenuProfileManager;
  */
 class Module extends AbstractModule {
 
+	/**
+	 * Nombre maximal d'entrées de menu persistées par niveau (garde-fou payload).
+	 */
+	private const MAX_ITEMS = 300;
+
+	/**
+	 * Copie du menu WP admin AVANT toute personnalisation par ce module
+	 * (séparateurs injectés, liens custom ajoutés, items masqués retirés).
+	 * L'éditeur doit présenter à l'utilisateur le menu WP d'origine, pas la
+	 * version déjà transformée — sinon nos propres séparateurs / liens custom
+	 * y réapparaissent en double. Capturé au début de apply_menu_visibility.
+	 *
+	 * @var array<int, mixed>|null
+	 */
+	private static $pristine_menu = null;
+
+	/**
+	 * @var array<string, mixed>|null
+	 */
+	private static $pristine_submenu = null;
+
 	public function init(): void {
 		// Moteur d'application des menus personnalisés
 		$has_active = ! empty( array_filter(
@@ -17,14 +38,23 @@ class Module extends AbstractModule {
 		) );
 
 		if ( $has_active ) {
-			add_filter( 'custom_menu_order', '__return_true' );
+			// N'active l'ordre custom que si l'utilisateur courant a réellement
+			// un profil actif (sinon on force tout le monde dans le chemin
+			// custom_menu_order pour rien).
+			add_filter( 'custom_menu_order', [ $this, 'maybe_enable_custom_order' ] );
 			add_filter( 'menu_order',  [ $this, 'apply_menu_order' ],      9999 );
 			add_action( 'admin_menu',  [ $this, 'apply_menu_visibility' ], 9999 );
 			add_action( 'admin_head',  [ $this, 'inject_menu_icon_overrides' ] );
+			add_action( 'admin_head',  [ $this, 'inject_custom_link_targets' ] );
 		}
 
+		// Uniformise l'opacité des icônes de menu (natives ET personnalisées) :
+		// WP atténue par défaut #adminmenu .wp-menu-image img à 60% tant que
+		// l'item n'est pas survolé/actif. Indépendant d'un profil actif, pour
+		// que même les icônes natives (ex. l'icône du plugin lui-même) en profitent.
+		add_action( 'admin_head', [ $this, 'inject_global_icon_opacity_fix' ] );
+
 		// AJAX endpoints
-		add_action( 'wp_ajax_skmt_wl_get_wp_menu',       [ $this, 'ajax_get_wp_menu' ] );
 		add_action( 'wp_ajax_skmt_wl_save_profile',      [ $this, 'ajax_save_profile' ] );
 		add_action( 'wp_ajax_skmt_wl_delete_profile',    [ $this, 'ajax_delete_profile' ] );
 		add_action( 'wp_ajax_skmt_wl_duplicate_profile', [ $this, 'ajax_duplicate_profile' ] );
@@ -38,15 +68,50 @@ class Module extends AbstractModule {
 	 * MOTEUR DE MENU
 	 * ================================================================ */
 
+	/**
+	 * N'active le tri de menu personnalisé que pour un utilisateur réellement
+	 * ciblé par un profil actif ; laisse la valeur des autres filtres intacte
+	 * sinon.
+	 *
+	 * @param bool $enabled Valeur courante du filtre custom_menu_order.
+	 */
+	public function maybe_enable_custom_order( $enabled ): bool {
+		if ( MenuProfileManager::get_active_for_user( get_current_user_id() ) ) {
+			return true;
+		}
+		return (bool) $enabled;
+	}
+
 	public function apply_menu_order( array $menu_order ): array {
 		$profile = MenuProfileManager::get_active_for_user( get_current_user_id() );
 		if ( ! $profile || empty( $profile['items'] ) ) {
 			return $menu_order;
 		}
 
-		$slugs     = array_filter( array_map( fn( $item ) => $item['slug'] ?? '', $profile['items'] ) );
+		$slugs = [];
+		foreach ( $profile['items'] as $item ) {
+			$type = $item['type'] ?? 'wp_item';
+
+			// Un lien personnalisé est enregistré dans $menu par add_menu_page()
+			// sous le slug que WordPress dérive de l'URL, PAS l'URL brute :
+			// add_menu_page applique plugin_basename() sur le menu_slug reçu.
+			// Il faut reproduire exactement la même transformation ici, sinon
+			// le slug ne correspond à aucune entrée de $menu_order et le lien
+			// retombe dans "remaining" (donc tout en bas du menu).
+			if ( 'custom_link' === $type ) {
+				if ( ! empty( $item['url'] ) ) {
+					$slugs[] = $this->custom_link_slug( $item['url'] );
+				}
+				continue;
+			}
+
+			if ( ! empty( $item['slug'] ) ) {
+				$slugs[] = $item['slug'];
+			}
+		}
+
 		$remaining = array_values( array_diff( $menu_order, $slugs ) );
-		return array_values( array_merge( array_values( $slugs ), $remaining ) );
+		return array_values( array_merge( $slugs, $remaining ) );
 	}
 
 	public function apply_menu_visibility(): void {
@@ -55,13 +120,34 @@ class Module extends AbstractModule {
 			return;
 		}
 
-		global $menu;
+		global $menu, $submenu;
+
+		// Instantané du menu WP pristine, avant nos modifications : consommé
+		// par get_admin_js_data() pour alimenter l'éditeur avec le vrai menu
+		// WP (et non la version déjà personnalisée).
+		if ( null === self::$pristine_menu ) {
+			self::$pristine_menu    = is_array( $menu ) ? $menu : [];
+			self::$pristine_submenu = is_array( $submenu ) ? $submenu : [];
+		}
+
+		$next_position = 9000;
 
 		foreach ( $profile['items'] as $item ) {
 			$type = $item['type'] ?? 'wp_item';
 			$slug = $item['slug'] ?? '';
 
 			if ( 'separator' === $type ) {
+				if ( ! empty( $slug ) && is_array( $menu ) ) {
+					// Les clés de $menu doivent rester des entiers (WordPress les
+					// traite comme telles) : on cherche le prochain slot entier
+					// libre plutôt que d'incrémenter en float, qui serait
+					// silencieusement tronqué par PHP (et provoque des collisions).
+					while ( isset( $menu[ $next_position ] ) ) {
+						$next_position++;
+					}
+					$menu[ $next_position ] = [ '', 'read', $slug, '', 'wp-menu-separator' ];
+					$next_position++;
+				}
 				continue;
 			}
 
@@ -72,7 +158,7 @@ class Module extends AbstractModule {
 
 			if ( 'custom_link' === $type && ! empty( $item['url'] ) ) {
 				$label    = sanitize_text_field( $item['label'] ?? __( 'Lien', 'studio-kyne-mini-tools' ) );
-				$icon_url = sanitize_text_field( $item['icon'] ?? 'dashicons-admin-links' );
+				$icon_url = $this->resolve_native_icon_url( $item['icon'] ?? null );
 				add_menu_page( $label, $label, 'read', esc_url_raw( $item['url'] ), '', $icon_url, 999 );
 				continue;
 			}
@@ -90,90 +176,308 @@ class Module extends AbstractModule {
 					}
 					break;
 				}
+
+				if ( ! empty( $item['children'] ) ) {
+					$this->apply_submenu( $slug, (array) $item['children'] );
+				}
 			}
 		}
 	}
 
+	/**
+	 * Applique les personnalisations enfants (ordre, visibilité, label) au
+	 * $submenu WP réel : le filtre menu_order ne gère QUE le premier niveau,
+	 * les sous-menus doivent être réécrits directement dans le global $submenu.
+	 *
+	 * @param string               $parent_slug Slug du parent dans $submenu.
+	 * @param array<int, mixed>    $children    Enfants du profil, dans l'ordre voulu.
+	 */
+	private function apply_submenu( string $parent_slug, array $children ): void {
+		global $submenu;
+		if ( empty( $submenu[ $parent_slug ] ) || ! is_array( $submenu[ $parent_slug ] ) ) {
+			return;
+		}
+
+		// Indexe les entrées WP existantes par leur slug ([2]).
+		$existing = [];
+		foreach ( $submenu[ $parent_slug ] as $sub ) {
+			if ( is_array( $sub ) && isset( $sub[2] ) ) {
+				$existing[ $sub[2] ] = $sub;
+			}
+		}
+
+		$reordered = [];
+		foreach ( $children as $child ) {
+			$child_slug = $child['slug'] ?? '';
+			if ( '' === $child_slug || ! isset( $existing[ $child_slug ] ) ) {
+				continue;
+			}
+			if ( ! ( $child['visible'] ?? true ) ) {
+				unset( $existing[ $child_slug ] );
+				continue;
+			}
+			$entry = $existing[ $child_slug ];
+			if ( isset( $child['label'] ) && $child['label'] !== null && '' !== $child['label'] ) {
+				$entry[0] = esc_html( $child['label'] );
+			}
+			$reordered[] = $entry;
+			unset( $existing[ $child_slug ] );
+		}
+
+		// Entrées WP non listées dans le profil (ajoutées après sa création) :
+		// conservées à la suite pour ne rien faire disparaître par surprise.
+		foreach ( $existing as $entry ) {
+			$reordered[] = $entry;
+		}
+
+		$submenu[ $parent_slug ] = $reordered;
+	}
+
+	/**
+	 * Ajoute target="_blank" / rel="noopener" aux liens personnalisés qui le
+	 * demandent : add_menu_page() ne sait pas poser d'attribut target, on le
+	 * fait donc côté DOM après rendu du menu.
+	 */
+	public function inject_custom_link_targets(): void {
+		$profile = MenuProfileManager::get_active_for_user( get_current_user_id() );
+		if ( ! $profile || empty( $profile['items'] ) ) {
+			return;
+		}
+
+		$slugs = [];
+		foreach ( $profile['items'] as $item ) {
+			if ( 'custom_link' !== ( $item['type'] ?? '' ) ) {
+				continue;
+			}
+			if ( empty( $item['target_blank'] ) || empty( $item['url'] ) ) {
+				continue;
+			}
+			$slugs[] = $this->custom_link_slug( $item['url'] );
+		}
+
+		if ( ! $slugs ) {
+			return;
+		}
+		?>
+		<script>
+		document.addEventListener( 'DOMContentLoaded', function () {
+			var slugs = <?php echo wp_json_encode( $slugs ); ?>;
+			var links = document.querySelectorAll( '#adminmenu a.menu-top' );
+			slugs.forEach( function ( slug ) {
+				for ( var i = 0; i < links.length; i++ ) {
+					if ( ( links[ i ].getAttribute( 'href' ) || '' ).indexOf( slug ) !== -1 ) {
+						links[ i ].setAttribute( 'target', '_blank' );
+						links[ i ].setAttribute( 'rel', 'noopener noreferrer' );
+					}
+				}
+			} );
+		} );
+		</script>
+		<?php
+	}
+
+	/**
+	 * Injecte les icônes SVG/média personnalisées dans le menu admin réel.
+	 *
+	 * Rendu via un vrai <img> (identique à l'aperçu dans l'éditeur), pas via
+	 * un background-image CSS : ce dernier laissait le stroke/fill du SVG
+	 * (currentColor) se faire écraser par les styles natifs de #adminmenu,
+	 * ce qui rendait les icônes "pleines" au lieu de respecter leur tracé
+	 * (stroke) d'origine. Un <img> avec la même source base64 s'affiche
+	 * identiquement à ce que montrent déjà le picker et l'arbre de l'éditeur.
+	 */
 	public function inject_menu_icon_overrides(): void {
 		$profile = MenuProfileManager::get_active_for_user( get_current_user_id() );
 		if ( ! $profile || empty( $profile['items'] ) ) {
 			return;
 		}
 
-		$css = '';
+		$icons = [];
 		foreach ( $profile['items'] as $item ) {
-			if ( empty( $item['slug'] ) || empty( $item['icon'] ) ) {
+			if ( empty( $item['icon'] ) ) {
 				continue;
 			}
-			$icon     = $item['icon'];
-			$css_slug = esc_attr( sanitize_text_field( $item['slug'] ) );
+			$icon = $item['icon'];
+
+			// Un lien personnalisé est enregistré dans $menu (donc dans le
+			// href réel) sous le slug dérivé par add_menu_page (plugin_basename
+			// de l'URL), pas sous son slug interne généré côté client ni l'URL
+			// brute (voir apply_menu_visibility / apply_menu_order).
+			$match_slug = 'custom_link' === ( $item['type'] ?? 'wp_item' )
+				? ( ! empty( $item['url'] ) ? $this->custom_link_slug( $item['url'] ) : '' )
+				: ( $item['slug'] ?? '' );
+
+			if ( empty( $match_slug ) ) {
+				continue;
+			}
 
 			if ( strpos( $icon, 'svg:' ) === 0 ) {
 				$svg_b64 = substr( $icon, 4 );
-				if ( base64_decode( $svg_b64, true ) === false ) {
+				$svg_xml = base64_decode( $svg_b64, true );
+				if ( false === $svg_xml ) {
 					continue;
 				}
-				$img_src = 'data:image/svg+xml;base64,' . esc_attr( $svg_b64 );
+				$img_src = 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) );
 			} elseif ( strpos( $icon, 'http' ) === 0 ) {
 				$img_src = esc_url( $icon );
 			} else {
 				continue;
 			}
 
-			$css .= '#adminmenu a[href*="' . $css_slug . '"] .wp-menu-image{'
-				. 'background-image:url("' . $img_src . '")!important;'
-				. 'background-position:center center!important;background-repeat:no-repeat!important;background-size:20px!important}'
-				. '#adminmenu a[href*="' . $css_slug . '"] .wp-menu-image::before{content:""!important}';
+			$icons[] = [
+				'slug' => sanitize_text_field( $match_slug ),
+				'src'  => $img_src,
+			];
 		}
 
-		if ( $css ) {
-			echo '<style>' . $css . '</style>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+		if ( ! $icons ) {
+			return;
 		}
+
+		// CSS immédiat (avant peinture, admin_head) : masque le dashicon
+		// d'origine tant que le JS n'a pas remplacé le contenu, pour éviter
+		// le flash "dashicon puis icône custom" au chargement. L'inline style
+		// posé ensuite par le script (opacity:1 !important) prend le dessus,
+		// une déclaration inline important battant toujours une règle de
+		// feuille de style important sur la même propriété.
+		$hide_css = '';
+		foreach ( $icons as $entry ) {
+			$css_slug  = str_replace( [ '"', '<', '>', '\\' ], '', $entry['slug'] );
+			$hide_css .= '#adminmenu a[href*="' . $css_slug . '"] .wp-menu-image{opacity:0!important}';
+		}
+		echo '<style>' . $hide_css . '</style>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+
+		?>
+		<script>
+		document.addEventListener( 'DOMContentLoaded', function () {
+			var icons = <?php echo wp_json_encode( $icons ); ?>;
+			var links = document.querySelectorAll( '#adminmenu a.menu-top' );
+			icons.forEach( function ( entry ) {
+				for ( var i = 0; i < links.length; i++ ) {
+					var href = links[ i ].getAttribute( 'href' ) || '';
+					if ( href.indexOf( entry.slug ) === -1 ) {
+						continue;
+					}
+					var imgEl = links[ i ].querySelector( '.wp-menu-image' );
+					if ( ! imgEl ) {
+						continue;
+					}
+					// Le dashicon d'origine est rendu via un ::before CSS sur les
+					// classes dashicons-before/dashicons-xxx : vider innerHTML ne
+					// le retire pas (les pseudo-éléments ne font pas partie du DOM).
+					// Pour les liens personnalisés, WP a aussi pu poser lui-même un
+					// background-image inline (via add_menu_page + icon_url data:)
+					// sur ce même élément : on repart d'un style totalement vierge.
+					imgEl.className = 'wp-menu-image';
+					imgEl.removeAttribute( 'style' );
+					// WP applique opacity:.6 sur #adminmenu .wp-menu-image img : il
+					// faut forcer opacity:1 en !important pour battre cette règle,
+					// et révéler l'icône masquée temporairement par le <style> ci-dessus.
+					imgEl.style.setProperty( 'opacity', '1', 'important' );
+					imgEl.innerHTML = '';
+					var img = document.createElement( 'img' );
+					img.src = entry.src;
+					img.alt = '';
+					img.style.cssText = 'width:20px;height:20px;object-fit:contain;';
+					img.style.setProperty( 'opacity', '1', 'important' );
+					// Aligne verticalement avec les dashicons natifs : WP force
+					// padding-top:9px sur .wp-menu-image img (dashicons: 7px de
+					// chaque côté pour un glyphe de 20px dans un conteneur de 34px).
+					img.style.setProperty( 'padding-top', '7px', 'important' );
+					imgEl.appendChild( img );
+					break;
+				}
+			} );
+		} );
+		</script>
+		<?php
+	}
+
+	/**
+	 * Force l'opacité pleine des icônes de menu, natives ET personnalisées :
+	 * WP atténue par défaut #adminmenu .wp-menu-image img à 60% tant que
+	 * l'item n'est pas survolé/actif — comportement jugé peu lisible, à
+	 * uniformiser indépendamment d'un profil Menu Creator actif.
+	 *
+	 * Corrige aussi l'alignement vertical : WP applique padding:9px 0 0 aux
+	 * icônes <img> (ex. le logo du plugin lui-même) alors que les dashicons
+	 * sont centrés à 7px — d'où un décalage de 2px. On n'override QUE le
+	 * padding-top (pas de shorthand ni de box-sizing:border-box, qui ferait
+	 * rentrer le padding DANS la taille 20×20 fixée en inline sur nos icônes
+	 * custom injectées et les réduirait/désaligne­rait).
+	 */
+	public function inject_global_icon_opacity_fix(): void {
+		echo '<style>#adminmenu .wp-menu-image img{opacity:1!important;padding-top:7px!important}</style>';
+	}
+
+	/**
+	 * Slugs de menu WP jamais surfacés dans l'éditeur (et donc jamais appliqués).
+	 *
+	 * Le Gestionnaire de liens (link-manager.php + sa taxonomie link_category)
+	 * est une fonctionnalité legacy désactivée par défaut depuis WP 3.5 : quand
+	 * elle est off, elle n'apparaît pas dans le menu WP réel, donc la faire
+	 * remonter dans le Créateur crée un item fantôme déroutant. On la masque
+	 * par défaut. Filtrable pour les sites qui l'utilisent réellement.
+	 *
+	 * @return array<int, string>
+	 */
+	private function editor_excluded_slugs(): array {
+		return (array) apply_filters( 'skmt_mc_editor_excluded_slugs', [
+			'link-manager.php',
+		] );
+	}
+
+	/**
+	 * Reproduit la transformation qu'applique add_menu_page() à un menu_slug :
+	 * plugin_basename( esc_url_raw( $url ) ). C'est sous CE slug que le lien
+	 * personnalisé existe réellement dans $menu / $menu_order — le matcher
+	 * ainsi garantit que l'ordre choisi et l'override d'icône ciblent la bonne
+	 * entrée (au lieu de laisser le lien retomber en bas du menu).
+	 */
+	private function custom_link_slug( string $url ): string {
+		return plugin_basename( esc_url_raw( $url ) );
+	}
+
+	/**
+	 * Résout un icon_url natif WP (dashicon, data-URI SVG, ou URL média)
+	 * à partir du format interne stocké côté client.
+	 */
+	private function resolve_native_icon_url( ?string $icon ): string {
+		if ( empty( $icon ) ) {
+			return 'dashicons-admin-links';
+		}
+		if ( strpos( $icon, 'dashicons-' ) === 0 ) {
+			return sanitize_text_field( $icon );
+		}
+		if ( strpos( $icon, 'svg:' ) === 0 ) {
+			$svg_b64 = substr( $icon, 4 );
+			$svg_xml = base64_decode( $svg_b64, true );
+			if ( false === $svg_xml ) {
+				return 'dashicons-admin-links';
+			}
+			return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) );
+		}
+		if ( strpos( $icon, 'http' ) === 0 ) {
+			return esc_url_raw( $icon );
+		}
+		return 'dashicons-admin-links';
+	}
+
+	/**
+	 * Fige "currentColor" à la couleur de repos réelle des glyphes dashicons
+	 * de ce skin admin (#f3f1f1, cf. colors/modern/colors.css) : rendu en
+	 * <img>/background-image (pas de DOM inline), currentColor ne peut hériter
+	 * d'aucune couleur de texte environnante et résoudrait sinon au noir par
+	 * défaut. Fixe (pas de variante hover blanche) — l'écart visuel avec le
+	 * blanc pur du survol natif est minime.
+	 */
+	private function neutralize_svg_color( string $svg_xml ): string {
+		return str_replace( 'currentColor', '#f3f1f1', $svg_xml );
 	}
 
 	/* ================================================================
 	 * AJAX
 	 * ================================================================ */
-
-	public function ajax_get_wp_menu(): void {
-		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ] );
-		}
-
-		if ( ! did_action( 'admin_menu' ) ) {
-			do_action( 'admin_menu', '' );
-		}
-
-		global $menu, $submenu;
-		$clean_menu = [];
-		if ( is_array( $menu ) ) {
-			foreach ( $menu as $item ) {
-				if ( ! is_array( $item ) ) continue;
-				$clean_menu[] = [
-					'label' => wp_strip_all_tags( $item[0] ?? '' ),
-					'cap'   => $item[1] ?? 'read',
-					'slug'  => $item[2] ?? '',
-					'icon'  => $item[6] ?? '',
-				];
-			}
-		}
-		$clean_submenu = [];
-		if ( is_array( $submenu ) ) {
-			foreach ( $submenu as $parent_slug => $sub_items ) {
-				$clean_submenu[ $parent_slug ] = [];
-				foreach ( (array) $sub_items as $item ) {
-					if ( ! is_array( $item ) ) continue;
-					$clean_submenu[ $parent_slug ][] = [
-						'label' => wp_strip_all_tags( $item[0] ?? '' ),
-						'cap'   => $item[1] ?? 'read',
-						'slug'  => $item[2] ?? '',
-					];
-				}
-			}
-		}
-		wp_send_json_success( [ 'menu' => $clean_menu, 'submenu' => $clean_submenu ] );
-	}
 
 	public function ajax_save_profile(): void {
 		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
@@ -272,6 +576,9 @@ class Module extends AbstractModule {
 	}
 
 	private function sanitize_menu_items( array $items, int $depth = 0 ): array {
+		// Garde-fou anti-payload : borne le nombre d'entrées persistées par
+		// niveau, pour éviter qu'un profil pathologique ne gonfle l'option.
+		$items     = array_slice( array_values( $items ), 0, self::MAX_ITEMS );
 		$sanitized = [];
 		foreach ( $items as $item ) {
 			if ( ! is_array( $item ) ) continue;
@@ -285,7 +592,7 @@ class Module extends AbstractModule {
 				'type'         => $type,
 				'slug'         => sanitize_text_field( $item['slug'] ?? '' ),
 				'label'        => isset( $item['label'] ) && $item['label'] !== null ? sanitize_text_field( $item['label'] ) : null,
-				'icon'         => isset( $item['icon'] ) && $item['icon'] !== null ? sanitize_text_field( $item['icon'] ) : null,
+				'icon'         => $this->sanitize_icon_value( $item['icon'] ?? null ),
 				'visible'      => isset( $item['visible'] ) ? (bool) $item['visible'] : true,
 				'target_blank' => ! empty( $item['target_blank'] ),
 				'url'          => 'custom_link' === $type ? esc_url_raw( $item['url'] ?? '' ) : '',
@@ -293,6 +600,23 @@ class Module extends AbstractModule {
 			];
 		}
 		return $sanitized;
+	}
+
+	/**
+	 * Sanitise la valeur d'icône : dashicon / "svg:<base64>" via
+	 * sanitize_text_field, mais URL média via esc_url_raw.
+	 *
+	 * @param mixed $icon
+	 */
+	private function sanitize_icon_value( $icon ): ?string {
+		if ( $icon === null || '' === $icon ) {
+			return null;
+		}
+		$icon = (string) $icon;
+		if ( strpos( $icon, 'http' ) === 0 ) {
+			return esc_url_raw( $icon );
+		}
+		return sanitize_text_field( $icon );
 	}
 
 	/* ================================================================
@@ -327,7 +651,10 @@ class Module extends AbstractModule {
 	}
 
 	public function get_admin_js(): array {
-		return [ SKMT_ASSETS_URL . 'admin/js/modules/menu-creator.js' ];
+		return [
+			SKMT_ASSETS_URL . 'admin/js/vendor/sortable.min.js',
+			SKMT_ASSETS_URL . 'admin/js/modules/menu-creator.js',
+		];
 	}
 
 	public function get_admin_js_data(): array {
@@ -346,21 +673,26 @@ class Module extends AbstractModule {
 
 		if ( 'module_menu_creator' === $tab && is_admin() && current_user_can( 'manage_options' ) ) {
 			global $menu, $submenu;
+			// Menu WP d'origine si disponible (capturé avant nos modifications),
+			// sinon le global (déjà pristine quand aucun profil n'est actif).
+			$src_menu    = null !== self::$pristine_menu    ? self::$pristine_menu    : ( is_array( $menu ) ? $menu : [] );
+			$src_submenu = null !== self::$pristine_submenu ? self::$pristine_submenu : ( is_array( $submenu ) ? $submenu : [] );
+			$excluded    = $this->editor_excluded_slugs();
 			$wp_menu = [];
-			if ( is_array( $menu ) ) {
-				foreach ( $menu as $item ) {
-					if ( ! is_array( $item ) ) continue;
-					$wp_menu[] = [
-						'label' => wp_strip_all_tags( $item[0] ?? '' ),
-						'cap'   => $item[1] ?? 'read',
-						'slug'  => $item[2] ?? '',
-						'icon'  => $item[6] ?? '',
-					];
-				}
+			foreach ( $src_menu as $item ) {
+				if ( ! is_array( $item ) ) continue;
+				if ( in_array( $item[2] ?? '', $excluded, true ) ) continue;
+				$wp_menu[] = [
+					'label' => wp_strip_all_tags( $item[0] ?? '' ),
+					'cap'   => $item[1] ?? 'read',
+					'slug'  => $item[2] ?? '',
+					'icon'  => $item[6] ?? '',
+				];
 			}
 			$wp_submenu = [];
-			if ( is_array( $submenu ) ) {
-				foreach ( $submenu as $parent => $subs ) {
+			if ( is_array( $src_submenu ) ) {
+				foreach ( $src_submenu as $parent => $subs ) {
+					if ( in_array( $parent, $excluded, true ) ) continue;
 					$wp_submenu[ $parent ] = [];
 					foreach ( (array) $subs as $item ) {
 						if ( ! is_array( $item ) ) continue;
@@ -466,6 +798,7 @@ class Module extends AbstractModule {
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		if ( 'module_menu_creator' === $tab ) {
 			wp_enqueue_media();
+			wp_enqueue_style( 'dashicons' );
 		}
 	}
 }

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-**Studio Kyne Mini Tools** is a modular WordPress plugin (PHP 7.4+, WP 5.8+). No build tools, no Composer, no npm — pure PHP with a custom PSR-4 autoloader. There are no automated tests.
+**Studio Kyne Mini Tools** is a modular WordPress plugin (PHP 7.4+, WP 5.8+). No build step, no Composer, no npm — pure PHP with a custom PSR-4 autoloader. There are no automated tests. Third-party JS is vendored as-is under `assets/admin/js/vendor/` (e.g. `sortable.min.js`), never bundled.
 
 ## Releases
 
@@ -57,9 +57,13 @@ Each module is a class extending `AbstractModule` (which implements `ModuleInter
 
 Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_data()`, `on_activate()`, `on_deactivate()`.
 
+Modules can depend on classes from another module's namespace (e.g. `MenuCreator\Module` uses `WhiteLabel\MenuProfileManager` for profile storage/resolution) — this is fine since the autoloader has no per-module isolation, but be aware the dependent module won't work correctly if the other module is deactivated/uninstalled.
+
 **Module settings template** lives at `includes/Modules/{ModuleName}/settings-template.php` (loaded by `templates/admin/module-settings.php`). Available variables: `$module_id`, `$module`, `$instance`, `$module_settings`, `$tab`.
 
 Form fields must use `name="skmt_module_settings[field_name]"` and the hidden input `skmt_tab=module_{id}` so `Admin::handle_save_settings()` routes the POST correctly.
+
+`get_admin_js_data()` return values are injected into `window.skmtAdmin` by `Admin::enqueue_module_assets()`: the `i18n` key is merged into `window.skmtAdmin.i18n`, and every other key is set directly as `window.skmtAdmin[key]` (JSON-encoded). Use this to pass arbitrary module data (e.g. `mcProfiles`, `wpMenu`) to JS, not just translations.
 
 ### Admin form flow
 
@@ -72,15 +76,56 @@ All settings forms POST to `admin-post.php`. The action name determines the hand
 
 All handlers verify a nonce and `manage_options` capability, then redirect with `?skmt_notice=...`.
 
+### AJAX endpoints
+
+Module AJAX actions follow `wp_ajax_skmt_{module}_{action}` naming and a consistent guard pattern at the top of every handler:
+```php
+check_ajax_referer( 'skmt_admin_nonce', 'nonce' ); // or wp_verify_nonce() + manual wp_send_json_error()
+if ( ! current_user_can( 'manage_options' ) ) {
+    wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ] );
+}
+```
+All request data goes through `sanitize_text_field( wp_unslash( $_POST[...] ) )` (or the type-appropriate sanitizer) before use; responses use `wp_send_json_success()` / `wp_send_json_error()`. The nonce is created once via `wp_create_nonce( 'skmt_admin_nonce' )` and shared across modules (see `window.skmtNotifData.nonce` / `window.skmtAdmin`).
+
 ### Icon system
 
-Icons are inline SVGs rendered via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Available icons are defined in `Admin::get_icon_paths()`: `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`.
+Icons are inline SVGs rendered via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Available icons are defined in `Admin::get_icon_paths()`: `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`, `bell`, `x`, `log-in`, `folder`, `chevron-down`, `palette`, `menu`.
 
-## Security module specifics
+### Persistent notices
+
+Separate from the ephemeral toast system (`skmtShowToast`), `Admin::add_persistent_notice(string $id, string $message, string $type, int $user_id = 0)` / `Admin::dismiss_persistent_notice(string $id)` store notices in a user's `skmt_notices` user meta so they survive page reloads. `$user_id` defaults to the current user but can target a specific user from a userless context (e.g. cron completing a background job). Rendered into `window.skmtPersistentNotices` in the notification drawer; dismissed client-side via the `wp_ajax_skmt_dismiss_notice` endpoint (`Admin::handle_dismiss_notice()`).
+
+## Module specifics
+
+### Security
 
 - **RateLimiter**: hooks into the `authenticate` filter at priority 999 (returns `WP_Error` to block). Failure tracking via `wp_login_failed` hook. Success reset via `wp_login` hook. `maybe_block_login($user)` is the filter callback.
 - **LoginUrlHandler**: hooks into `wp_loaded` to intercept both the custom login slug and direct `wp-login.php` access. Must check `action !== 'logout'` before redirecting logged-in users.
 - **HardeningService**: user enumeration is blocked via `template_redirect` + `is_author()` (not `parse_query`). REST user endpoint uses `rest_request_before_callbacks` filter.
+
+### WhiteLabel
+
+Two independent concerns in one module:
+- **Admin bar / footer cleanup** (`Module.php`): each toggle in `admin_bar`/`footer` settings conditionally registers its own `admin_bar_menu`/`admin_head`/`gettext`/`show_admin_bar` hook in `init()` — nothing is hooked unless the corresponding setting is enabled.
+- **Menu profile storage** (`MenuProfileManager.php`): a static, settings-independent CRUD/resolution layer stored under its own option `skmt_wl_menu_profiles` (not `skmt_module_white_label`). `get_active_for_user()` resolves the highest-priority active profile per user (include_users > include_roles > apply_to_all, exclusions always win, ties broken by `updated_at`) and caches the result in a per-user transient (`skmt_wl_menu_user_{id}`, 1h TTL) — call `clear_user_cache()`/`clear_all_cache()` after any profile mutation. This class is consumed by the **MenuCreator** module, not by WhiteLabel's own `Module.php`.
+
+### ImageOptimizer
+
+Orchestrator (`Module.php`) over `ImageProcessor` (conversion/resize), `MediaLibrary` (media-list integration), and `BulkProcessor` (batched WP-Cron optimization of the whole library). `BulkProcessor` persists its state (including the initiating `user_id`) under `{module_option_key}` + `BULK_STATE_SUFFIX` and takes an optional `on_complete_fn(int $user_id)` callback fired once when the run finishes — the module uses it to drop a persistent notice for that user (works even though the cron tick has no current user). Current bulk state is passed to JS via `get_admin_js_data()` as `bulkState` so the UI can resume progress display on load.
+
+### MenuCreator
+
+Applies the `MenuProfileManager` profiles to the actual wp-admin menu: `custom_menu_order` (enabled per-user via `maybe_enable_custom_order`, not blindly) + `menu_order` filter for ordering, `admin_menu` action for visibility/relabeling/separators/custom links (including child/submenu reordering), `admin_head` for injecting per-item icon CSS overrides (base64 SVG or URL), custom-link `target` attributes, and a global menu-icon opacity fix (registered unconditionally). Menu-transforming hooks only register in `init()` if at least one profile is `status === 'active'`. `apply_menu_visibility()` snapshots the untouched WP menu into `self::$pristine_menu`/`$pristine_submenu` **before** mutating the globals, so the editor is fed the real WP menu (not our already-injected separators/custom links).
+
+The editor gets its data through `get_admin_js_data()` (keys `mcProfiles`, `wpMenu`, `wpSubmenu`, `wpRoles`, `wpRecentUsers`, `iconLibrary`) — there is **no** `ajax_get_wp_menu` endpoint. Drag-and-drop reordering uses vendored SortableJS (`assets/admin/js/vendor/sortable.min.js`). Ships its own AJAX endpoints (`skmt_wl_*` action names despite living in the MenuCreator module) and embeds a Lucide icon library inline in `get_lucide_icons()` for the icon picker.
+
+### Login
+
+Customizes the WordPress login page via `login_*` hooks (`login_enqueue_scripts`, `login_head` CSS variables, `login_headerurl`/`login_headertext` logo, `login_footer` side panel + DOM tweaks). Each optional hide/toggle (language dropdown, lost-password, back-to-blog) is registered conditionally. Settings stored under `skmt_module_login`.
+
+### Files
+
+`FileManager.php` is a standalone filesystem service rooted at `ABSPATH`; `Module.php` is a thin AJAX/admin-post wrapper (`ajax_list`, `ajax_delete`, `ajax_rename`, `ajax_move`, `ajax_mkdir`, `ajax_zip`, `ajax_extract`, `ajax_get_content`, `ajax_save_content`, `ajax_upload`, plus a `admin_post_skmt_files_download` streaming download handler). All path input goes through `get_post_path()` (`sanitize_text_field` + `rawurldecode`) before reaching `FileManager` — never trust a client-supplied path directly.
 
 ## Adding a new module
 
