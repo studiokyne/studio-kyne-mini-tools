@@ -96,20 +96,6 @@ if ( ! defined( 'ABSPATH' ) ) {
 		<div class="skmt-files-editor__header">
 			<span class="skmt-files-editor__filename" id="skmt-editor-filename"></span>
 			<div class="skmt-files-editor__header-actions">
-				<select id="skmt-editor-lang" class="skmt-select skmt-select--sm" title="<?php esc_attr_e( 'Langage', 'studio-kyne-mini-tools' ); ?>">
-					<option value="">Auto</option>
-					<option value="application/x-httpd-php">PHP</option>
-					<option value="text/javascript">JavaScript</option>
-					<option value="text/css">CSS</option>
-					<option value="text/html">HTML</option>
-					<option value="text/xml">XML / SVG</option>
-					<option value="application/json">JSON</option>
-					<option value="text/x-sh">Shell</option>
-					<option value="text/x-sql">SQL</option>
-					<option value="text/x-markdown">Markdown</option>
-					<option value="text/plain"><?php esc_html_e( 'Texte brut', 'studio-kyne-mini-tools' ); ?></option>
-				</select>
-				<span class="skmt-files-editor__header-sep" aria-hidden="true"></span>
 				<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" id="skmt-editor-close">
 					<?php esc_html_e( 'Fermer', 'studio-kyne-mini-tools' ); ?>
 				</button>

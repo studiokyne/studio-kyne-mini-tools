@@ -6,14 +6,14 @@
  */
 
 $module_settings = $instance->get_settings();
-$preview = $instance->get_bulk_preview();
-$estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 ?>
 
-<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+<form id="skmt-module-form" class="skmt-form skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
+
+	<div class="skmt-module-form__scroll">
 
 	<!-- Comportement -->
 	<div class="skmt-section">
@@ -169,6 +169,60 @@ $estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 		</div>
 	</div>
 
+	<div class="skmt-divider"></div>
+
+	<!-- Téléchargements SVG -->
+	<?php $svg_enabled = ! empty( $module_settings['svg_upload'] ); ?>
+	<div class="skmt-section">
+		<div class="skmt-section__header">
+			<h2 class="skmt-section__title"><?php echo esc_html__( 'Téléchargements SVG', 'studio-kyne-mini-tools' ); ?></h2>
+			<p class="skmt-section__desc"><?php echo esc_html__( 'Les fichiers SVG sont du XML et peuvent contenir du code malveillant. Une fois activés, chaque SVG téléversé est automatiquement assaini (suppression du JavaScript, des gestionnaires d\'événements et des références externes).', 'studio-kyne-mini-tools' ); ?></p>
+		</div>
+		<div class="skmt-section__content">
+			<div class="skmt-option">
+				<div class="skmt-option__content">
+					<label for="skmt_svg_upload" class="skmt-option__label"><?php echo esc_html__( 'Autoriser l\'upload de SVG', 'studio-kyne-mini-tools' ); ?></label>
+					<p class="skmt-option__desc"><?php echo esc_html__( 'Active l\'upload de fichiers .svg assainis dans la médiathèque.', 'studio-kyne-mini-tools' ); ?></p>
+				</div>
+				<div class="skmt-option__control">
+					<label class="skmt-toggle">
+						<input type="checkbox"
+							   id="skmt_svg_upload"
+							   name="skmt_module_settings[svg_upload]"
+							   value="1"
+							   data-svg-master
+							   <?php checked( $svg_enabled, true ); ?>>
+						<span class="skmt-toggle__slider"></span>
+					</label>
+				</div>
+			</div>
+
+			<?php $svg_roles = (array) ( $module_settings['svg_roles'] ?? [] ); ?>
+			<div class="skmt-svg-roles<?php echo $svg_enabled ? '' : ' is-disabled'; ?>" id="skmt-svg-roles">
+				<div class="skmt-svg-roles__head">
+					<span class="skmt-svg-roles__title"><?php echo esc_html__( 'Rôles autorisés', 'studio-kyne-mini-tools' ); ?></span>
+					<span class="skmt-svg-roles__hint"><?php echo esc_html__( 'Seuls ces rôles pourront téléverser des SVG.', 'studio-kyne-mini-tools' ); ?></span>
+				</div>
+				<div class="skmt-svg-roles__grid">
+					<?php foreach ( wp_roles()->get_names() as $role_slug => $role_name ) : ?>
+						<label class="skmt-svg-role">
+							<span class="skmt-toggle">
+								<input type="checkbox"
+									   name="skmt_module_settings[svg_roles][]"
+									   value="<?php echo esc_attr( $role_slug ); ?>"
+									   <?php checked( in_array( $role_slug, $svg_roles, true ), true ); ?>>
+								<span class="skmt-toggle__slider"></span>
+							</span>
+							<span class="skmt-svg-role__name"><?php echo esc_html( translate_user_role( $role_name ) ); ?></span>
+						</label>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		</div>
+	</div>
+
+	<div class="skmt-divider"></div>
+
 	<!-- Optimisation en masse -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
@@ -176,35 +230,48 @@ $estimated_saved = (int) ( $preview['estimated_bytes_saved'] ?? 0 );
 			<p class="skmt-section__desc"><?php echo esc_html__( 'Optimise les images déjà présentes dans la médiathèque.', 'studio-kyne-mini-tools' ); ?></p>
 		</div>
 		<div class="skmt-section__content">
-			<div class="skmt-bulk-status">
-				<div class="skmt-bulk-status__info">
-					<span class="skmt-bulk-status__count">
-						<?php $remaining = (int) ( $preview['remaining'] ?? 0 ); ?>
-						<span id="skmt-bulk-remaining"><?php echo esc_html( $remaining ); ?></span>
-						<?php echo esc_html__( 'images à optimiser', 'studio-kyne-mini-tools' ); ?>
-					</span>
-					<span class="skmt-form__help">
-						<?php echo esc_html__( 'Gains potentiels :', 'studio-kyne-mini-tools' ); ?>
-						<strong id="skmt-bulk-potential"><?php echo esc_html( size_format( $estimated_saved, 2 ) ); ?></strong>
-					</span>
+			<div class="skmt-bulk" id="skmt-bulk">
+
+				<!-- État initial : lancer un scan avant d'afficher des chiffres -->
+				<div class="skmt-bulk__scan" id="skmt-bulk-scan-intro">
+					<p class="skmt-bulk__scan-hint">
+						<?php echo esc_html__( 'Analysez la médiathèque pour connaître le nombre d\'images restant à optimiser.', 'studio-kyne-mini-tools' ); ?>
+					</p>
+					<button type="button" id="skmt-bulk-scan" class="skmt-btn skmt-btn--secondary">
+						<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+						<?php echo esc_html__( 'Scanner la médiathèque', 'studio-kyne-mini-tools' ); ?>
+					</button>
 				</div>
-				<div class="skmt-bulk-status__progress" style="display: none;">
+
+				<!-- Résultat du scan (révélé par le JS) -->
+				<div class="skmt-bulk__result" id="skmt-bulk-result" style="display: none;">
+					<div class="skmt-bulk__stats">
+						<div class="skmt-bulk__stat">
+							<span class="skmt-bulk__stat-value" id="skmt-bulk-remaining">0</span>
+							<span class="skmt-bulk__stat-label"><?php echo esc_html__( 'images à optimiser', 'studio-kyne-mini-tools' ); ?></span>
+						</div>
+						<div class="skmt-bulk__stat" id="skmt-bulk-potential-tile" style="display: none;">
+							<span class="skmt-bulk__stat-value" id="skmt-bulk-potential">—</span>
+							<span class="skmt-bulk__stat-label"><?php echo esc_html__( 'gains potentiels estimés', 'studio-kyne-mini-tools' ); ?></span>
+						</div>
+					</div>
+					<div class="skmt-bulk__action">
+						<button type="button" id="skmt-bulk-start" class="skmt-btn skmt-btn--primary" disabled>
+							<?php echo esc_html__( 'Lancer l\'optimisation', 'studio-kyne-mini-tools' ); ?>
+						</button>
+					</div>
+				</div>
+
+				<!-- Progression -->
+				<div class="skmt-bulk__progress skmt-bulk-status__progress" style="display: none;">
 					<div class="skmt-progress">
 						<div class="skmt-progress__bar" style="width: 0%"></div>
 					</div>
 					<span class="skmt-bulk-status__message"></span>
 				</div>
-				<button type="button" id="skmt-bulk-start" class="skmt-btn skmt-btn--primary"
-						<?php disabled( 0 === $remaining ); ?>>
-					<?php echo esc_html__( 'Lancer l\'optimisation', 'studio-kyne-mini-tools' ); ?>
-				</button>
 			</div>
 		</div>
 	</div>
 
-	<div class="skmt-page__footer">
-		<button type="submit" class="skmt-btn skmt-btn--primary">
-			<?php echo esc_html__( 'Enregistrer les réglages', 'studio-kyne-mini-tools' ); ?>
-		</button>
-	</div>
+	</div><!-- .skmt-module-form__scroll -->
 </form>

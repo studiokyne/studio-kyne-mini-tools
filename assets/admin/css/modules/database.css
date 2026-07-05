@@ -204,10 +204,18 @@
 .skmt-db__data-table td.skmt-db__td-binary { color: var(--skmt-text-secondary); font-style: italic; cursor: default; }
 .skmt-db__data-empty { text-align: center; color: var(--skmt-text-secondary); cursor: default; padding: 24px; }
 
+/* Bouton de suppression discret : icône seule, révélée au survol de la ligne. */
 .skmt-db__delete-row {
   display: inline-flex; align-items: center; justify-content: center;
-  padding: 2px 8px; white-space: nowrap;
+  width: 26px; height: 26px; padding: 0;
+  border: none; background: none; border-radius: var(--skmt-radius-xs);
+  color: var(--skmt-n400); cursor: pointer;
+  opacity: 0; transition: opacity .12s, background .12s, color .12s;
 }
+.skmt-db__delete-row svg { width: 15px; height: 15px; pointer-events: none; }
+.skmt-db__data-table tr:hover .skmt-db__delete-row,
+.skmt-db__delete-row:focus-visible { opacity: 1; }
+.skmt-db__delete-row:hover { background: var(--skmt-danger-bg); color: var(--skmt-danger); }
 
 /* ================================================================
  * ONGLET STRUCTURE

@@ -10,7 +10,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  min-height: 400px;
+  flex: 1;
+  min-height: 0;
 }
 
 /* Masquer le bouton "Enregistrer" du header (pas de form dans ce module) */
@@ -30,6 +31,7 @@
   border-bottom: 1px solid var(--skmt-border);
   background: var(--skmt-n50);
   flex-wrap: wrap;
+  flex-shrink: 0;
 }
 
 .skmt-files__breadcrumb {
@@ -108,6 +110,7 @@
   padding: 8px 20px;
   background: var(--skmt-accent-light);
   border-bottom: 1px solid var(--skmt-border);
+  flex-shrink: 0;
 }
 
 .skmt-files__selection-count {
@@ -132,8 +135,9 @@
  * ================================================================ */
 
 .skmt-files__table-wrap {
-  overflow-x: auto;
+  overflow: auto;
   flex: 1;
+  min-height: 0;
 }
 
 .skmt-files__table {
@@ -156,6 +160,12 @@
   text-transform: uppercase;
   letter-spacing: 0.04em;
   white-space: nowrap;
+  /* Entête figée pendant le scroll du corps de la table. */
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: var(--skmt-n50);
+  box-shadow: inset 0 -1px 0 var(--skmt-border);
 }
 
 .skmt-files__table tbody tr {
@@ -497,139 +507,21 @@
   flex-direction: column;
 }
 
-/* ---- Dark theme CodeMirror (Catppuccin Mocha) ---- */
-/*
- * On utilise le thème "skmt-dark" (via theme: "skmt-dark" en JS)
- * pour éviter tout conflit de spécificité avec le CSS de WordPress (.cm-s-default).
- * Les sélecteurs .cm-s-skmt-dark ont priorité sur .cm-s-default grâce au nom unique.
- */
-.cm-s-skmt-dark.CodeMirror,
-.skmt-files-editor__body .CodeMirror {
-  flex: 1;
-  font-size: 13px;
-  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
-  line-height: 1.65;
-  background: #1e1e2e;
-  color: #cdd6f4;
-}
-
-.skmt-files-editor__body .CodeMirror-scroll {
-  box-sizing: border-box;
-}
-
-.cm-s-skmt-dark .CodeMirror-gutters,
-.skmt-files-editor__body .CodeMirror-gutters {
-  background: #181825;
-  border-right: 1px solid #313244;
-}
-
-.cm-s-skmt-dark .CodeMirror-linenumber,
-.skmt-files-editor__body .CodeMirror-linenumber {
-  color: #45475a;
-}
-
-.cm-s-skmt-dark .CodeMirror-cursor,
-.skmt-files-editor__body .CodeMirror-cursor {
-  border-left: 2px solid #cba6f7;
-}
-
-.cm-s-skmt-dark .CodeMirror-selected,
-.cm-s-skmt-dark.CodeMirror-focused .CodeMirror-selected,
-.skmt-files-editor__body .CodeMirror-selected,
-.skmt-files-editor__body .CodeMirror-focused .CodeMirror-selected {
-  background: #313244;
-}
-
-.cm-s-skmt-dark .CodeMirror-activeline-background,
-.skmt-files-editor__body .CodeMirror-activeline-background {
-  background: rgba(49, 50, 68, 0.4);
-}
-
-.cm-s-skmt-dark .CodeMirror-matchingbracket,
-.skmt-files-editor__body .CodeMirror-matchingbracket {
-  background: #45475a;
-  color: #cdd6f4 !important;
-  outline: 1px solid #cba6f7;
-}
-
-/* Tokens de syntaxe — thème skmt-dark */
-.cm-s-skmt-dark .cm-keyword {
-  color: #cba6f7;
-}
-.cm-s-skmt-dark .cm-atom {
-  color: #fab387;
-}
-.cm-s-skmt-dark .cm-number {
-  color: #fab387;
-}
-.cm-s-skmt-dark .cm-string {
-  color: #a6e3a1;
-}
-.cm-s-skmt-dark .cm-string-2 {
-  color: #a6e3a1;
-}
-.cm-s-skmt-dark .cm-comment {
-  color: #6c7086;
-  font-style: italic;
-}
-.cm-s-skmt-dark .cm-variable {
-  color: #cdd6f4;
-}
-.cm-s-skmt-dark .cm-variable-2 {
-  color: #89dceb;
-}
-.cm-s-skmt-dark .cm-variable-3,
-.cm-s-skmt-dark .cm-type {
-  color: #f5c2e7;
-}
-.cm-s-skmt-dark .cm-def {
-  color: #89b4fa;
-}
-.cm-s-skmt-dark .cm-bracket {
-  color: #cdd6f4;
-}
-.cm-s-skmt-dark .cm-tag {
-  color: #f38ba8;
-}
-.cm-s-skmt-dark .cm-attribute {
-  color: #fab387;
-}
-.cm-s-skmt-dark .cm-qualifier {
-  color: #a6e3a1;
-}
-.cm-s-skmt-dark .cm-property {
-  color: #89dceb;
-}
-.cm-s-skmt-dark .cm-operator {
-  color: #89dceb;
-}
-.cm-s-skmt-dark .cm-meta {
-  color: #89b4fa;
-}
-.cm-s-skmt-dark .cm-builtin {
-  color: #f5c2e7;
-}
-.cm-s-skmt-dark .cm-link {
-  color: #89b4fa;
-  text-decoration: underline;
-}
-.cm-s-skmt-dark .cm-error {
-  color: #f38ba8;
-  background: rgba(243, 139, 168, 0.15);
-}
-
+/* ---- Éditeur en texte brut (thème sombre) ---- */
 #skmt-editor-textarea {
+  flex: 1;
   width: 100%;
   height: 100%;
   resize: none;
   border: none;
   padding: 16px;
   font-size: 13px;
-  font-family: "SFMono-Regular", "Consolas", monospace;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
   line-height: 1.65;
   color: #cdd6f4;
   background: #1e1e2e;
   outline: none;
+  tab-size: 2;
 }
 
 /* ---- Spinner animation ---- */

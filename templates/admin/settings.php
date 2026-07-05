@@ -65,6 +65,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 		</div>
 	</div>
 
+	<div class="skmt-page__scroll">
+
 	<!-- ================================================================
 	     MISES À JOUR
 	     ================================================================ -->
@@ -80,12 +82,12 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 			</div>
 			<div class="skmt-section__content">
 
-				<div class="skmt-form__group skmt-form__group--toggle">
-					<div class="skmt-form__toggle-label">
-						<label class="skmt-form__label"><?php echo esc_html__( 'Version actuelle', 'studio-kyne-mini-tools' ); ?></label>
-						<p class="skmt-form__help"><?php echo esc_html__( 'Version du plugin installée sur ce site.', 'studio-kyne-mini-tools' ); ?></p>
+				<div class="skmt-option">
+					<div class="skmt-option__content">
+						<span class="skmt-option__label"><?php echo esc_html__( 'Version actuelle', 'studio-kyne-mini-tools' ); ?></span>
+						<p class="skmt-option__desc"><?php echo esc_html__( 'Version du plugin installée sur ce site.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
-					<div class="skmt-inline">
+					<div class="skmt-option__control skmt-inline">
 						<span class="skmt-badge skmt-badge--info">v<?php echo esc_html( SKMT_VERSION ); ?></span>
 						<button type="submit" class="skmt-btn skmt-btn--secondary skmt-btn--sm" form="skmt-check-updates-form">
 							<?php echo esc_html__( 'Vérifier les mises à jour', 'studio-kyne-mini-tools' ); ?>
@@ -93,27 +95,34 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 					</div>
 				</div>
 
-				<div class="skmt-form__group">
-					<label for="skmt_update_channel" class="skmt-form__label"><?php echo esc_html__( 'Canal de mise à jour', 'studio-kyne-mini-tools' ); ?></label>
-					<select id="skmt_update_channel" name="skmt_global[update_channel]" class="skmt-select skmt-select--sm">
-						<option value="stable" <?php selected( $update_channel, 'stable' ); ?>><?php echo esc_html__( 'Stable (main)', 'studio-kyne-mini-tools' ); ?></option>
-						<option value="dev" <?php selected( $update_channel, 'dev' ); ?>><?php echo esc_html__( 'Dev (pre-release)', 'studio-kyne-mini-tools' ); ?></option>
-					</select>
+				<div class="skmt-option">
+					<div class="skmt-option__content">
+						<label for="skmt_update_channel" class="skmt-option__label"><?php echo esc_html__( 'Canal de mise à jour', 'studio-kyne-mini-tools' ); ?></label>
+						<p class="skmt-option__desc"><?php echo esc_html__( 'Choisissez entre les versions stables et les pré-versions de développement.', 'studio-kyne-mini-tools' ); ?></p>
+					</div>
+					<div class="skmt-option__control">
+						<select id="skmt_update_channel" name="skmt_global[update_channel]" class="skmt-select skmt-select--sm">
+							<option value="stable" <?php selected( $update_channel, 'stable' ); ?>><?php echo esc_html__( 'Stable (main)', 'studio-kyne-mini-tools' ); ?></option>
+							<option value="dev" <?php selected( $update_channel, 'dev' ); ?>><?php echo esc_html__( 'Dev (pre-release)', 'studio-kyne-mini-tools' ); ?></option>
+						</select>
+					</div>
 				</div>
 
-				<div class="skmt-form__group skmt-form__group--toggle">
-					<div class="skmt-form__toggle-label">
-						<label for="skmt_auto_updates" class="skmt-form__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></label>
-						<p class="skmt-form__help"><?php echo esc_html__( 'Autoriser WordPress à mettre à jour automatiquement ce plugin.', 'studio-kyne-mini-tools' ); ?></p>
+				<div class="skmt-option">
+					<div class="skmt-option__content">
+						<label for="skmt_auto_updates" class="skmt-option__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></label>
+						<p class="skmt-option__desc"><?php echo esc_html__( 'Autoriser WordPress à mettre à jour automatiquement ce plugin.', 'studio-kyne-mini-tools' ); ?></p>
 					</div>
-					<label class="skmt-toggle">
-						<input type="checkbox"
-							   id="skmt_auto_updates"
-							   name="skmt_global[auto_updates]"
-							   value="1"
-							<?php checked( $auto_updates, true ); ?>>
-						<span class="skmt-toggle__slider"></span>
-					</label>
+					<div class="skmt-option__control">
+						<label class="skmt-toggle">
+							<input type="checkbox"
+								   id="skmt_auto_updates"
+								   name="skmt_global[auto_updates]"
+								   value="1"
+								<?php checked( $auto_updates, true ); ?>>
+							<span class="skmt-toggle__slider"></span>
+						</label>
+					</div>
 				</div>
 
 			</div>
@@ -292,11 +301,7 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 		</div>
 	</details>
 
-	<div class="skmt-page__footer">
-		<button type="submit" form="skmt-save-settings-form" class="skmt-btn skmt-btn--primary">
-			<?php echo esc_html__( 'Enregistrer les réglages', 'studio-kyne-mini-tools' ); ?>
-		</button>
-	</div>
+	</div><!-- .skmt-page__scroll -->
 
 	<form id="skmt-check-updates-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'skmt_check_updates', 'skmt_check_nonce' ); ?>

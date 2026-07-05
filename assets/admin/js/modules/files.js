@@ -19,11 +19,9 @@
     i18n: skmtAdmin.i18n || {},
     downloadUrl: "",
     downloadNonce: "",
-    editorCm: null,
     editorPath: null,
     editorDirty: false,
-    editorAutoMode: "text/plain",
-    editorSuppressChange: false,
+    editorInputBound: false,
     movePath: null,
     renamePath: null,
     dragCounter: 0,
@@ -629,7 +627,6 @@
     var editorEl   = document.getElementById("skmt-files-editor");
     var closeBtn   = document.getElementById("skmt-editor-close");
     var saveBtn    = document.getElementById("skmt-editor-save");
-    var langSelect = document.getElementById("skmt-editor-lang");
     if (!closeBtn || !saveBtn) return;
 
     if (saveBtn) saveBtn.disabled = true;
@@ -643,12 +640,6 @@
         if (e.target === editorEl) closeEditor();
       });
     }
-
-    if (langSelect) langSelect.addEventListener("change", function () {
-      if (!fm.editorCm) return;
-      var mode = langSelect.value || fm.editorAutoMode;
-      fm.editorCm.setOption("mode", mode);
-    });
 
     document.addEventListener("keydown", function (e) {
       if (!editorEl || editorEl.style.display === "none") return;
@@ -676,81 +667,29 @@
       var editorEl   = document.getElementById("skmt-files-editor");
       var filenameEl = document.getElementById("skmt-editor-filename");
       var textarea   = document.getElementById("skmt-editor-textarea");
-      var langSelect = document.getElementById("skmt-editor-lang");
-      var ext        = name.split(".").pop().toLowerCase();
-      var mode       = getModeForExt(ext);
       var content    = data.data.content;
 
-      fm.editorAutoMode = mode;
-
       if (filenameEl) filenameEl.textContent = name;
-      editorEl.style.display = "";
+      if (editorEl) editorEl.style.display = "";
 
-      // Sync dropdown — sélectionner l'option correspondant au mode détecté
-      if (langSelect) {
-        var found = false;
-        for (var i = 0; i < langSelect.options.length; i++) {
-          if (langSelect.options[i].value === mode) {
-            langSelect.value = mode;
-            found = true;
-            break;
-          }
-        }
-        if (!found) langSelect.value = "";
-      }
-
-      if (fm.editorCm) {
-        // Réutiliser l'instance — setValue déclenche "change", on le supprime
-        fm.editorSuppressChange = true;
-        fm.editorCm.setOption("mode", mode);
-        fm.editorCm.setValue(content);
-        fm.editorCm.clearHistory();
-        fm.editorSuppressChange = false;
-        fm.editorDirty = false;
-        updateSaveBtn();
-        setTimeout(function () { fm.editorCm.refresh(); }, 30);
-      } else if (window.CodeMirror) {
+      // Éditeur en texte brut (pas de coloration syntaxique).
+      if (textarea) {
         textarea.value = content;
-        try {
-          fm.editorCm = window.CodeMirror.fromTextArea(textarea, {
-            lineNumbers:  true,
-            mode:         mode,
-            lineWrapping: true,
-            indentUnit:   2,
-            tabSize:      2,
-            theme:        "skmt-dark",
-            matchBrackets: true,
-          });
-          fm.editorCm.setSize(null, "calc(100vh - 81px)");
-
-          // Tracker les modifications
-          fm.editorCm.on("change", function () {
-            if (fm.editorSuppressChange) return;
+        textarea.style.display = "";
+        if (!fm.editorInputBound) {
+          fm.editorInputBound = true;
+          textarea.addEventListener("input", function () {
             if (!fm.editorDirty) {
               fm.editorDirty = true;
               updateSaveBtn();
             }
           });
-
-          fm.editorDirty = false;
-          updateSaveBtn();
-          setTimeout(function () { fm.editorCm && fm.editorCm.refresh(); }, 30);
-        } catch (e) {
-          fm.editorCm = null;
-          if (textarea) {
-            textarea.style.display = "";
-            textarea.addEventListener("input", function () {
-              if (!fm.editorDirty) {
-                fm.editorDirty = true;
-                updateSaveBtn();
-              }
-            });
-          }
         }
-      } else {
-        textarea.value = content;
-        textarea.style.display = "";
+        setTimeout(function () { textarea.focus(); }, 30);
       }
+
+      fm.editorDirty = false;
+      updateSaveBtn();
     });
   }
 
@@ -780,13 +719,8 @@
   function saveEditorContent() {
     if (!fm.editorPath) return;
 
-    var content;
-    if (fm.editorCm) {
-      content = fm.editorCm.getValue();
-    } else {
-      var ta = document.getElementById("skmt-editor-textarea");
-      content = ta ? ta.value : "";
-    }
+    var ta = document.getElementById("skmt-editor-textarea");
+    var content = ta ? ta.value : "";
 
     var saveBtn = document.getElementById("skmt-editor-save");
     if (saveBtn) saveBtn.disabled = true;
@@ -802,24 +736,6 @@
       updateSaveBtn();
       showToast("Fichier enregistré.", "success");
     });
-  }
-
-  function getModeForExt(ext) {
-    var map = {
-      php:   "application/x-httpd-php",
-      js:    "text/javascript",
-      ts:    "text/typescript",
-      css:   "text/css",
-      html:  "text/html",
-      htm:   "text/html",
-      xml:   "text/xml",
-      svg:   "text/xml",
-      json:  "application/json",
-      sh:    "text/x-sh",
-      bash:  "text/x-sh",
-      sql:   "text/x-sql",
-    };
-    return map[ext] || "text/plain";
   }
 
   function isEditable(ext) {

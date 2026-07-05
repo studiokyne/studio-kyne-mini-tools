@@ -17,10 +17,12 @@ $auth      = $module_settings['authentication'] ?? [];
 $hardening = $module_settings['hardening'] ?? [];
 ?>
 
-<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+<form id="skmt-module-form" class="skmt-form skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
+
+	<div class="skmt-module-form__scroll">
 
 	<!-- ============================================================
 		 AUTHENTIFICATION
@@ -274,10 +276,6 @@ $hardening = $module_settings['hardening'] ?? [];
 		</div>
 	</div>
 
-	<div class="skmt-page__footer">
-		<button type="submit" class="skmt-btn skmt-btn--primary">
-			<?php esc_html_e( 'Enregistrer les paramètres', 'studio-kyne-mini-tools' ); ?>
-		</button>
-	</div>
+	</div><!-- .skmt-module-form__scroll -->
 
 </form>

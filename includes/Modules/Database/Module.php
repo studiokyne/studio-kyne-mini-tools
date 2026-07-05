@@ -111,9 +111,15 @@ class Module extends AbstractModule {
 			$name  = $t['Name'];
 			$is_wp = str_starts_with( $name, $prefix );
 
+			// `SHOW TABLE STATUS`.Rows est une estimation pour InnoDB (souvent 0 ou
+			// très approximative). On récupère un compte exact via COUNT(*). Le nom
+			// provient de SHOW TABLE STATUS, donc sûr à échapper en backticks.
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+			$count = $wpdb->get_var( 'SELECT COUNT(*) FROM `' . str_replace( '`', '``', $name ) . '`' );
+
 			$tables[] = [
 				'name'         => $name,
-				'rows'         => (int) $t['Rows'],
+				'rows'         => null === $count ? (int) $t['Rows'] : (int) $count,
 				'size'         => ( (int) $t['Data_length'] + (int) $t['Index_length'] ),
 				'engine'       => $t['Engine'],
 				'is_wp_prefix' => $is_wp,

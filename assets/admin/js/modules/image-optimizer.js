@@ -8,12 +8,30 @@
   document.addEventListener("DOMContentLoaded", function () {
     initBulkOptimization();
     initSingleOptimization();
+    initSvgRolesToggle();
   });
+
+  // Grise le sélecteur de rôles quand l'upload SVG est désactivé.
+  function initSvgRolesToggle() {
+    const master = document.querySelector("[data-svg-master]");
+    const roles = document.getElementById("skmt-svg-roles");
+    if (!master || !roles) return;
+
+    const sync = function () {
+      roles.classList.toggle("is-disabled", !master.checked);
+    };
+    master.addEventListener("change", sync);
+    sync();
+  }
 
   function initBulkOptimization() {
     const startBtn = document.getElementById("skmt-bulk-start");
     if (!startBtn || typeof skmtAdmin === "undefined") return;
 
+    const scanBtn = document.getElementById("skmt-bulk-scan");
+    const introEl = document.getElementById("skmt-bulk-scan-intro");
+    const resultEl = document.getElementById("skmt-bulk-result");
+    const potentialTile = document.getElementById("skmt-bulk-potential-tile");
     const progressEl = document.querySelector(".skmt-bulk-status__progress");
     const messageEl = document.querySelector(".skmt-bulk-status__message");
     const barEl = document.querySelector(".skmt-progress__bar");
@@ -24,6 +42,71 @@
     var POLL_MAX = 5000;
     var pollInterval = POLL_MIN;
     var isRunning = false;
+
+    // Bascule de l'invite « scanner » vers le bloc résultat (stats + bouton).
+    function revealResult() {
+      if (introEl) introEl.style.display = "none";
+      if (resultEl) resultEl.style.display = "flex";
+    }
+
+    // Scan à la demande : compte les images et estime les gains.
+    if (scanBtn) {
+      scanBtn.addEventListener("click", function () {
+        scanBtn.disabled = true;
+        var originalLabel = scanBtn.textContent;
+        scanBtn.textContent = skmtAdmin.i18n.bulkScanning || "Analyse…";
+
+        const formData = new FormData();
+        formData.append("action", "skmt_image_optimizer_bulk_scan");
+        formData.append("nonce", skmtAdmin.nonce);
+
+        fetch(skmtAdmin.ajaxUrl, {
+          method: "POST",
+          credentials: "same-origin",
+          body: formData,
+        })
+          .then(function (response) {
+            return response.json();
+          })
+          .then(function (data) {
+            scanBtn.disabled = false;
+            scanBtn.textContent = originalLabel;
+
+            if (!data.success) {
+              if (typeof window.skmtShowToast === "function") {
+                window.skmtShowToast(data.data || "Erreur", "error");
+              }
+              return;
+            }
+
+            const result = data.data || {};
+            const remaining = parseInt(result.remaining, 10) || 0;
+            const estimated = parseInt(result.estimated_bytes_saved, 10) || 0;
+
+            if (remainingEl) remainingEl.textContent = remaining;
+
+            // On n'affiche l'estimation que si un historique la rend crédible.
+            if (potentialTile) {
+              if (estimated > 0) {
+                if (potentialEl) potentialEl.textContent = formatBytes(estimated);
+                potentialTile.style.display = "";
+              } else {
+                potentialTile.style.display = "none";
+              }
+            }
+
+            startBtn.disabled = remaining === 0;
+            revealResult();
+          })
+          .catch(function (err) {
+            scanBtn.disabled = false;
+            scanBtn.textContent = originalLabel;
+            if (typeof window.skmtShowToast === "function") {
+              window.skmtShowToast(err.message || "Erreur réseau", "error");
+            }
+          });
+      });
+    }
 
     startBtn.addEventListener("click", function () {
       if (isRunning) return;
@@ -48,6 +131,8 @@
     if (initialState && initialState.running) {
       isRunning = true;
       pollInterval = POLL_MIN;
+
+      revealResult();
 
       startBtn.disabled = true;
       startBtn.textContent =

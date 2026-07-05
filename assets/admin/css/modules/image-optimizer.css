@@ -2,26 +2,159 @@
  * Image Optimizer module
  */
 
-.skmt-bulk-status {
+/* ================================================================
+ * TÉLÉCHARGEMENTS SVG — sélecteur de rôles pleine largeur
+ * ================================================================ */
+.skmt-svg-roles {
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid var(--skmt-border);
+  border-radius: var(--skmt-radius);
+  background: var(--skmt-n50);
+  transition: opacity 0.2s ease;
+}
+
+.skmt-svg-roles__head {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 2px;
+  margin-bottom: 12px;
 }
 
-.skmt-bulk-status__info {
-  font-size: 14px;
-  color: var(--skmt-text-secondary);
-}
-
-.skmt-bulk-status__count {
+.skmt-svg-roles__title {
+  font-size: 13px;
   font-weight: 600;
   color: var(--skmt-text);
 }
 
-.skmt-bulk-status__progress {
+.skmt-svg-roles__hint {
+  font-size: 12px;
+  color: var(--skmt-text-secondary);
+}
+
+.skmt-svg-roles__grid {
+  display: grid;
+  /* Colonnes assez larges pour que les noms de rôles longs
+	 ("Administrateur/administratrice") tiennent sur une seule ligne
+	 au lieu de renvoyer une lettre isolée à la ligne suivante. */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 8px;
+}
+
+.skmt-svg-role {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--skmt-border);
+  border-radius: var(--skmt-radius-sm);
+  background: var(--skmt-surface);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.skmt-svg-role:hover {
+  border-color: var(--skmt-accent);
+}
+
+/* Le toggle ne doit jamais être écrasé par un libellé de rôle long. */
+.skmt-svg-role .skmt-toggle {
+  flex-shrink: 0;
+}
+
+.skmt-svg-role__name {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--skmt-text);
+  user-select: none;
+  /* Filet de sécurité pour les écrans très étroits : évite le débordement
+	 hors de la carte (les noms de rôles sont des mots insécables). Sur les
+	 colonnes larges définies ci-dessus, aucun retour à la ligne ne se produit. */
+  overflow-wrap: anywhere;
+}
+
+/* Master toggle off → rôles grisés et non interactifs */
+.skmt-svg-roles.is-disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ================================================================
+ * OPTIMISATION EN MASSE
+ * ================================================================ */
+.skmt-bulk {
+  padding: 18px 20px;
+  border: 1px solid var(--skmt-border);
+  border-radius: var(--skmt-radius);
+  background: var(--skmt-n50);
+}
+
+/* État initial : invitation au scan */
+.skmt-bulk__scan {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.skmt-bulk__scan-hint {
+  flex: 1;
+  min-width: 200px;
+  font-size: 13px;
+  color: var(--skmt-text-secondary);
+}
+
+.skmt-bulk__scan .skmt-btn svg,
+.skmt-bulk__action .skmt-btn svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Résultat du scan : stats + action */
+.skmt-bulk__result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.skmt-bulk__stats {
+  display: flex;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.skmt-bulk__stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skmt-bulk__stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--skmt-text);
+}
+
+.skmt-bulk__stat-label {
+  font-size: 12px;
+  color: var(--skmt-text-secondary);
+}
+
+.skmt-bulk__action {
+  flex-shrink: 0;
+}
+
+.skmt-bulk__progress {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  margin-top: 14px;
 }
 
 .skmt-bulk-status__message {
@@ -44,6 +177,14 @@
   transition: width 0.3s ease;
 }
 
-.skmt-card--bulk {
-  margin-top: 24px;
+@media screen and (max-width: 782px) {
+  .skmt-bulk__result {
+    align-items: stretch;
+  }
+
+  .skmt-bulk__action,
+  .skmt-bulk__action .skmt-btn,
+  .skmt-bulk__scan .skmt-btn {
+    width: 100%;
+  }
 }

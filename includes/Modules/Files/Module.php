@@ -28,7 +28,6 @@ class Module extends AbstractModule {
 		add_action( 'wp_ajax_skmt_files_save_content', [ $this, 'ajax_save_content' ] );
 		add_action( 'wp_ajax_skmt_files_upload',       [ $this, 'ajax_upload' ] );
 		add_action( 'admin_post_skmt_files_download',  [ $this, 'handle_download' ] );
-		add_action( 'admin_enqueue_scripts',           [ $this, 'enqueue_code_editor' ] );
 	}
 
 	/* ================================================================
@@ -332,18 +331,6 @@ class Module extends AbstractModule {
 	/* ================================================================
 	 * ASSETS
 	 * ================================================================ */
-
-	public function enqueue_code_editor( string $hook ): void {
-		if ( strpos( $hook, 'studio-kyne-mini-tools' ) === false ) {
-			return;
-		}
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		if ( $tab !== 'module_files' ) {
-			return;
-		}
-		// Charge CodeMirror avec le mode PHP (inclut HTML, CSS, JS).
-		wp_enqueue_code_editor( [ 'type' => 'application/x-httpd-php' ] );
-	}
 
 	public function get_admin_css(): array {
 		return [ SKMT_ASSETS_URL . 'admin/css/modules/files.css' ];

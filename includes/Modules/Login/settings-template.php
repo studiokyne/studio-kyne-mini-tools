@@ -26,10 +26,12 @@ $logo_id  = absint( $branding['logo_id'] ?? 0 );
 $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 ?>
 
-<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form">
+<form id="skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form skmt-module-form">
 	<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
+
+	<div class="skmt-module-form__scroll">
 
 	<!-- ============================================================
 		 LAYOUT — PANNEAU IMAGE
@@ -317,10 +319,6 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 		</div>
 	</div>
 
-	<div class="skmt-page__footer">
-		<button type="submit" class="skmt-btn skmt-btn--primary">
-			<?php esc_html_e( 'Enregistrer les réglages', 'studio-kyne-mini-tools' ); ?>
-		</button>
-	</div>
+	</div><!-- .skmt-module-form__scroll -->
 
 </form>

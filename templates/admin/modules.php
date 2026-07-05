@@ -13,7 +13,7 @@ $modules = $this->modules->get_all();
 		</div>
 	</div>
 
-	<div>
+	<div class="skmt-page__scroll">
 		<form id="skmt-modules-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="skmt-form">
 			<?php wp_nonce_field( 'skmt_update_modules', 'skmt_modules_nonce' ); ?>
 			<input type="hidden" name="action" value="skmt_update_modules">

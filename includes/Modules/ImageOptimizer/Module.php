@@ -25,6 +25,7 @@ class Module extends AbstractModule {
 	private ImageProcessor $processor;
 	private BulkProcessor $bulk;
 	private MediaLibrary $media_library;
+	private SvgHandler $svg;
 
 	/**
 	 * Réglages actifs du module (cache mémoire).
@@ -54,6 +55,10 @@ class Module extends AbstractModule {
 		$this->media_library = new MediaLibrary( $this, $this->processor );
 		$this->media_library->init();
 
+		// Support SVG sécurisé (ne branche ses filtres que si activé).
+		$this->svg = new SvgHandler( $this->settings );
+		$this->svg->init();
+
 		// Hooks d'upload
 		add_filter( 'wp_handle_upload', [ $this, 'handle_upload' ] );
 		add_filter( 'wp_generate_attachment_metadata', [ $this, 'optimize_attachment_sizes' ], 10, 2 );
@@ -62,6 +67,7 @@ class Module extends AbstractModule {
 		add_action( 'add_attachment', [ $this, 'generate_alt_text' ] );
 
 		// Bulk AJAX
+		add_action( 'wp_ajax_skmt_image_optimizer_bulk_scan', [ $this, 'ajax_bulk_scan' ] );
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk', [ $this, 'ajax_bulk_start' ] );
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk_status', [ $this, 'ajax_bulk_status' ] );
 
@@ -83,6 +89,8 @@ class Module extends AbstractModule {
 			'strip_exif'         => true,
 			'generate_alt'       => true,
 			'keep_original'      => false,
+			'svg_upload'         => false,
+			'svg_roles'          => [ 'administrator' ],
 		] );
 	}
 
@@ -98,11 +106,24 @@ class Module extends AbstractModule {
 			'strip_exif'         => isset( $settings['strip_exif'] ),
 			'generate_alt'       => isset( $settings['generate_alt'] ),
 			'keep_original'      => isset( $settings['keep_original'] ),
+			'svg_upload'         => isset( $settings['svg_upload'] ),
+			'svg_roles'          => $this->sanitize_roles( $settings['svg_roles'] ?? [] ),
 		];
 
 		$this->settings = $sanitized;
 
 		return $this->save_module_settings( $sanitized );
+	}
+
+	/**
+	 * Ne conserve que des slugs de rôles WordPress réellement existants.
+	 */
+	private function sanitize_roles( $roles ): array {
+		if ( ! is_array( $roles ) ) {
+			return [];
+		}
+		$valid = array_keys( wp_roles()->get_names() );
+		return array_values( array_intersect( array_map( 'sanitize_key', $roles ), $valid ) );
 	}
 
 	/* ================================================================
@@ -125,6 +146,7 @@ class Module extends AbstractModule {
 		return [
 			'bulkState' => $this->bulk->get_state(),
 			'i18n' => [
+				'bulkScanning'  => __( 'Analyse…', 'studio-kyne-mini-tools' ),
 				'bulkRunning'   => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
 				'bulkProcessed' => __( 'Traité :', 'studio-kyne-mini-tools' ),
 				'bulkRemaining' => __( 'Restant :', 'studio-kyne-mini-tools' ),
@@ -540,6 +562,10 @@ class Module extends AbstractModule {
 	/* ================================================================
 	 * DÉLÉGATION BULK (hooks cron + AJAX)
 	 * ================================================================ */
+
+	public function ajax_bulk_scan(): void {
+		$this->bulk->ajax_scan();
+	}
 
 	public function ajax_bulk_start(): void {
 		$this->bulk->ajax_start( self::BATCH_SIZE );

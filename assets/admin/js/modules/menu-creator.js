@@ -79,6 +79,26 @@
       }
     });
 
+    // Fermer les multi-selects rôles/utilisateurs (inclure/exclure) au clic
+    // en dehors — capture phase pour résister aux stopPropagation de WP.
+    document.addEventListener("mousedown", function (e) {
+      ["include", "exclude"].forEach(function (key) {
+        var w = ms[key];
+        if (w && w.open && w.container && !w.container.contains(e.target)) {
+          w.close();
+        }
+      });
+    }, true);
+
+    // …et avec Échap.
+    document.addEventListener("keydown", function (e) {
+      if (e.key !== "Escape") return;
+      ["include", "exclude"].forEach(function (key) {
+        var w = ms[key];
+        if (w && w.open) w.close();
+      });
+    });
+
     renderProfilesSidebar();
     bindProfilesSidebar();
     showPlaceholder();
@@ -891,14 +911,16 @@
       '<input type="text" class="skmt-input" id="skmt-wl-item-label" value="' + esc(item.label || "") + '" ' +
         'placeholder="' + esc(item._wpLabel || prettifySlug(item.slug)) + '">',
       "Laisser vide pour conserver le label d'origine.");
-    if (!isChild) {
-      html += (
-        '<div class="skmt-wl-settings-row skmt-wl-settings-row--inline">' +
-          '<div class="skmt-wl-settings-row__label"><span>Icône</span></div>' +
-          buildIconBtnHtml(item) +
-        "</div>"
-      );
-    }
+    html += (
+      '<div class="skmt-wl-settings-row skmt-wl-settings-row--inline">' +
+        '<div class="skmt-wl-settings-row__label"><span>Icône</span>' +
+          (isChild
+            ? '<p class="skmt-form__help">Appliquée uniquement lorsque cet élément devient un menu de premier niveau (rôles à capacités réduites, ex. « Profil » pour les auteurs).</p>'
+            : "") +
+        "</div>" +
+        buildIconBtnHtml(item) +
+      "</div>"
+    );
     html += settingsRow("Visible",
       '<label class="skmt-toggle">' +
         '<input type="checkbox" id="skmt-wl-item-visible"' + (item.visible !== false ? " checked" : "") + '>' +
@@ -1224,56 +1246,84 @@
   function createMultiSelect(containerId, initialSelected) {
     var container = document.getElementById(containerId);
     if (!container) return null;
-    var widget = { selected: initialSelected || [], results: [], open: false, timer: null };
+    var widget = { selected: initialSelected || [], results: [], open: false, timer: null, container: container };
+
+    // Structure persistante. L'input n'est JAMAIS recréé : le rebuild complet
+    // de l'ancienne version détruisait l'input focalisé, ce qui déclenchait un
+    // blur → le dropdown se refermait aussitôt (« pas le temps de cliquer »).
+    container.innerHTML =
+      '<div class="skmt-wl-ms-tags"></div>' +
+      '<div class="skmt-wl-ms-dropdown" style="display:none"></div>';
+    var tagsEl     = container.querySelector(".skmt-wl-ms-tags");
+    var dropdownEl = container.querySelector(".skmt-wl-ms-dropdown");
+    var input      = document.createElement("input");
+    input.type        = "text";
+    input.className   = "skmt-wl-ms-input";
+    input.placeholder = "Rechercher…";
+    tagsEl.appendChild(input);
+
     widget.getValue = function () {
       return {
         roles: widget.selected.filter(function (s) { return s.type === "role"; }).map(function (s) { return s.rawId; }),
         users: widget.selected.filter(function (s) { return s.type === "user"; }).map(function (s) { return s.rawId; }),
       };
     };
-    widget.render = function () {
-      var chips = widget.selected.map(function (s) {
-        return '<span class="skmt-wl-chip">' + esc(s.label) +
-          '<button type="button" class="skmt-wl-chip__remove" data-id="' + esc(s.id) + '">' +
-            (L.x || "×") + "</button></span>";
-      }).join("");
-      container.innerHTML = (
-        '<div class="skmt-wl-ms-tags">' + chips +
-          '<input type="text" class="skmt-wl-ms-input" placeholder="Rechercher…">' +
-        "</div>" +
-        '<div class="skmt-wl-ms-dropdown" style="display:' + (widget.open ? "" : "none") + '">' +
-          msDropdownHtml(widget) + "</div>"
-      );
-      var input = container.querySelector(".skmt-wl-ms-input");
-      if (input) {
-        input.addEventListener("focus",  function () { widget.open = true;  widget.search(""); });
-        input.addEventListener("blur",   function () { setTimeout(function () { widget.open = false; widget.render(); }, 200); });
-        input.addEventListener("input",  function () {
-          clearTimeout(widget.timer);
-          widget.timer = setTimeout(function () { widget.search(input.value); }, 300);
-        });
+
+    function renderChips() {
+      Array.prototype.slice.call(tagsEl.querySelectorAll(".skmt-wl-chip")).forEach(function (c) { c.remove(); });
+      widget.selected.forEach(function (s) {
+        var chip = document.createElement("span");
+        chip.className = "skmt-wl-chip";
+        chip.innerHTML = esc(s.label) +
+          '<button type="button" class="skmt-wl-chip__remove" data-id="' + esc(s.id) + '">' + (L.x || "×") + "</button>";
+        tagsEl.insertBefore(chip, input);
+      });
+    }
+
+    function renderDropdown() {
+      dropdownEl.innerHTML = msDropdownHtml(widget);
+      dropdownEl.style.display = widget.open ? "" : "none";
+    }
+
+    widget.render = function () { renderChips(); renderDropdown(); };
+    widget.close  = function () { if (!widget.open) return; widget.open = false; renderDropdown(); };
+
+    // Délégation : chips et options sont recréés à chaque rendu, on écoute
+    // donc au niveau du container (une seule fois, pas de fuite de listeners).
+    container.addEventListener("mousedown", function (e) {
+      var rm = e.target.closest(".skmt-wl-chip__remove");
+      if (rm) {
+        e.preventDefault();
+        widget.selected = widget.selected.filter(function (s) { return s.id !== rm.dataset.id; });
+        setDirty(true);
+        widget.render();
+        input.focus();
+        return;
       }
-      container.querySelectorAll(".skmt-wl-chip__remove").forEach(function (btn) {
-        btn.addEventListener("mousedown", function (e) {
-          e.preventDefault();
-          widget.selected = widget.selected.filter(function (s) { return s.id !== btn.dataset.id; });
+      var opt = e.target.closest(".skmt-wl-ms-option");
+      if (opt) {
+        e.preventDefault(); // conserve le focus de l'input
+        if (!widget.selected.find(function (s) { return s.id === opt.dataset.id; })) {
+          var rawId = opt.dataset.type === "user" ? parseInt(opt.dataset.raw, 10) : opt.dataset.raw;
+          widget.selected.push({ id: opt.dataset.id, rawId: rawId, label: opt.dataset.label, type: opt.dataset.type });
           setDirty(true);
-          widget.render();
-        });
-      });
-      container.querySelectorAll(".skmt-wl-ms-option").forEach(function (opt) {
-        opt.addEventListener("mousedown", function (e) {
-          e.preventDefault();
-          if (!widget.selected.find(function (s) { return s.id === opt.dataset.id; })) {
-            var rawId = opt.dataset.type === "user" ? parseInt(opt.dataset.raw, 10) : opt.dataset.raw;
-            widget.selected.push({ id: opt.dataset.id, rawId: rawId, label: opt.dataset.label, type: opt.dataset.type });
-            setDirty(true);
-          }
-          widget.open = false;
-          widget.render();
-        });
-      });
-    };
+        }
+        widget.render(); // reste ouvert pour permettre les ajouts multiples
+        input.focus();
+        return;
+      }
+      // Clic dans la zone de tags (hors chip) → focus l'input.
+      if (e.target === tagsEl || e.target === container) {
+        input.focus();
+      }
+    });
+
+    input.addEventListener("focus", function () { widget.open = true; widget.search(input.value || ""); });
+    input.addEventListener("click", function () { if (!widget.open) { widget.open = true; widget.search(input.value || ""); } });
+    input.addEventListener("input", function () {
+      clearTimeout(widget.timer);
+      widget.timer = setTimeout(function () { widget.search(input.value); }, 300);
+    });
     widget.search = function (q) {
       var wpRoles = skmtAdmin.wpRoles || {};
       var res = [];

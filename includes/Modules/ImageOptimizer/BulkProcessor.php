@@ -94,6 +94,26 @@ class BulkProcessor {
 	}
 
 	/**
+	 * Scan à la demande : compte les images restantes et estime les gains,
+	 * sans rien lancer. Alimente l'UI « Scanner la médiathèque ».
+	 */
+	public function ajax_scan(): void {
+		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$preview = $this->get_preview();
+
+		wp_send_json_success( [
+			'remaining'             => (int) ( $preview['remaining'] ?? 0 ),
+			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
+			'avg_saved_per_image'   => (int) ( $preview['avg_saved_per_image'] ?? 0 ),
+		] );
+	}
+
+	/**
 	 * Retourne l'état courant du bulk (polling JS).
 	 */
 	public function ajax_status( int $batch_size ): void {

@@ -74,6 +74,55 @@
   background: var(--skmt-n50);
 }
 
+/*
+ * Vues « pleine hauteur » : l'entête reste fixe et seul le corps scrolle.
+ * Déclencheurs :
+ *   - .skmt-module-form  → modules formulaire (Image, Sécurité, Connexion, Marque Blanche)
+ *   - .skmt-page__scroll → pages admin (Réglages, Modules)
+ *   - .skmt-files        → module Fichiers
+ * Même pattern :has() que Base de données (.skmt-db) et Créateur de menu (.skmt-mc-editor).
+ */
+.skmt-admin-main:has(.skmt-module-form),
+.skmt-admin-main:has(.skmt-page__scroll),
+.skmt-admin-main:has(.skmt-files) {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: 0;
+}
+
+.skmt-admin-main:has(.skmt-module-form) .skmt-page,
+.skmt-admin-main:has(.skmt-page__scroll) .skmt-page,
+.skmt-admin-main:has(.skmt-files) .skmt-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.skmt-admin-main:has(.skmt-module-form) .skmt-page__header,
+.skmt-admin-main:has(.skmt-page__scroll) .skmt-page__header,
+.skmt-admin-main:has(.skmt-files) .skmt-page__header {
+  position: static;
+  flex-shrink: 0;
+}
+
+.skmt-module-form {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.skmt-module-form__scroll,
+.skmt-page__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .skmt-section {
   margin-bottom: 0;
 }
