@@ -500,10 +500,8 @@ class Admin {
 		if ( 'settings' === $tab && isset( $_POST['skmt_global'] ) ) {
 			$global = [
 				'update_channel' => isset( $_POST['skmt_global']['update_channel'] ) ? sanitize_key( $_POST['skmt_global']['update_channel'] ) : 'stable',
-				'auto_updates'   => ! empty( $_POST['skmt_global']['auto_updates'] ),
 			];
 			$this->settings->set( 'global', $global );
-			$this->ensure_auto_updates_enabled();
 		}
 
 		// Réglages d'un module
@@ -677,7 +675,7 @@ class Admin {
 		}
 
 		// Reset réglages globaux
-		$this->settings->set( 'global', [ 'update_channel' => 'stable', 'auto_updates' => false ] );
+		$this->settings->set( 'global', [ 'update_channel' => 'stable' ] );
 
 		// Reset les options de chaque module enregistré
 		foreach ( $this->modules->get_all() as $module_id => $module ) {
@@ -784,35 +782,6 @@ class Admin {
 			'skmt_notice_type' => 'success',
 		], admin_url( 'admin.php' ) ) );
 		exit;
-	}
-
-	/* ================================================================
-	 * AUTO-UPDATES
-	 * ================================================================ */
-
-	/**
-	 * Synchronise l'option WordPress auto_update_plugins avec le réglage SKMT.
-	 */
-	public function ensure_auto_updates_enabled(): void {
-		$plugin_file  = plugin_basename( SKMT_PLUGIN_FILE );
-		$auto_updates = (array) get_site_option( 'auto_update_plugins', [] );
-		$global       = $this->settings->get( 'global', [] );
-		$enabled      = ! empty( $global['auto_updates'] );
-
-		if ( $enabled ) {
-			if ( in_array( $plugin_file, $auto_updates, true ) ) {
-				return;
-			}
-			$auto_updates[] = $plugin_file;
-			update_site_option( 'auto_update_plugins', array_values( array_unique( $auto_updates ) ) );
-			return;
-		}
-
-		if ( ! in_array( $plugin_file, $auto_updates, true ) ) {
-			return;
-		}
-
-		update_site_option( 'auto_update_plugins', array_values( array_diff( $auto_updates, [ $plugin_file ] ) ) );
 	}
 
 	/* ================================================================

@@ -67,14 +67,26 @@ class Updater {
 		// Comparer les versions
 		$has_update = $this->compare_versions( SKMT_VERSION, $remote['version'] );
 
+		$item = (object) [
+			'slug'         => dirname( $plugin_file ),
+			'plugin'       => $plugin_file,
+			'new_version'  => $has_update ? $remote['version'] : SKMT_VERSION,
+			'url'          => $remote['url'],
+			'package'      => $remote['download_url'],
+			'icons'        => [],
+			'banners'      => [],
+			'tested'       => get_bloginfo( 'version' ),
+			'requires'     => '5.8',
+			'requires_php' => '7.4',
+		];
+
 		if ( $has_update ) {
-			$transient->response[ $plugin_file ] = (object) [
-				'slug'        => dirname( $plugin_file ),
-				'plugin'      => $plugin_file,
-				'new_version' => $remote['version'],
-				'url'         => $remote['url'],
-				'package'     => $remote['download_url'],
-			];
+			$transient->response[ $plugin_file ] = $item;
+		} else {
+			// Aucune mise à jour, mais on déclare la source connue :
+			// WordPress affiche alors la colonne « Mises à jour auto »
+			// et peut gérer l'auto-update natif de ce plugin.
+			$transient->no_update[ $plugin_file ] = $item;
 		}
 
 		return $transient;

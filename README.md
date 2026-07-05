@@ -33,6 +33,7 @@ Dans Reglages > Mises a jour GitHub :
 - Suppression EXIF
 - Alt text auto
 - Optimisation en masse
+- Upload SVG securise (assainissement liste blanche, autorise par role)
 
 ### Security
 
@@ -43,6 +44,8 @@ Dans Reglages > Mises a jour GitHub :
 ### White Label
 
 - Nettoyage de la barre d'admin et du footer
+- Epuration de la page de profil (masquage des sections superflues)
+- Avatars locaux (upload via mediatheque, prioritaire sur Gravatar)
 - Profils de menu (stockage/resolution par utilisateur, role ou global)
 
 ### Menu Creator

@@ -33,7 +33,6 @@ class Activator {
 		$default_settings = [
 			'global'  => [
 				'update_channel' => 'stable',
-				'auto_updates'   => false,
 			],
 			'modules' => $modules_defaults,
 		];
