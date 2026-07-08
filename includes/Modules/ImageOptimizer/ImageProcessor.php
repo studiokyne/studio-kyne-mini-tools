@@ -58,9 +58,11 @@ class ImageProcessor {
 		}
 
 		if ( $has_gd ) {
-			$gd_info = gd_info();
-			$gd_avif = ! empty( $gd_info['AVIF Support'] ) && function_exists( 'imageavif' );
-			$gd_webp = ! empty( $gd_info['WebP Support'] ) && function_exists( 'imagewebp' );
+			// On sonde par un vrai encodage plutôt que de se fier à gd_info() :
+			// imagewebp()/imageavif() existent toujours en PHP 8.1+ même sans la
+			// lib sous-jacente, et gd_info() peut mentir sur certains builds.
+			$gd_avif = $this->gd_can_encode( 'avif' );
+			$gd_webp = $this->gd_can_encode( 'webp' );
 		}
 
 		$this->capabilities = [
@@ -95,6 +97,36 @@ class ImageProcessor {
 			return is_string( $blob ) && '' !== $blob;
 		} catch ( \Throwable $e ) {
 			return false;
+		}
+	}
+
+	/**
+	 * Vérifie que GD peut réellement *encoder* un format, par un vrai encodage
+	 * en mémoire. imagewebp()/imageavif() existent toujours en PHP 8.1+ même si
+	 * la lib (libwebp/libavif) n'est pas compilée : seul un encodage réel tranche.
+	 */
+	private function gd_can_encode( string $format ): bool {
+		$fn = 'webp' === $format ? 'imagewebp' : ( 'avif' === $format ? 'imageavif' : '' );
+
+		if ( '' === $fn || ! function_exists( $fn ) || ! function_exists( 'imagecreatetruecolor' ) ) {
+			return false;
+		}
+
+		$image = imagecreatetruecolor( 4, 4 );
+		if ( false === $image ) {
+			return false;
+		}
+
+		try {
+			ob_start();
+			$ok   = $fn( $image, null, 80 );
+			$blob = ob_get_clean();
+
+			return $ok && is_string( $blob ) && '' !== $blob;
+		} catch ( \Throwable $e ) {
+			return false;
+		} finally {
+			imagedestroy( $image );
 		}
 	}
 
