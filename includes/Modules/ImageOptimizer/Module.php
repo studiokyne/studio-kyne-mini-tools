@@ -59,8 +59,8 @@ class Module extends AbstractModule {
 		$this->svg = new SvgHandler( $this->settings );
 		$this->svg->init();
 
-		// Hooks d'upload
-		add_filter( 'wp_handle_upload', [ $this, 'handle_upload' ] );
+		// Hook d'upload : tout le pipeline (original + miniatures) passe par
+		// wp_generate_attachment_metadata, qui mesure la vraie taille d'origine.
 		add_filter( 'wp_generate_attachment_metadata', [ $this, 'optimize_attachment_sizes' ], 10, 2 );
 
 		// Alt text automatique
@@ -215,35 +215,17 @@ class Module extends AbstractModule {
 	}
 
 	/* ================================================================
-	 * HOOKS D'UPLOAD
+	 * HOOK D'UPLOAD
 	 * ================================================================ */
 
 	/**
-	 * Hook wp_handle_upload : optimise le fichier original immédiatement après upload.
-	 */
-	public function handle_upload( array $upload ): array {
-		if ( ! $this->settings['optimize_on_upload'] ) {
-			return $upload;
-		}
-
-		$file_path = $upload['file'] ?? '';
-		$file_type = $upload['type'] ?? '';
-
-		if ( empty( $file_path ) || ! $this->processor->is_supported_mime( $file_type ) ) {
-			return $upload;
-		}
-
-		if ( $this->processor->is_animated( $file_path, $file_type ) ) {
-			return $upload;
-		}
-
-		$this->processor->optimize( $file_path );
-
-		return $upload;
-	}
-
-	/**
 	 * Hook wp_generate_attachment_metadata : optimise + convertit original et miniatures.
+	 *
+	 * Unique point d'optimisation à l'upload : il s'exécute après la génération
+	 * des miniatures et mesure la taille réelle du fichier d'origine. Ne PAS
+	 * pré-optimiser le fichier dans wp_handle_upload — sinon la mesure « avant »
+	 * porte sur un fichier déjà compressé et le gain affiché est nul (l'image est
+	 * quand même marquée « optimisée »).
 	 */
 	public function optimize_attachment_sizes( array $metadata, int $attachment_id ): array {
 		if ( ! $this->settings['optimize_on_upload'] ) {
