@@ -44,6 +44,34 @@ class Updater {
 
 		add_filter( 'pre_set_site_transient_update_plugins', [ $this, 'check_update' ] );
 		add_filter( 'plugins_api', [ $this, 'plugin_info' ], 10, 3 );
+
+		// Après une mise à jour du plugin, purger le cache de version distante
+		// (12 h) et le transient WP des mises à jour, sinon la pastille « mise à
+		// jour disponible » persiste jusqu'à une vérification manuelle.
+		add_action( 'upgrader_process_complete', [ $this, 'purge_cache_after_update' ], 10, 2 );
+	}
+
+	/**
+	 * Vide les caches de mise à jour après l'installation d'une nouvelle version.
+	 *
+	 * @param object $upgrader Instance de l'upgrader (non utilisée).
+	 * @param array  $options  Contexte de l'opération.
+	 */
+	public function purge_cache_after_update( $upgrader, array $options ): void {
+		if ( ( $options['action'] ?? '' ) !== 'update' || ( $options['type'] ?? '' ) !== 'plugin' ) {
+			return;
+		}
+
+		$our_plugin = plugin_basename( SKMT_PLUGIN_FILE );
+		$updated    = (array) ( $options['plugins'] ?? [] );
+
+		if ( ! in_array( $our_plugin, $updated, true ) ) {
+			return;
+		}
+
+		delete_transient( $this->transient_key . '_stable' );
+		delete_transient( $this->transient_key . '_dev' );
+		delete_site_transient( 'update_plugins' );
 	}
 
 	/**
