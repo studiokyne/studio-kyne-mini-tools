@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Constantes de base
-define( 'SKMT_VERSION', '1.0.9-dev.7' );
+define( 'SKMT_VERSION', '1.0.9' );
 define( 'SKMT_PLUGIN_FILE', __FILE__ );
 define( 'SKMT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SKMT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );

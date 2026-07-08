@@ -62,7 +62,7 @@ jobs:
           set -euo pipefail
 
           sed -E -i "s/^ \* Version:[[:space:]]+.*/ * Version:     ${VERSION}/" studio-kyne-mini-tools.php
-          sed -E -i "s/(define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*')[0-9]+\.[0-9]+\.[0-9]+/\1${VERSION}/" studio-kyne-mini-tools.php
+          sed -E -i "s/(define[[:space:]]*\([[:space:]]*'SKMT_VERSION'[[:space:]]*,[[:space:]]*')[0-9]+\.[0-9]+\.[0-9]+(-[a-z0-9.]*)?/\1${VERSION}/" studio-kyne-mini-tools.php
 
       - name: Commit release version
         env:
