@@ -39,32 +39,40 @@ class ImageProcessor {
 
 		$has_imagick = extension_loaded( 'imagick' );
 		$has_gd      = extension_loaded( 'gd' );
-		$can_avif    = false;
-		$can_webp    = false;
+
+		// Capacité d'encodage par moteur ET par format. Indispensable car un
+		// format peut être *enregistré* (queryFormats) sans délégué d'encodage
+		// réel : la conversion échoue alors à l'exécution (« Unable to set image
+		// format », « no decode delegate »). On teste donc chaque paire par un
+		// vrai encodage 1×1, et on route ensuite la conversion vers le moteur qui
+		// fonctionne réellement (l'un peut savoir, l'autre non).
+		$imagick_avif = false;
+		$imagick_webp = false;
+		$gd_avif      = false;
+		$gd_webp      = false;
 
 		if ( $has_imagick ) {
-			// queryFormats() liste les formats *enregistrés*, mais un format peut
-			// l'être sans que le délégué d'encodage (libheif/libaom, libwebp) soit
-			// réellement présent : la conversion échoue alors à l'exécution
-			// (« Unable to set image format », « no decode delegate »). On vérifie
-			// donc la capacité par un vrai encodage 1×1 plutôt que de s'y fier.
-			$formats  = \Imagick::queryFormats();
-			$can_avif = in_array( 'AVIF', $formats, true ) && $this->imagick_can_encode( 'avif' );
-			$can_webp = in_array( 'WEBP', $formats, true ) && $this->imagick_can_encode( 'webp' );
+			$formats      = \Imagick::queryFormats();
+			$imagick_avif = in_array( 'AVIF', $formats, true ) && $this->imagick_can_encode( 'avif' );
+			$imagick_webp = in_array( 'WEBP', $formats, true ) && $this->imagick_can_encode( 'webp' );
 		}
 
 		if ( $has_gd ) {
-			$gd_info  = gd_info();
-			$can_avif = $can_avif || ( $gd_info['AVIF Support'] ?? false );
-			$can_webp = $can_webp || ( $gd_info['WebP Support'] ?? false );
+			$gd_info = gd_info();
+			$gd_avif = ! empty( $gd_info['AVIF Support'] ) && function_exists( 'imageavif' );
+			$gd_webp = ! empty( $gd_info['WebP Support'] ) && function_exists( 'imagewebp' );
 		}
 
 		$this->capabilities = [
-			'imagick' => $has_imagick,
-			'gd'      => $has_gd,
-			'avif'    => $can_avif,
-			'webp'    => $can_webp,
-			'editor'  => $has_imagick ? 'imagick' : ( $has_gd ? 'gd' : 'none' ),
+			'imagick'      => $has_imagick,
+			'gd'           => $has_gd,
+			'avif'         => $imagick_avif || $gd_avif,
+			'webp'         => $imagick_webp || $gd_webp,
+			'imagick_avif' => $imagick_avif,
+			'imagick_webp' => $imagick_webp,
+			'gd_avif'      => $gd_avif,
+			'gd_webp'      => $gd_webp,
+			'editor'       => $has_imagick ? 'imagick' : ( $has_gd ? 'gd' : 'none' ),
 		];
 
 		return $this->capabilities;
@@ -245,9 +253,15 @@ class ImageProcessor {
 
 		$cap = $this->get_capabilities();
 
-		if ( $cap['imagick'] ) {
+		// Router vers le moteur qui sait réellement encoder CE format. Ne pas se
+		// contenter de « Imagick d'abord » : sur certains serveurs Imagick a le
+		// format enregistré mais pas le délégué, alors que GD sait l'encoder.
+		$imagick_ok = 'avif' === $target_format ? $cap['imagick_avif'] : $cap['imagick_webp'];
+		$gd_ok      = 'avif' === $target_format ? $cap['gd_avif'] : $cap['gd_webp'];
+
+		if ( $imagick_ok ) {
 			$ok = $this->convert_with_imagick( $file_path, $output_path, $target_format );
-		} elseif ( $cap['gd'] ) {
+		} elseif ( $gd_ok ) {
 			$ok = $this->convert_with_gd( $file_path, $output_path, $target_format );
 		} else {
 			return false;
@@ -297,20 +311,47 @@ class ImageProcessor {
 		}
 	}
 
+	/**
+	 * Convertit via l'extension GD *directement* (imagewebp/imageavif).
+	 *
+	 * On n'utilise pas wp_get_image_editor() ici : quand Imagick est présent,
+	 * WordPress renvoie l'éditeur Imagick — donc un serveur dont le délégué
+	 * Imagick est cassé mais dont GD sait encoder ne serait jamais servi par GD.
+	 * On appelle donc GD sans intermédiaire.
+	 */
 	private function convert_with_gd( string $source, string $output, string $format ): bool {
-		$editor = wp_get_image_editor( $source );
-
-		if ( is_wp_error( $editor ) ) {
-			$this->log_error( 'convert/gd', $source, $editor );
+		if ( ! function_exists( 'imagecreatefromstring' ) ) {
 			return false;
 		}
 
-		$editor->set_quality( (int) ( $this->settings['quality'] ?? 75 ) );
-		$mime   = 'webp' === $format ? 'image/webp' : 'image/avif';
-		$result = $editor->save( $output, $mime );
+		$data  = @file_get_contents( $source );
+		$image = false !== $data ? @imagecreatefromstring( $data ) : false;
 
-		if ( is_wp_error( $result ) ) {
-			$this->log_error( 'convert/gd', $source, $result );
+		if ( false === $image ) {
+			$this->log_error( 'convert/gd', $source, 'imagecreatefromstring a échoué' );
+			return false;
+		}
+
+		if ( function_exists( 'imagepalettetotruecolor' ) ) {
+			imagepalettetotruecolor( $image );
+		}
+		imagealphablending( $image, false );
+		imagesavealpha( $image, true );
+
+		$quality = (int) ( $this->settings['quality'] ?? 75 );
+
+		if ( 'webp' === $format ) {
+			$ok = function_exists( 'imagewebp' ) && imagewebp( $image, $output, $quality );
+		} elseif ( 'avif' === $format ) {
+			$ok = function_exists( 'imageavif' ) && imageavif( $image, $output, $quality );
+		} else {
+			$ok = false;
+		}
+
+		imagedestroy( $image );
+
+		if ( ! $ok ) {
+			$this->log_error( 'convert/gd', $source, 'encodage ' . $format . ' via GD a échoué' );
 			return false;
 		}
 
