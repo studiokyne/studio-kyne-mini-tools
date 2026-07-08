@@ -139,8 +139,9 @@ class ImageProcessor {
 
 			$imagick->setImageCompressionQuality( (int) ( $this->settings['quality'] ?? 75 ) );
 			$imagick->writeImage( $file_path );
-		} catch ( \Exception $e ) {
-			// Ne pas bloquer l'upload
+		} catch ( \Throwable $e ) {
+			// Ne pas bloquer l'upload, mais tracer l'erreur pour diagnostic.
+			$this->log_error( 'optimize/imagick', $file_path, $e );
 		} finally {
 			if ( $imagick instanceof \Imagick ) {
 				$imagick->clear();
@@ -153,6 +154,7 @@ class ImageProcessor {
 		$editor = wp_get_image_editor( $file_path );
 
 		if ( is_wp_error( $editor ) ) {
+			$this->log_error( 'optimize/gd', $file_path, $editor );
 			return;
 		}
 
@@ -165,7 +167,11 @@ class ImageProcessor {
 		}
 
 		$editor->set_quality( (int) ( $this->settings['quality'] ?? 75 ) );
-		$editor->save( $file_path );
+
+		$saved = $editor->save( $file_path );
+		if ( is_wp_error( $saved ) ) {
+			$this->log_error( 'optimize/gd', $file_path, $saved );
+		}
 	}
 
 	/* ================================================================
@@ -255,7 +261,8 @@ class ImageProcessor {
 			$imagick->writeImage( $output );
 
 			return true;
-		} catch ( \Exception $e ) {
+		} catch ( \Throwable $e ) {
+			$this->log_error( 'convert/imagick', $source, $e );
 			return false;
 		} finally {
 			if ( $imagick instanceof \Imagick ) {
@@ -269,6 +276,7 @@ class ImageProcessor {
 		$editor = wp_get_image_editor( $source );
 
 		if ( is_wp_error( $editor ) ) {
+			$this->log_error( 'convert/gd', $source, $editor );
 			return false;
 		}
 
@@ -276,7 +284,12 @@ class ImageProcessor {
 		$mime   = 'webp' === $format ? 'image/webp' : 'image/avif';
 		$result = $editor->save( $output, $mime );
 
-		return ! is_wp_error( $result );
+		if ( is_wp_error( $result ) ) {
+			$this->log_error( 'convert/gd', $source, $result );
+			return false;
+		}
+
+		return true;
 	}
 
 	/* ================================================================
@@ -316,7 +329,8 @@ class ImageProcessor {
 				$imagick     = new \Imagick( $file_path );
 				$is_animated = $imagick->getNumberImages() > 1;
 				return $is_animated;
-			} catch ( \Exception $e ) {
+			} catch ( \Throwable $e ) {
+				$this->log_error( 'is_animated/imagick', $file_path, $e );
 				return false;
 			} finally {
 				if ( $imagick instanceof \Imagick ) {
@@ -391,5 +405,35 @@ class ImageProcessor {
 		$alt = preg_replace( '/-\d+x\d+$/', '', $filename );
 		$alt = str_replace( [ '-', '_', '.' ], ' ', (string) $alt );
 		return ucfirst( trim( $alt ) );
+	}
+
+	/**
+	 * Trace une erreur de traitement image dans le log PHP.
+	 *
+	 * Les échecs Imagick/GD étaient jusqu'ici avalés en silence : impossible de
+	 * savoir pourquoi une image ne se compressait/convertissait pas. On les logge
+	 * désormais (préfixe grep-able). Sur les hébergements qui redirigent error_log
+	 * vers stderr, le message apparaît directement dans les logs du conteneur,
+	 * même avec WP_DEBUG désactivé.
+	 *
+	 * @param string                     $context   Étape concernée (ex. « convert/imagick »).
+	 * @param string                     $file_path Fichier en cause.
+	 * @param \Throwable|\WP_Error|string $error    Exception, WP_Error ou message brut.
+	 */
+	private function log_error( string $context, string $file_path, $error ): void {
+		if ( $error instanceof \Throwable ) {
+			$message = $error->getMessage();
+		} elseif ( is_wp_error( $error ) ) {
+			$message = $error->get_error_message();
+		} else {
+			$message = (string) $error;
+		}
+
+		error_log( sprintf(
+			'[SKMT Image Optimizer] %s a échoué pour %s : %s',
+			$context,
+			$file_path,
+			'' !== $message ? $message : 'erreur inconnue'
+		) );
 	}
 }
