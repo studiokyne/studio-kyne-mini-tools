@@ -43,9 +43,14 @@ class ImageProcessor {
 		$can_webp    = false;
 
 		if ( $has_imagick ) {
+			// queryFormats() liste les formats *enregistrés*, mais un format peut
+			// l'être sans que le délégué d'encodage (libheif/libaom, libwebp) soit
+			// réellement présent : la conversion échoue alors à l'exécution
+			// (« Unable to set image format », « no decode delegate »). On vérifie
+			// donc la capacité par un vrai encodage 1×1 plutôt que de s'y fier.
 			$formats  = \Imagick::queryFormats();
-			$can_avif = in_array( 'AVIF', $formats, true );
-			$can_webp = in_array( 'WEBP', $formats, true );
+			$can_avif = in_array( 'AVIF', $formats, true ) && $this->imagick_can_encode( 'avif' );
+			$can_webp = in_array( 'WEBP', $formats, true ) && $this->imagick_can_encode( 'webp' );
 		}
 
 		if ( $has_gd ) {
@@ -63,6 +68,26 @@ class ImageProcessor {
 		];
 
 		return $this->capabilities;
+	}
+
+	/**
+	 * Vérifie qu'Imagick peut réellement *encoder* un format donné, en tentant
+	 * un encodage d'une image 1×1. Contourne les builds où le format est
+	 * enregistré (queryFormats) mais dont le délégué d'encodage est absent/cassé.
+	 */
+	private function imagick_can_encode( string $format ): bool {
+		try {
+			$probe = new \Imagick();
+			$probe->newImage( 1, 1, new \ImagickPixel( 'white' ) );
+			$probe->setImageFormat( $format );
+			$blob = $probe->getImageBlob();
+			$probe->clear();
+			$probe->destroy();
+
+			return is_string( $blob ) && '' !== $blob;
+		} catch ( \Throwable $e ) {
+			return false;
+		}
 	}
 
 	/**
