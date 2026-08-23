@@ -35,6 +35,14 @@ abstract class AbstractModule implements ModuleInterface {
 	/**
 	 * Lit les réglages du module depuis la base, fusionnés avec les defaults.
 	 *
+	 * La fusion est RÉCURSIVE. wp_parse_args() ne fusionne qu'au premier
+	 * niveau : dès qu'une clé existe en base, sa valeur remplace le défaut en
+	 * bloc. Pour les modules à réglages imbriqués (Sécurité, Connexion, Marque
+	 * blanche), toute sous-clé ajoutée dans une version ultérieure serait donc
+	 * absente des installations existantes tant que l'utilisateur n'a pas
+	 * rouvert l'écran et re-sauvegardé — un nouveau réglage dont le défaut vaut
+	 * true arriverait silencieusement à false chez tout le monde.
+	 *
 	 * @param array $defaults Valeurs par défaut à appliquer.
 	 */
 	protected function get_module_settings( array $defaults = [] ): array {
@@ -44,7 +52,37 @@ abstract class AbstractModule implements ModuleInterface {
 			$stored = [];
 		}
 
-		return empty( $defaults ) ? $stored : wp_parse_args( $stored, $defaults );
+		return empty( $defaults ) ? $stored : self::merge_defaults( $defaults, $stored );
+	}
+
+	/**
+	 * Fusionne les réglages stockés par-dessus les valeurs par défaut.
+	 *
+	 * On ne descend que dans les tableaux ASSOCIATIFS : une liste (rôles
+	 * autorisés, IP whitelistées…) doit être remplacée en bloc, jamais fusionnée
+	 * index par index — sinon retirer une entrée serait impossible, la valeur
+	 * par défaut ressurgissant à sa position.
+	 *
+	 * @param array $defaults Valeurs de référence.
+	 * @param array $stored   Valeurs lues en base.
+	 */
+	protected static function merge_defaults( array $defaults, array $stored ): array {
+		$merged = $defaults;
+
+		foreach ( $stored as $key => $value ) {
+			$default = $defaults[ $key ] ?? null;
+
+			$merged[ $key ] = ( is_array( $value ) && is_array( $default ) && ! self::is_list( $default ) )
+				? self::merge_defaults( $default, $value )
+				: $value;
+		}
+
+		return $merged;
+	}
+
+	/** Vrai pour un tableau à clés numériques consécutives (ou vide). */
+	private static function is_list( array $value ): bool {
+		return [] === $value || array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 
 	/**
@@ -52,6 +90,24 @@ abstract class AbstractModule implements ModuleInterface {
 	 */
 	protected function save_module_settings( array $data ): bool {
 		return update_option( $this->get_module_option_key(), $data );
+	}
+
+	/**
+	 * Convertit des réglages STOCKÉS en charge utile de FORMULAIRE.
+	 *
+	 * save_settings() est écrit pour ce que poste l'écran de réglages. Pour la
+	 * plupart des modules, cette forme coïncide avec celle qui est stockée, et
+	 * l'identité suffit. Quand elle diffère — Sécurité stocke sous
+	 * authentication/hardening ce que le formulaire envoie à plat — le module
+	 * surcharge cette méthode.
+	 *
+	 * Sert à l'import de configuration : un fichier importé doit emprunter
+	 * exactement le chemin d'assainissement du formulaire, jamais un second.
+	 *
+	 * @param array $stored Réglages tels qu'ils sont en base.
+	 */
+	public function to_form_payload( array $stored ): array {
+		return $stored;
 	}
 
 	/* ================================================================
@@ -63,6 +119,20 @@ abstract class AbstractModule implements ModuleInterface {
 	}
 
 	public function get_admin_js(): array {
+		return [];
+	}
+
+	/**
+	 * Handles de scripts déjà enregistrés dont dépend le JS du module.
+	 *
+	 * Permet de réutiliser une bibliothèque tierce partagée (SortableJS…) plutôt
+	 * que d'en renvoyer l'URL depuis get_admin_js() : deux modules qui font ce
+	 * dernier choix produisent deux handles différents pour le même fichier, que
+	 * WordPress ne peut pas dédupliquer.
+	 *
+	 * @return string[]
+	 */
+	public function get_admin_js_deps(): array {
 		return [];
 	}
 
@@ -99,14 +169,19 @@ abstract class AbstractModule implements ModuleInterface {
 	}
 
 	/**
-	 * Clés d'options et de post_meta à supprimer lors de la désinstallation.
+	 * Clés à supprimer lors de la désinstallation.
 	 *
-	 * @return array{options: string[], meta: string[]}
+	 * `meta` désigne des post_meta et `user_meta` des métadonnées d'utilisateur :
+	 * ce sont deux tables distinctes, une clé rangée dans la mauvaise n'est
+	 * jamais supprimée.
+	 *
+	 * @return array{options: string[], meta: string[], user_meta: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [],
-			'meta'    => [],
+			'options'   => [],
+			'meta'      => [],
+			'user_meta' => [],
 		];
 	}
 }

@@ -441,6 +441,42 @@ class Module extends AbstractModule {
 		wp_send_json_success();
 	}
 
+	/**
+	 * Repère une opération interdite dans une requête, ou null.
+	 *
+	 * Deux précautions contre les faux positifs, qui bloquaient des requêtes
+	 * parfaitement légitimes :
+	 *  - la comparaison se fait sur des MOTS entiers (« migrant » ne contient
+	 *    plus « GRANT ») ;
+	 *  - les chaînes littérales sont neutralisées au préalable, une valeur
+	 *    n'étant jamais une instruction.
+	 *
+	 * Le test ne porte que sur cette copie : c'est bien la requête d'origine
+	 * qui est exécutée ensuite.
+	 */
+	private function find_forbidden_keyword( string $sql ): ?string {
+		// Neutralise le contenu des littéraux ('…' et "…") : une valeur n'est
+		// jamais une instruction.
+		$sans_litteraux = preg_replace(
+			[ "#'[^']*'#", '#"[^"]*"#' ],
+			[ "''", '""' ],
+			$sql
+		);
+
+		// preg_replace peut échouer (chaîne non close, limite de récursion) :
+		// on retombe alors sur la requête brute plutôt que de ne rien vérifier.
+		$sujet = ( null === $sans_litteraux ) ? $sql : $sans_litteraux;
+
+		foreach ( self::FORBIDDEN_KEYWORDS as $kw ) {
+			$motif = '/\b' . str_replace( ' ', '\s+', preg_quote( $kw, '/' ) ) . '\b/i';
+			if ( preg_match( $motif, $sujet ) ) {
+				return $kw;
+			}
+		}
+
+		return null;
+	}
+
 	public function ajax_run_query(): void {
 		$this->guard();
 
@@ -451,11 +487,9 @@ class Module extends AbstractModule {
 		}
 
 		// Garde-fou 1 : opérations interdites (gestion des bases/utilisateurs, arrêt serveur…).
-		$upper = strtoupper( $sql );
-		foreach ( self::FORBIDDEN_KEYWORDS as $kw ) {
-			if ( str_contains( $upper, $kw ) ) {
-				wp_send_json_error( [ 'message' => sprintf( __( 'Opération interdite dans cet éditeur : %s.', 'studio-kyne-mini-tools' ), $kw ) ] );
-			}
+		$forbidden = $this->find_forbidden_keyword( $sql );
+		if ( null !== $forbidden ) {
+			wp_send_json_error( [ 'message' => sprintf( __( 'Opération interdite dans cet éditeur : %s.', 'studio-kyne-mini-tools' ), $forbidden ) ] );
 		}
 
 		// Détecter si c'est une requête de lecture.

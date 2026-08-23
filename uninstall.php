@@ -28,11 +28,16 @@ $module_classes = [
 	'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
 	'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
 	'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
+	'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
 ];
 
 // Suppression de l'option globale.
 delete_option( 'skmt_settings' );
 delete_site_option( 'skmt_settings' );
+
+// Métadonnées écrites par le cœur du plugin (centre de notifications).
+// Aucun module ne les déclare : elles ne sont rattachées à aucun d'entre eux.
+delete_metadata( 'user', 0, 'skmt_notices', '', true );
 
 // Suppression des options et meta propres à chaque module.
 foreach ( $module_classes as $id => $class ) {
@@ -51,6 +56,12 @@ foreach ( $module_classes as $id => $class ) {
 		delete_post_meta_by_key( $meta_key );
 	}
 
+	// Métadonnées d'utilisateur : delete_post_meta_by_key() ne les touche pas,
+	// elles vivent dans une autre table.
+	foreach ( $keys['user_meta'] ?? [] as $meta_key ) {
+		delete_metadata( 'user', 0, $meta_key, '', true );
+	}
+
 	// Suppression des post types custom
 	foreach ( $keys['post_type'] ?? [] as $post_type ) {
 		// Récupérer tous les posts du type custom
@@ -62,6 +73,27 @@ foreach ( $module_classes as $id => $class ) {
 
 		foreach ( $posts as $post ) {
 			wp_delete_post( $post->ID, true ); // true = hard delete
+		}
+	}
+
+	// Suppression des taxonomies custom (tous les termes).
+	// Le plugin n'étant pas booté ici, la taxonomie n'est pas enregistrée : on
+	// l'enregistre à la volée pour que get_terms()/wp_delete_term() fonctionnent.
+	foreach ( $keys['taxonomy'] ?? [] as $taxonomy ) {
+		if ( ! taxonomy_exists( $taxonomy ) ) {
+			register_taxonomy( $taxonomy, 'attachment', [ 'public' => false ] );
+		}
+
+		$terms = get_terms( [
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+			'fields'     => 'ids',
+		] );
+
+		if ( ! is_wp_error( $terms ) ) {
+			foreach ( $terms as $term_id ) {
+				wp_delete_term( $term_id, $taxonomy );
+			}
 		}
 	}
 }

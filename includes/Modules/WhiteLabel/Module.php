@@ -469,7 +469,10 @@ class Module extends AbstractModule {
 	public static function get_uninstall_keys(): array {
 		return [
 			'options' => [ 'skmt_module_white_label' ],
-			'meta'    => [ self::AVATAR_META ],
+			'meta'    => [],
+			// L'avatar local est stocké sur l'UTILISATEUR, pas sur un post :
+			// déclaré en 'meta', il n'était jamais supprimé.
+			'user_meta' => [ self::AVATAR_META ],
 		];
 	}
 

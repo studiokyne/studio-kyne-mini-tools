@@ -33,6 +33,19 @@ class Updater {
 	private int $cache_duration = 43200;
 
 	/**
+	 * Durée du cache en cas d'échec (15 minutes).
+	 *
+	 * Sans cache négatif, une panne réseau ou un quota GitHub dépassé (60
+	 * requêtes/heure en anonyme) relance un appel HTTP à 10 s de timeout à
+	 * CHAQUE vérification de mise à jour — donc, en pratique, à chaque
+	 * chargement d'écran d'administration.
+	 */
+	private int $failure_cache_duration = 900;
+
+	/** Sentinelle stockée dans le transient pour mémoriser un échec. */
+	private const FAILURE_MARKER = 'skmt_update_check_failed';
+
+	/**
 	 * Initialise l'updater.
 	 */
 	public function init(): void {
@@ -220,6 +233,12 @@ class Updater {
 		$cache_key = $this->transient_key . '_' . $this->channel;
 		$cached = get_transient( $cache_key );
 
+		// Un échec récent est mémorisé comme tel : on ne réinterroge pas GitHub
+		// avant l'expiration du cache négatif.
+		if ( self::FAILURE_MARKER === $cached ) {
+			return false;
+		}
+
 		if ( false !== $cached ) {
 			return $cached;
 		}
@@ -235,19 +254,31 @@ class Updater {
 		] );
 
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
-			return false;
+			return $this->remember_failure( $cache_key );
 		}
 
 		$body = json_decode( wp_remote_retrieve_body( $response ), true );
 		$data = $this->normalize_release_data( $body );
 
 		if ( false === $data ) {
-			return false;
+			return $this->remember_failure( $cache_key );
 		}
 
 		set_transient( $cache_key, $data, $this->cache_duration );
 
 		return $data;
+	}
+
+	/**
+	 * Mémorise un échec de consultation et retourne false.
+	 *
+	 * @param string $cache_key Clé de transient du canal courant.
+	 * @return false
+	 */
+	private function remember_failure( string $cache_key ) {
+		set_transient( $cache_key, self::FAILURE_MARKER, $this->failure_cache_duration );
+
+		return false;
 	}
 
 	/**

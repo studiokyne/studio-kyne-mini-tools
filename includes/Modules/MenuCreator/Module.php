@@ -665,10 +665,16 @@ class Module extends AbstractModule {
 	}
 
 	public function get_admin_js(): array {
-		return [
-			SKMT_ASSETS_URL . 'admin/js/vendor/sortable.min.js',
-			SKMT_ASSETS_URL . 'admin/js/modules/menu-creator.js',
-		];
+		return [ SKMT_ASSETS_URL . 'admin/js/modules/menu-creator.js' ];
+	}
+
+	/**
+	 * SortableJS est déclaré en dépendance plutôt que renvoyé par
+	 * get_admin_js() : le module Médias charge le même fichier, et deux URL
+	 * identiques sous deux handles différents étaient servies deux fois.
+	 */
+	public function get_admin_js_deps(): array {
+		return [ 'skmt-sortable-js' ];
 	}
 
 	public function get_admin_js_data(): array {
