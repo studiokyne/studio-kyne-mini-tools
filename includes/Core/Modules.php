@@ -94,6 +94,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Database\\Module',
 				'icon'        => 'database',
 			],
+			'media'           => [
+				'name'        => __( 'Médias', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Organisez vos médias en dossiers virtuels.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Médias', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Organiser les médias', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Media\\Module',
+				'icon'        => 'folder-tree',
+			],
 		];
 
 		/**
@@ -190,10 +198,18 @@ class Modules {
 
 	/**
 	 * Active un module et appelle son hook on_activate().
+	 *
+	 * L'état déjà atteint est un succès, pas un échec : update_option() renvoie
+	 * false quand la valeur ne change pas, et s'y fier faisait annoncer une
+	 * erreur — sans appeler on_activate() — pour un module déjà actif.
 	 */
 	public function activate( string $id ): bool {
 		if ( ! isset( $this->registered[ $id ] ) ) {
 			return false;
+		}
+
+		if ( $this->is_active( $id ) ) {
+			return true;
 		}
 
 		$result = $this->settings->set( "modules.{$id}", true );
@@ -210,10 +226,16 @@ class Modules {
 
 	/**
 	 * Désactive un module et appelle son hook on_deactivate().
+	 *
+	 * Voir activate() : l'état déjà atteint est un succès.
 	 */
 	public function deactivate( string $id ): bool {
 		if ( ! isset( $this->registered[ $id ] ) ) {
 			return false;
+		}
+
+		if ( ! $this->is_active( $id ) ) {
+			return true;
 		}
 
 		// Utiliser l'instance active si disponible, sinon en créer une temporaire.
@@ -255,6 +277,17 @@ class Modules {
 	 */
 	public function get_active_instances(): array {
 		return $this->active;
+	}
+
+	/**
+	 * Retourne une instance d'un module enregistré, active ou non.
+	 *
+	 * L'instance active est réutilisée quand elle existe ; sinon une instance
+	 * non initialisée est créée. Permet de lire le schéma de réglages d'un
+	 * module désactivé (import de configuration) sans l'accrocher à WordPress.
+	 */
+	public function get_instance( string $id ): ?ModuleInterface {
+		return $this->active[ $id ] ?? $this->make_instance( $id );
 	}
 
 	/**

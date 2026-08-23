@@ -2,6 +2,7 @@
 namespace StudioKyne\MiniTools\Admin;
 
 use StudioKyne\MiniTools\Core\Modules;
+use StudioKyne\MiniTools\Core\AbstractModule;
 use StudioKyne\MiniTools\Core\Settings;
 
 /**
@@ -55,8 +56,10 @@ class Admin {
 		add_action( 'admin_post_skmt_import_settings', [ $this, 'handle_import_settings' ] );
 		add_action( 'admin_head', [ $this, 'output_menu_separator_css' ] );
 		add_action( 'admin_footer', [ $this, 'render_modal' ] );
-		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ] );
-		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], 11 );
+		// Priorité maximale : les pages du plugin ont leur propre pied de page,
+		// il doit rester vide même si un module (Marque blanche) le personnalise.
+		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ], PHP_INT_MAX );
+		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], PHP_INT_MAX );
 		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_start' ], 0 );
 		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_end' ],   PHP_INT_MAX );
 		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
@@ -166,13 +169,22 @@ class Admin {
 			return;
 		}
 
-		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [],                    SKMT_VERSION );
+		// tokens.css d'abord : il ne contient que des custom properties, tous les
+		// autres feuilles en dependent.
+		wp_enqueue_style( 'skmt-tokens-css',     SKMT_ASSETS_URL . 'admin/css/tokens.css',     [],                    SKMT_VERSION );
+		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [ 'skmt-tokens-css' ], SKMT_VERSION );
 		wp_enqueue_style( 'skmt-layout-css',     SKMT_ASSETS_URL . 'admin/css/layout.css',     [ 'skmt-reset-css' ],  SKMT_VERSION );
 		wp_enqueue_style( 'skmt-sidebar-css',    SKMT_ASSETS_URL . 'admin/css/sidebar.css',    [ 'skmt-layout-css' ], SKMT_VERSION );
-		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-reset-css' ],  SKMT_VERSION );
+		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-tokens-css' ], SKMT_VERSION );
 		wp_enqueue_style( 'skmt-buttons-css',    SKMT_ASSETS_URL . 'admin/css/buttons.css',    [ 'skmt-components-css' ], SKMT_VERSION );
 
 		wp_enqueue_script( 'skmt-admin-js', SKMT_ASSETS_URL . 'admin/js/admin.js', [], SKMT_VERSION, true );
+
+		// Bibliothèques tierces partagées : enregistrées une seule fois sous un
+		// handle stable, chargées uniquement si un module les déclare en
+		// dépendance. Le module Médias utilise le même handle : WordPress
+		// dédoublonne donc quand les deux sont présents sur le même écran.
+		wp_register_script( 'skmt-sortable-js', SKMT_ASSETS_URL . 'admin/js/vendor/sortable.min.js', [], SKMT_VERSION, true );
 
 		$this->localize_admin_script( 'skmt-admin-js' );
 
@@ -238,7 +250,8 @@ class Admin {
 			}
 
 			$handle = 'skmt-module-' . $module_id . '-js-' . $index;
-			wp_enqueue_script( $handle, $script_url, [ 'skmt-admin-js' ], SKMT_VERSION, true );
+			$deps   = array_merge( [ 'skmt-admin-js' ], $instance->get_admin_js_deps() );
+			wp_enqueue_script( $handle, $script_url, $deps, SKMT_VERSION, true );
 
 			// Injection des données JS spécifiques au module dans skmtAdmin
 			$js_data = $instance->get_admin_js_data();
@@ -764,14 +777,11 @@ class Admin {
 			exit;
 		}
 
-		update_option( 'skmt_settings', $data['global'] );
+		update_option( 'skmt_settings', $this->sanitize_imported_globals( $data['global'] ) );
 
 		if ( isset( $data['modules'] ) && is_array( $data['modules'] ) ) {
-			$registered_modules = $this->modules->get_all();
 			foreach ( $data['modules'] as $module_id => $module_settings ) {
-				if ( isset( $registered_modules[ $module_id ] ) && is_array( $module_settings ) ) {
-					update_option( 'skmt_module_' . $module_id, $module_settings );
-				}
+				$this->import_module_settings( sanitize_key( (string) $module_id ), $module_settings );
 			}
 		}
 
@@ -782,6 +792,125 @@ class Admin {
 			'skmt_notice_type' => 'success',
 		], admin_url( 'admin.php' ) ) );
 		exit;
+	}
+
+	/* ================================================================
+	 * ASSAINISSEMENT DE L'IMPORT
+	 *
+	 * Un fichier importé ne passe par aucun formulaire : il ne peut donc pas
+	 * s'appuyer sur les save_settings() des modules, écrits pour la charge utile
+	 * du formulaire (à plat) et non pour la structure stockée (imbriquée).
+	 * Écrire le JSON tel quel contournerait pourtant TOUTE la validation —
+	 * HTML non filtré dans le pied de page marque blanche, rôles arbitraires,
+	 * slug de connexion libre.
+	 *
+	 * On reconstruit donc la valeur à partir du schéma réel du module
+	 * (get_settings(), soit defaults + stocké) : les clés inconnues sont
+	 * écartées, chaque valeur est ramenée au type de sa contrepartie, et les
+	 * chaînes passent par wp_kses_post().
+	 * ================================================================ */
+
+	/**
+	 * Assainit le bloc « global » (contenu complet de l'option skmt_settings).
+	 *
+	 * Whitelist stricte : seules les clés que le plugin sait interpréter
+	 * survivent, et l'état d'activation se limite aux modules enregistrés.
+	 *
+	 * @param mixed $raw Valeur importée.
+	 */
+	private function sanitize_imported_globals( $raw ): array {
+		$raw     = is_array( $raw ) ? $raw : [];
+		$global  = is_array( $raw['global'] ?? null ) ? $raw['global'] : [];
+		$modules = is_array( $raw['modules'] ?? null ) ? $raw['modules'] : [];
+
+		// On part de l'existant : un fichier partiel ne doit pas effacer l'état
+		// des modules qu'il ne mentionne pas.
+		$current         = get_option( 'skmt_settings', [] );
+		$current         = is_array( $current ) ? $current : [];
+		$current_global  = is_array( $current['global'] ?? null ) ? $current['global'] : [];
+		$current_modules = is_array( $current['modules'] ?? null ) ? $current['modules'] : [];
+
+		$clean = [
+			'global'  => $current_global,
+			'modules' => $current_modules,
+		];
+
+		if ( array_key_exists( 'update_channel', $global ) ) {
+			$channel = sanitize_key( (string) $global['update_channel'] );
+			$clean['global']['update_channel'] = in_array( $channel, [ 'stable', 'dev' ], true ) ? $channel : 'stable';
+		}
+
+		if ( array_key_exists( 'auto_updates', $global ) ) {
+			$clean['global']['auto_updates'] = ! empty( $global['auto_updates'] );
+		}
+
+		// Seuls les modules réellement enregistrés peuvent voir leur état changer.
+		foreach ( array_keys( $this->modules->get_all() ) as $module_id ) {
+			if ( array_key_exists( $module_id, $modules ) ) {
+				$clean['modules'][ $module_id ] = ! empty( $modules[ $module_id ] );
+			}
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Rejoue les réglages importés d'un module à travers son propre
+	 * assainisseur, exactement comme le ferait l'écran de réglages.
+	 *
+	 * @param string $module_id Identifiant du module.
+	 * @param mixed  $raw       Bloc importé.
+	 * @return bool Vrai si le module a effectivement été mis à jour.
+	 */
+	private function import_module_settings( string $module_id, $raw ): bool {
+		if ( '' === $module_id || ! is_array( $raw ) || ! isset( $this->modules->get_all()[ $module_id ] ) ) {
+			return false;
+		}
+
+		$instance = $this->modules->get_instance( $module_id );
+		if ( ! $instance ) {
+			return false;
+		}
+
+		// Module sans réglages (Base de données, Médias, Fichiers…) : rien à
+		// importer. Le traverser écraserait des données sans raison.
+		if ( ! $instance->get_settings() ) {
+			return false;
+		}
+
+		$payload = $instance instanceof AbstractModule
+			? $instance->to_form_payload( $raw )
+			: $raw;
+
+		return (bool) $instance->save_settings( self::drop_false_values( $payload ) );
+	}
+
+	/**
+	 * Retire les valeurs strictement false d'un tableau associatif.
+	 *
+	 * Un formulaire HTML n'envoie pas ses cases décochées, et certains modules
+	 * s'appuient sur cette absence (isset()). Un JSON, lui, porte explicitement
+	 * « false » : sans cette normalisation, un réglage désactivé à l'export
+	 * reviendrait activé à l'import.
+	 *
+	 * @param array $data Charge utile à normaliser.
+	 */
+	private static function drop_false_values( array $data ): array {
+		$clean = [];
+
+		foreach ( $data as $key => $value ) {
+			if ( false === $value ) {
+				continue;
+			}
+
+			// Les listes (rôles, IP…) sont transmises telles quelles : leur
+			// sémantique est positionnelle, pas déclarative.
+			$clean[ $key ] = is_array( $value ) && $value !== array_values( $value )
+				? self::drop_false_values( $value )
+				: $value;
+		}
+
+		return $clean;
 	}
 
 	/* ================================================================
@@ -860,6 +989,7 @@ class Admin {
 		'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
 		'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
 		'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+		'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
 		];
 	}
 
