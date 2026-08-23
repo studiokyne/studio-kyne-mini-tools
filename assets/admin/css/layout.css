@@ -203,3 +203,13 @@
     margin: 0 20px;
   }
 }
+
+/*
+ * Override du chrome wp-admin.
+ * Hors @layer volontairement : le CSS non-layered de WordPress battrait
+ * n'importe quelle couche. Cantonne ici car layout.css n'est enqueue que
+ * sur les pages du plugin (voir Admin::enqueue_assets).
+ */
+#wpbody-content {
+  padding: 0 !important;
+}
