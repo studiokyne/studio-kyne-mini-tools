@@ -1,74 +1,89 @@
 # Studio Kyne Mini Tools
 
-Plugin WordPress modulaire, leger et performant pour optimiser et ameliorer votre site.
+Plugin WordPress modulaire, léger et performant pour optimiser et améliorer votre site.
 
 ## Fonctionnalités principales
 
-- Architecture modulaire, modules activables a la demande
+- Architecture modulaire, modules activables à la demande
 - Interface admin custom moderne et rapide
-- Mises a jour via GitHub (canal Stable et Dev)
-- Modules : Image Optimizer, Security, White Label, Menu Creator, Login, Files, Database
+- Mises à jour via GitHub (canal Stable et Dev)
+- Modules : Image Optimizer, Security, White Label, Menu Creator, Login, Files, Database, Médias
 
 ## Installation
 
-1. Telechargez le ZIP depuis les releases GitHub.
-2. Uploadez le ZIP dans Extensions > Ajouter > Televerser.
+1. Téléchargez le ZIP depuis les releases GitHub.
+2. Uploadez le ZIP dans Extensions > Ajouter > Téléverser.
 3. Activez le plugin.
-4. Ouvrez le menu SKMT dans l’admin.
+4. Ouvrez le menu SKMT dans l'admin.
 
-## Mise a jour
+## Mise à jour
 
-Dans Reglages > Mises a jour GitHub :
+Dans Réglages > Mises à jour GitHub :
 
 - Choisissez le canal Stable (main) ou Dev (pre-release).
-- Cliquez sur Verifier les mises a jour pour forcer un check.
+- Cliquez sur Vérifier les mises à jour pour forcer un check.
 
 ## Modules
 
 ### Image Optimizer
 
 - Conversion AVIF/WebP (auto)
-- Qualite configurable
+- Qualité configurable
 - Redimensionnement
 - Suppression EXIF
 - Alt text auto
 - Optimisation en masse
-- Upload SVG securise (assainissement liste blanche, autorise par role)
+- Upload SVG sécurisé (assainissement liste blanche, autorisé par rôle)
 
 ### Security
 
 - Limitation des tentatives de connexion (rate limiting)
-- URL de connexion personnalisee
-- Durcissement (anti-enumeration des utilisateurs, endpoint REST users)
+- Origine de l'IP configurable : connexion directe (défaut), Cloudflare ou reverse proxy.
+  Les en-têtes de proxy sont envoyés par le client : ne les activer que si le site est
+  réellement derrière ce proxy, sinon le blocage se contourne en changeant d'en-tête.
+- URL de connexion personnalisée.
+  En cas d'oubli du slug, poser `define( 'SKMT_DISABLE_LOGIN_URL', true );` dans
+  `wp-config.php` réactive `wp-login.php`.
+- Durcissement (anti-énumération des utilisateurs, endpoint REST users)
 
 ### White Label
 
 - Nettoyage de la barre d'admin et du footer
-- Epuration de la page de profil (masquage des sections superflues)
-- Avatars locaux (upload via mediatheque, prioritaire sur Gravatar)
-- Profils de menu (stockage/resolution par utilisateur, role ou global)
+- Épuration de la page de profil (masquage des sections superflues)
+- Avatars locaux (upload via médiathèque, prioritaire sur Gravatar)
+- Profils de menu (stockage/résolution par utilisateur, rôle ou global)
 
 ### Menu Creator
 
-- Reorganisation et masquage des entrees du menu wp-admin (drag & drop)
-- Renommage, separateurs, liens personnalises, icones (bibliotheque Lucide)
+- Réorganisation et masquage des entrées du menu wp-admin (drag & drop)
+- Renommage, séparateurs, liens personnalisés, icônes (bibliothèque Lucide)
 
 ### Login
 
-- Personnalisation de la page de connexion (logo, couleurs, panneau lateral)
-- Masquage optionnel : langue, mot de passe oublie, retour au site
+- Personnalisation de la page de connexion (logo, couleurs, panneau latéral)
+- Masquage optionnel : langue, mot de passe oublié, retour au site
 
 ### Files
 
-- Gestionnaire de fichiers (liste, renommer, deplacer, supprimer)
-- Upload, zip/dezip, edition et telechargement, racine `ABSPATH`
+- Gestionnaire de fichiers (liste, renommer, déplacer, supprimer)
+- Upload, zip/dézip, édition et téléchargement, racine `ABSPATH`
+- Éditeur de code avec coloration syntaxique et autocomplétion (CodeMirror livré par
+  WordPress ; respecte le réglage de coloration du profil utilisateur)
 
 ### Database
 
-- Explorateur/editeur de tables sur `$wpdb` (donnees, structure)
-- Edition, insertion et suppression de lignes typees (avec support NULL)
-- Editeur SQL libre securise (mots-cles interdits, confirmation des ecritures, plafond de lignes)
-- Export `.sql` type, historique des requetes (local au navigateur)
+- Explorateur/éditeur de tables sur `$wpdb` (données, structure)
+- Édition, insertion et suppression de lignes typées (avec support NULL)
+- Éditeur SQL libre sécurisé (mots-clés interdits, confirmation des écritures, plafond de lignes)
+- Export `.sql` typé, historique des requêtes (local au navigateur)
+
+### Médias
+
+- Dossiers virtuels dans la médiathèque : aucun fichier n'est déplacé sur le disque
+- Panneau de dossiers partout où WordPress affiche une médiathèque (page Médias en
+  grille et en liste, éditeur de blocs, personnalisateur, constructeurs de page)
+- Glisser-déposer des médias et des dossiers, appartenance à plusieurs dossiers
+- Dossiers d'un média modifiables depuis sa fiche de détails
 
 ## Architecture
 
@@ -86,12 +101,12 @@ studio-kyne-mini-tools/
     └── admin/
 ```
 
-## Developpement
+## Développement
 
 ### Ajouter un module
 
-1. Creer un dossier dans includes/Modules/MonModule/
-2. Implementer ModuleInterface
+1. Créer un dossier dans includes/Modules/MonModule/
+2. Implémenter ModuleInterface
 3. Enregistrer le module via filtre `skmt_module_definitions`
 
 ```php
@@ -114,7 +129,7 @@ class Module extends AbstractModule {
 
 ### Enregistrement extensible des modules
 
-Le core expose un registre extensible pour eviter de modifier `Core/Modules.php` a chaque nouveau module.
+Le core expose un registre extensible pour éviter de modifier `Core/Modules.php` à chaque nouveau module.
 
 ```php
 add_filter( 'skmt_module_definitions', function( array $modules ) {
@@ -132,21 +147,34 @@ add_filter( 'skmt_module_definitions', function( array $modules ) {
 
 ### Recommandation architecture module (simple -> complexe)
 
-- Module simple:
+- Module simple :
   - `Module.php` (hooks + settings + vue)
-- Module complexe:
+- Module complexe :
   - `Module.php` (orchestration)
-  - `Services/` (metier, API, cron, stockage)
+  - `Services/` (métier, API, cron, stockage)
   - `Admin/` (UI, handlers, rendering)
-  - `Domain/` (DTO, regles, validation)
+  - `Domain/` (DTO, règles, validation)
 
-Chaque module doit sanitiser ses propres settings dans `save_settings()` (le core n'applique plus de sanitization generique).
+Chaque module doit sanitiser ses propres settings dans `save_settings()` (le core n'applique plus de sanitization générique).
+
+Points de contrat utiles :
+
+- `get_uninstall_keys()` distingue `options`, `meta` (post meta) et `user_meta`. Une méta
+  d'utilisateur déclarée sous `meta` n'est jamais supprimée : ce sont deux tables.
+- `get_admin_js_deps()` déclare des handles de scripts déjà enregistrés (bibliothèques
+  tierces partagées) plutôt que d'en renvoyer l'URL depuis `get_admin_js()`.
+- `to_form_payload()` convertit des réglages stockés vers la forme attendue par
+  `save_settings()`. Utilisé par l'import de configuration, qui rejoue ainsi
+  l'assainisseur du module au lieu d'écrire le JSON tel quel.
+- Les défauts de `get_defaults()` sont fusionnés récursivement : une sous-clé ajoutée
+  dans une version ultérieure arrive donc avec sa valeur par défaut chez les
+  installations existantes.
 
 ## Releases et versioning
 
-- Stable: releases depuis la branche main
-- Dev: pre-releases auto depuis la branche dev
-- Le ZIP est attache aux releases (studio-kyne-mini-tools.zip)
+- Stable : releases depuis la branche main
+- Dev : pre-releases auto depuis la branche dev
+- Le ZIP est attaché aux releases (studio-kyne-mini-tools.zip)
 
 ## Licence
 

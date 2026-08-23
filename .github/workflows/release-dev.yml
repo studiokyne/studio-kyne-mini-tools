@@ -115,7 +115,10 @@ jobs:
             --exclude='.github' \
             --exclude='.vscode' \
             --exclude='node_modules' \
-            --exclude='dist'
+            --exclude='dist' \
+            --exclude='.claude' \
+            --exclude='.mcp.json' \
+            --exclude='.gitignore'
           cd dist/package
           zip -r "../studio-kyne-mini-tools-${VERSION}.zip" studio-kyne-mini-tools
 

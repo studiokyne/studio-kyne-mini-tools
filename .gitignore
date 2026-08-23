@@ -1,0 +1,6 @@
+# Environnement de dev local (Claude Code, MCP) — jamais distribué
+.claude/settings.local.json
+.mcp.json
+.vscode/
+node_modules/
+dist/
