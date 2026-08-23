@@ -126,7 +126,12 @@ class ImageProcessor {
 		} catch ( \Throwable $e ) {
 			return false;
 		} finally {
-			imagedestroy( $image );
+			// Depuis PHP 8.0 GdImage est un objet libere par le GC : imagedestroy()
+			// n'a plus d'effet et devient deprecie en 8.5. Le plugin supporte encore
+			// PHP 7.4, ou l'appel reste utile (ressource, pas objet).
+			if ( PHP_VERSION_ID < 80000 ) {
+				imagedestroy( $image );
+			}
 		}
 	}
 
@@ -380,7 +385,12 @@ class ImageProcessor {
 			$ok = false;
 		}
 
-		imagedestroy( $image );
+		// Depuis PHP 8.0 GdImage est un objet libere par le GC : imagedestroy()
+		// n'a plus d'effet et devient deprecie en 8.5. Le plugin supporte encore
+		// PHP 7.4, ou l'appel reste utile (ressource, pas objet).
+		if ( PHP_VERSION_ID < 80000 ) {
+			imagedestroy( $image );
+		}
 
 		if ( ! $ok ) {
 			$this->log_error( 'convert/gd', $source, 'encodage ' . $format . ' via GD a échoué' );

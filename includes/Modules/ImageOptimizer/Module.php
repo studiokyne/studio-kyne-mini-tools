@@ -89,7 +89,7 @@ class Module extends AbstractModule {
 			'strip_exif'         => true,
 			'generate_alt'       => true,
 			'keep_original'      => false,
-			'svg_upload'         => false,
+			'svg_upload'         => true,
 			'svg_roles'          => [ 'administrator' ],
 		] );
 	}
