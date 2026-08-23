@@ -22,6 +22,7 @@
     editorPath: null,
     editorDirty: false,
     editorInputBound: false,
+    editorCm: null,
     movePath: null,
     renamePath: null,
     dragCounter: 0,
@@ -645,6 +646,9 @@
       if (!editorEl || editorEl.style.display === "none") return;
 
       if (e.key === "Escape") {
+        // Échap ferme d'abord la liste d'autocomplétion : la fermer ET quitter
+        // l'éditeur d'un seul appui ferait perdre la saisie en cours.
+        if (fm.editorCm && fm.editorCm.codemirror.state.completionActive) return;
         e.preventDefault();
         closeEditor();
       }
@@ -672,25 +676,86 @@
       if (filenameEl) filenameEl.textContent = name;
       if (editorEl) editorEl.style.display = "";
 
-      // Éditeur en texte brut (pas de coloration syntaxique).
       if (textarea) {
+        // Une instance CodeMirror précédente survivrait au changement de
+        // fichier : on repart toujours du textarea nu.
+        destroyCodeMirror();
+
         textarea.value = content;
         textarea.style.display = "";
+
         if (!fm.editorInputBound) {
           fm.editorInputBound = true;
-          textarea.addEventListener("input", function () {
-            if (!fm.editorDirty) {
-              fm.editorDirty = true;
-              updateSaveBtn();
-            }
-          });
+          textarea.addEventListener("input", markEditorDirty);
         }
-        setTimeout(function () { textarea.focus(); }, 30);
+
+        if (!initCodeMirror(name)) {
+          setTimeout(function () { textarea.focus(); }, 30);
+        }
       }
 
       fm.editorDirty = false;
       updateSaveBtn();
     });
+  }
+
+  function markEditorDirty() {
+    if (fm.editorDirty) return;
+    fm.editorDirty = true;
+    updateSaveBtn();
+  }
+
+  /**
+   * Passe le textarea en CodeMirror.
+   *
+   * Tout vient de WordPress : wp.codeEditor.initialize() branche la coloration,
+   * le linting et l'autocomplétion à la frappe (HTML, CSS, JS, PHP). Les
+   * réglages par extension sont préparés côté serveur par
+   * Files\Module::enqueue_code_editor().
+   *
+   * @param {string} name Nom du fichier, dont on tire l'extension.
+   * @return {boolean} Vrai si l'éditeur riche a bien été monté.
+   */
+  function initCodeMirror(name) {
+    var settings = (skmtAdmin.codeEditor || {})[fileExt(name)];
+    if (!settings || !window.wp || !wp.codeEditor) return false;
+
+    try {
+      fm.editorCm = wp.codeEditor.initialize("skmt-editor-textarea", settings);
+    } catch (e) {
+      // Coloration indisponible : le textarea nu reste parfaitement utilisable.
+      if (window.console && console.warn) console.warn("[SKMT] CodeMirror :", e);
+      fm.editorCm = null;
+      return false;
+    }
+
+    var cm = fm.editorCm.codemirror;
+    cm.on("change", markEditorDirty);
+    // La hauteur est portée par le conteneur flex (voir files.css).
+    cm.setSize("100%", "100%");
+    setTimeout(function () { cm.refresh(); cm.focus(); }, 30);
+
+    return true;
+  }
+
+  function destroyCodeMirror() {
+    if (!fm.editorCm) return;
+    try {
+      fm.editorCm.codemirror.toTextArea();
+    } catch (e) { /* déjà détaché */ }
+    fm.editorCm = null;
+  }
+
+  /** Contenu courant de l'éditeur, riche ou nu. */
+  function editorValue() {
+    if (fm.editorCm) return fm.editorCm.codemirror.getValue();
+    var ta = document.getElementById("skmt-editor-textarea");
+    return ta ? ta.value : "";
+  }
+
+  function fileExt(name) {
+    var parts = String(name || "").split(".");
+    return parts.length > 1 ? parts.pop().toLowerCase() : "";
   }
 
   function closeEditor() {
@@ -709,6 +774,7 @@
   }
 
   function doCloseEditor() {
+    destroyCodeMirror();
     var editorEl = document.getElementById("skmt-files-editor");
     if (editorEl) editorEl.style.display = "none";
     fm.editorPath  = null;
@@ -719,8 +785,7 @@
   function saveEditorContent() {
     if (!fm.editorPath) return;
 
-    var ta = document.getElementById("skmt-editor-textarea");
-    var content = ta ? ta.value : "";
+    var content = editorValue();
 
     var saveBtn = document.getElementById("skmt-editor-save");
     if (saveBtn) saveBtn.disabled = true;

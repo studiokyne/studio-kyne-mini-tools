@@ -28,6 +28,76 @@ class Module extends AbstractModule {
 		add_action( 'wp_ajax_skmt_files_save_content', [ $this, 'ajax_save_content' ] );
 		add_action( 'wp_ajax_skmt_files_upload',       [ $this, 'ajax_upload' ] );
 		add_action( 'admin_post_skmt_files_download',  [ $this, 'handle_download' ] );
+
+		// L'éditeur de code s'appuie sur CodeMirror, livré avec WordPress. Le
+		// core ne le charge pas de lui-même : il faut appeler wp_enqueue_code_editor()
+		// pendant admin_enqueue_scripts, ce que get_admin_js() ne permet pas
+		// d'exprimer (il ne retourne que des URL).
+		//
+		// Priorité 5 : Admin::enqueue_assets() lit get_admin_js_data() à la
+		// priorité 10, et les réglages CodeMirror doivent y être présents.
+		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_code_editor' ], 5 );
+	}
+
+	/* ================================================================
+	 * ÉDITEUR DE CODE
+	 * ================================================================ */
+
+	/**
+	 * Extensions ouvrables dans l'éditeur, et donc coloriables.
+	 *
+	 * Doit rester alignée sur isEditable() dans files.js : c'est cette liste
+	 * qui décide des modes CodeMirror préparés côté serveur.
+	 */
+	const EDITABLE_EXTENSIONS = [
+		'php', 'js', 'ts', 'css', 'html', 'htm', 'xml', 'svg',
+		'json', 'txt', 'md', 'sh', 'bash', 'sql', 'htaccess', 'env',
+		'yml', 'yaml', 'ini', 'conf', 'config', 'lock', 'log', 'htpasswd',
+	];
+
+	/** Réglages CodeMirror par extension, remplis par enqueue_code_editor(). */
+	private array $code_editor_settings = [];
+
+	/** Vrai uniquement sur l'onglet Fichiers du plugin. */
+	private function is_files_screen(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_key( $_GET['page'] ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : '';
+
+		return 'studio-kyne-mini-tools' === $page && 'module_files' === $tab;
+	}
+
+	/**
+	 * Charge CodeMirror (coloration syntaxique, autocomplétion, linting).
+	 *
+	 * Tout vient de WordPress : wp-codemirror embarque les modes et l'add-on
+	 * show-hint, et wp-admin/js/code-editor.js déclenche déjà l'autocomplétion
+	 * à la frappe pour HTML, CSS, JS et PHP. Rien à embarquer de notre côté.
+	 *
+	 * L'appel se fait une fois par extension : chaque type amène ses propres
+	 * linters (csslint, jshint, htmlhint, jsonlint) et wp_enqueue_script est
+	 * idempotent. On récupère au passage les réglages à passer au JS.
+	 */
+	public function enqueue_code_editor(): void {
+		if ( ! $this->is_files_screen() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		$this->code_editor_settings = [];
+
+		foreach ( self::EDITABLE_EXTENSIONS as $ext ) {
+			$settings = wp_enqueue_code_editor( [ 'file' => 'skmt.' . $ext ] );
+
+			// false = l'utilisateur a désactivé la coloration syntaxique dans son
+			// profil. On respecte ce choix : l'éditeur restera en texte brut.
+			if ( false === $settings ) {
+				$this->code_editor_settings = [];
+				return;
+			}
+
+			$this->code_editor_settings[ $ext ] = $settings;
+		}
 	}
 
 	/* ================================================================
@@ -351,6 +421,9 @@ class Module extends AbstractModule {
 				'downloadUrl'   => admin_url( 'admin-post.php?action=skmt_files_download' ),
 				'downloadNonce' => wp_create_nonce( 'skmt_files_download' ),
 			],
+			// Vide si la coloration syntaxique est désactivée dans le profil de
+			// l'utilisateur : files.js retombe alors sur le textarea nu.
+			'codeEditor' => $this->code_editor_settings,
 		];
 	}
 

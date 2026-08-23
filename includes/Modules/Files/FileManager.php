@@ -244,8 +244,18 @@ class FileManager {
 		if ( ! is_file( $abs ) ) {
 			throw new \InvalidArgumentException( 'Not a file.' );
 		}
+		if ( ! is_writable( $abs ) ) {
+			throw new \RuntimeException( 'Fichier en lecture seule : ' . $rel );
+		}
+
+		// L'échec doit remonter : sans exception, l'appelant annonce un
+		// enregistrement réussi alors que rien n'a été écrit sur le disque.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
-		return file_put_contents( $abs, $content ) !== false;
+		if ( file_put_contents( $abs, $content ) === false ) {
+			throw new \RuntimeException( 'Écriture impossible : ' . $rel );
+		}
+
+		return true;
 	}
 
 	/**

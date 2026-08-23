@@ -538,3 +538,107 @@
   animation: skmt-spin 0.75s linear infinite;
   transform-origin: center;
 }
+
+/* ================================================================
+ * ÉDITEUR DE CODE — habillage sombre de CodeMirror
+ *
+ * CodeMirror et ses modes sont ceux livrés avec WordPress (wp-codemirror) ;
+ * seul le thème par défaut, clair, est fourni. On repeint donc les jetons aux
+ * couleurs de l'éditeur existant plutôt que d'embarquer un thème de plus.
+ * ================================================================ */
+.skmt-files-editor .CodeMirror {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  padding: 0;
+  font-size: 13px;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
+  line-height: 1.65;
+  color: #cdd6f4;
+  background: #1e1e2e;
+  tab-size: 2;
+}
+.skmt-files-editor .CodeMirror-gutters {
+  background: #181825;
+  border-right: 1px solid #313244;
+}
+.skmt-files-editor .CodeMirror-linenumber {
+  color: #585b70;
+}
+.skmt-files-editor .CodeMirror-cursor {
+  border-left: 1px solid #f5e0dc;
+}
+.skmt-files-editor .CodeMirror-selected {
+  background: #45475a;
+}
+.skmt-files-editor .CodeMirror-focused .CodeMirror-selected,
+.skmt-files-editor .CodeMirror-line::selection,
+.skmt-files-editor .CodeMirror-line > span::selection {
+  background: #585b70;
+}
+.skmt-files-editor .CodeMirror-activeline-background,
+.skmt-files-editor .CodeMirror-activeline-gutter {
+  background: #262637;
+}
+.skmt-files-editor .CodeMirror-scrollbar-filler,
+.skmt-files-editor .CodeMirror-gutter-filler {
+  background: #1e1e2e;
+}
+.skmt-files-editor .CodeMirror-matchingbracket {
+  color: #a6e3a1 !important;
+  border-bottom: 1px solid #a6e3a1;
+}
+.skmt-files-editor .CodeMirror-nonmatchingbracket {
+  color: #f38ba8 !important;
+}
+
+/* Jetons */
+.skmt-files-editor .cm-comment    { color: #6c7086; font-style: italic; }
+.skmt-files-editor .cm-keyword    { color: #cba6f7; }
+.skmt-files-editor .cm-atom,
+.skmt-files-editor .cm-number      { color: #fab387; }
+.skmt-files-editor .cm-def         { color: #89b4fa; }
+.skmt-files-editor .cm-variable    { color: #cdd6f4; }
+.skmt-files-editor .cm-variable-2  { color: #f2cdcd; }
+.skmt-files-editor .cm-variable-3, 
+.skmt-files-editor .cm-type        { color: #f9e2af; }
+.skmt-files-editor .cm-property    { color: #89b4fa; }
+.skmt-files-editor .cm-operator    { color: #89dceb; }
+.skmt-files-editor .cm-string,
+.skmt-files-editor .cm-string-2    { color: #a6e3a1; }
+.skmt-files-editor .cm-meta        { color: #94e2d5; }
+.skmt-files-editor .cm-tag         { color: #f38ba8; }
+.skmt-files-editor .cm-attribute   { color: #f9e2af; }
+.skmt-files-editor .cm-qualifier,
+.skmt-files-editor .cm-builtin     { color: #f9e2af; }
+.skmt-files-editor .cm-bracket     { color: #9399b2; }
+.skmt-files-editor .cm-link        { color: #89b4fa; text-decoration: underline; }
+.skmt-files-editor .cm-error       { color: #f38ba8; }
+
+/* Autocomplétion et infobulles de lint : rendues dans <body>, donc hors du
+   panneau — elles doivent passer au-dessus de son overlay (z-index 99999). */
+/* wp-admin/css/widgets.css pose `ul.CodeMirror-hints { z-index: 101 }` : il
+   faut le même niveau de spécificité pour repasser devant l'overlay. */
+ul.CodeMirror-hints {
+  z-index: 100010;
+  padding: 4px;
+  font-family: "SFMono-Regular", "Consolas", "Menlo", monospace;
+  font-size: 12px;
+  color: #cdd6f4;
+  background: #313244;
+  border: 1px solid #45475a;
+  border-radius: var(--skmt-radius-xs, 4px);
+  box-shadow: 0 8px 24px oklch(0 0 0 / 0.35);
+}
+ul.CodeMirror-hints li.CodeMirror-hint {
+  padding: 3px 8px;
+  border-radius: var(--skmt-radius-xs, 4px);
+  color: #cdd6f4;
+}
+ul.CodeMirror-hints li.CodeMirror-hint-active {
+  color: #1e1e2e;
+  background: #89b4fa;
+}
+.CodeMirror-lint-tooltip {
+  z-index: 100010;
+}
