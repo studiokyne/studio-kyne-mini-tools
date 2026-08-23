@@ -13,8 +13,22 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+use StudioKyne\MiniTools\Modules\Security\ClientIp;
+
 $auth      = $module_settings['authentication'] ?? [];
 $hardening = $module_settings['hardening'] ?? [];
+
+$ip_source = ClientIp::sanitize_source( $auth['ip_source'] ?? '' );
+
+// En-têtes réellement présents sur CETTE requête : informe l'administrateur
+// sans jamais décider à sa place (leur présence est ce qu'un attaquant contrôle).
+$detected_headers = ClientIp::detected_headers();
+
+$ip_sources = [
+	ClientIp::SOURCE_REMOTE_ADDR => __( 'Aucun proxy — adresse de connexion directe (recommandé)', 'studio-kyne-mini-tools' ),
+	ClientIp::SOURCE_CLOUDFLARE  => __( 'Cloudflare — en-tête CF-Connecting-IP', 'studio-kyne-mini-tools' ),
+	ClientIp::SOURCE_FORWARDED   => __( 'Reverse proxy — en-tête X-Forwarded-For', 'studio-kyne-mini-tools' ),
+];
 ?>
 
 <form id="skmt-module-form" class="skmt-form skmt-module-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
@@ -129,6 +143,29 @@ $hardening = $module_settings['hardening'] ?? [];
 					><?php echo esc_textarea( implode( "\n", $auth['rate_limit_whitelist'] ?? [] ) ); ?></textarea>
 					<p class="skmt-form__help"><?php esc_html_e( 'Ces IPs ne seront jamais bloquées par le rate limiting.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
+
+				<div class="skmt-form__group">
+					<label for="skmt_ip_source" class="skmt-form__label">
+						<?php esc_html_e( "Origine de l’adresse IP", 'studio-kyne-mini-tools' ); ?>
+					</label>
+					<select id="skmt_ip_source" name="skmt_module_settings[ip_source]" class="skmt-select">
+						<?php foreach ( $ip_sources as $value => $label ) : ?>
+							<option value="<?php echo esc_attr( $value ); ?>" <?php selected( $ip_source, $value ); ?>>
+								<?php echo esc_html( $label ); ?>
+							</option>
+						<?php endforeach; ?>
+					</select>
+					<p class="skmt-form__help">
+						<?php esc_html_e( "Comment identifier un visiteur pour compter ses tentatives. Les en-têtes de proxy sont envoyés par le client : ne les activez que si le site est réellement derrière ce proxy, sinon le blocage se contourne en changeant simplement d’en-tête.", 'studio-kyne-mini-tools' ); ?>
+					</p>
+					<?php if ( $detected_headers ) : ?>
+						<p class="skmt-form__help">
+							<strong><?php esc_html_e( 'Détecté sur cette requête :', 'studio-kyne-mini-tools' ); ?></strong>
+							<?php echo esc_html( implode( ', ', array_keys( $detected_headers ) ) ); ?>.
+							<?php esc_html_e( "Leur présence ne prouve pas qu’un proxy les a posés.", 'studio-kyne-mini-tools' ); ?>
+						</p>
+					<?php endif; ?>
+				</div>
 			</div>
 
 			<!-- Custom Login URL Toggle + Input -->
@@ -180,6 +217,14 @@ $hardening = $module_settings['hardening'] ?? [];
 					<p class="skmt-form__help">
 						<?php esc_html_e( 'Exemples : connexion, login, admin, etc.', 'studio-kyne-mini-tools' ); ?>
 					</p>
+					<p class="skmt-form__help">
+						<?php esc_html_e( "En cas d'oubli, poser define( 'SKMT_DISABLE_LOGIN_URL', true ); dans wp-config.php reactive wp-login.php.", 'studio-kyne-mini-tools' ); ?>
+					</p>
+					<?php if ( \StudioKyne\MiniTools\Modules\Security\Module::login_url_disabled() ) : ?>
+						<p class="skmt-form__help">
+							<strong><?php esc_html_e( "Actuellement neutralisee par la constante SKMT_DISABLE_LOGIN_URL : wp-login.php reste accessible.", 'studio-kyne-mini-tools' ); ?></strong>
+						</p>
+					<?php endif; ?>
 				</div>
 			</div>
 

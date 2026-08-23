@@ -27,7 +27,8 @@ class Module extends AbstractModule {
 			$auth['rate_limit_whitelist'] ?? [],
 			$auth['rate_limit_attempts']  ?? 5,
 			$auth['rate_limit_window']    ?? 900,
-			$auth['rate_limit_lockout']   ?? 1800
+			$auth['rate_limit_lockout']   ?? 1800,
+			$auth['ip_source']            ?? ClientIp::SOURCE_REMOTE_ADDR
 		);
 		$this->hardening     = new HardeningService(
 			$this->settings['hardening']['disable_xmlrpc'] ?? false,
@@ -44,7 +45,7 @@ class Module extends AbstractModule {
 			add_action( 'wp_login_failed', [ $this, 'handle_login_failed' ] );
 		}
 
-		if ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) {
+		if ( ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) && ! self::login_url_disabled() ) {
 			add_action( 'wp_loaded',          [ $this->login_handler, 'wp_loaded' ], 10 );
 			add_filter( 'login_url',          [ $this->login_handler, 'filter_login_url' ], 10, 3 );
 			add_filter( 'site_url',           [ $this->login_handler, 'filter_site_url' ], 10 );
@@ -106,22 +107,52 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Récupère l'IP du client (supporte proxies et Cloudflare).
+	 * Porte de sortie : desactive l'URL de connexion personnalisee.
+	 *
+	 * A poser dans wp-config.php quand le slug a ete oublie ou mal saisi —
+	 * sans quoi wp-login.php reste bloque et le site devient inaccessible,
+	 * sans aucun recours depuis le navigateur.
+	 *
+	 *     define( 'SKMT_DISABLE_LOGIN_URL', true );
+	 */
+	public static function login_url_disabled(): bool {
+		return defined( 'SKMT_DISABLE_LOGIN_URL' ) && SKMT_DISABLE_LOGIN_URL;
+	}
+
+	/**
+	 * IP du client — déléguée au rate limiter, qui applique la source déclarée.
+	 *
+	 * Il y avait ici une seconde implémentation qui retenait la PREMIÈRE entrée
+	 * de X-Forwarded-For quand RateLimiter retenait la dernière : les tentatives
+	 * étaient donc comptées sous une clé que le blocage ne relisait jamais.
 	 *
 	 * @return string
 	 */
 	private function get_client_ip(): string {
-		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
+		return $this->rate_limiter->get_client_ip();
+	}
+
+	/**
+	 * Aplatit les réglages stockés vers la forme du formulaire.
+	 *
+	 * Le module stocke sous authentication/hardening mais save_settings() lit
+	 * des clés à plat : sans cette conversion, un import écraserait tout par
+	 * les valeurs par défaut.
+	 *
+	 * @param array $stored Réglages tels qu'ils sont en base.
+	 */
+	public function to_form_payload( array $stored ): array {
+		$auth      = is_array( $stored['authentication'] ?? null ) ? $stored['authentication'] : [];
+		$hardening = is_array( $stored['hardening'] ?? null ) ? $stored['hardening'] : [];
+
+		$payload = array_merge( $auth, $hardening );
+
+		// La liste blanche arrive du formulaire sous forme de textarea.
+		if ( isset( $payload['rate_limit_whitelist'] ) && is_array( $payload['rate_limit_whitelist'] ) ) {
+			$payload['rate_limit_whitelist'] = implode( PHP_EOL, $payload['rate_limit_whitelist'] );
 		}
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ips = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
-			return trim( $ips[0] );
-		}
-		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-		}
-		return '0.0.0.0';
+
+		return $payload;
 	}
 
 	/**
@@ -130,6 +161,13 @@ class Module extends AbstractModule {
 	 * @return array
 	 */
 	public function get_settings(): array {
+		// Une instance créée hors du cycle d'initialisation (import de
+		// configuration, module désactivé) n'a jamais rempli $this->settings :
+		// on lit alors la base, comme le font les autres modules.
+		if ( ! $this->settings ) {
+			$this->settings = $this->get_module_settings( self::get_defaults() );
+		}
+
 		return $this->settings;
 	}
 
@@ -159,8 +197,18 @@ class Module extends AbstractModule {
 			}
 		}
 
+		$current['authentication']['ip_source'] = ClientIp::sanitize_source( $settings['ip_source'] ?? '' );
+
 		if ( isset( $settings['rate_limit_whitelist'] ) ) {
-			$ips = array_filter( array_map( 'trim', explode( "\n", $settings['rate_limit_whitelist'] ) ) );
+			// Seules de vraies IP sont retenues : une entrée invalide ne
+			// correspondrait à rien et donnerait une whitelist qu'on croit active.
+			$lines = explode( "\n", (string) wp_unslash( $settings['rate_limit_whitelist'] ) );
+			$ips   = array_filter(
+				array_map( 'trim', $lines ),
+				static function ( $ip ) {
+					return (bool) filter_var( $ip, FILTER_VALIDATE_IP );
+				}
+			);
 			$current['authentication']['rate_limit_whitelist'] = array_values( $ips );
 		}
 
@@ -236,6 +284,9 @@ class Module extends AbstractModule {
 				'rate_limit_window'       => 900,
 				'rate_limit_lockout'      => 1800,
 				'rate_limit_whitelist'    => [],
+				// REMOTE_ADDR par défaut : c'est la seule valeur qu'un client ne
+				// peut pas falsifier. Voir ClientIp.
+				'ip_source'               => ClientIp::SOURCE_REMOTE_ADDR,
 			],
 			'hardening'      => [
 				'disable_xmlrpc'    => false,

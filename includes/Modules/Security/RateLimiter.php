@@ -13,30 +13,29 @@ class RateLimiter {
 	private const DEFAULT_LOCKOUT  = 1800;  // 30 min
 	private const TRANSIENT_TTL    = 86400; // 24 h max de vie
 
-	private int   $max_attempts;
-	private int   $window;
-	private int   $lockout;
-	private array $whitelist;
+	private int    $max_attempts;
+	private int    $window;
+	private int    $lockout;
+	private array  $whitelist;
+	private string $ip_source;
 
-	public function __construct( array $whitelist = [], int $max_attempts = self::DEFAULT_ATTEMPTS, int $window = self::DEFAULT_WINDOW, int $lockout = self::DEFAULT_LOCKOUT ) {
+	public function __construct( array $whitelist = [], int $max_attempts = self::DEFAULT_ATTEMPTS, int $window = self::DEFAULT_WINDOW, int $lockout = self::DEFAULT_LOCKOUT, string $ip_source = ClientIp::SOURCE_REMOTE_ADDR ) {
 		$this->whitelist     = $whitelist;
 		$this->max_attempts  = max( 1, $max_attempts );
 		$this->window        = max( 60, $window );
 		$this->lockout       = max( 60, $lockout );
+		$this->ip_source     = ClientIp::sanitize_source( $ip_source );
 	}
 
-	private function get_client_ip(): string {
-		if ( ! empty( $_SERVER['HTTP_CF_CONNECTING_IP'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['HTTP_CF_CONNECTING_IP'] ) );
-		}
-		if ( ! empty( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) {
-			$ips = explode( ',', sanitize_text_field( wp_unslash( $_SERVER['HTTP_X_FORWARDED_FOR'] ) ) );
-			return trim( end( $ips ) ); // dernière IP = la plus fiable contre le spoofing
-		}
-		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			return sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-		}
-		return '0.0.0.0';
+	/**
+	 * IP du client, résolue par ClientIp.
+	 *
+	 * Une seule implémentation pour tout le module : le compteur doit être
+	 * incrémenté sur exactement la même clé que celle que consulte le blocage,
+	 * sinon on compte des tentatives que l'on ne relit jamais.
+	 */
+	public function get_client_ip(): string {
+		return ClientIp::resolve( $this->ip_source );
 	}
 
 	public function is_whitelisted(): bool {

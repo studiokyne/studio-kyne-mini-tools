@@ -21,14 +21,44 @@ class LoginUrlHandler {
 	}
 
 	/**
-	 * Vérifie si l'URI actuelle correspond à la connexion personnalisée.
+	 * Racine de l'installation WordPress, sans slash final.
 	 *
-	 * @param string $uri
-	 * @return bool
+	 * Vaut '' à la racine du domaine, '/wp' pour une installation en
+	 * sous-répertoire. On lit l'option brute plutôt que site_url() : cette
+	 * classe filtre justement 'site_url', l'appeler ici boucherait à l'infini.
 	 */
-	private function is_custom_login_uri( string $uri ): bool {
-		$pattern = '/^\/?' . preg_quote( $this->custom_login_url, '/' ) . '(\/|\?|$)/';
-		return (bool) preg_match( $pattern, $uri );
+	private function install_path(): string {
+		$path = (string) wp_parse_url( (string) get_option( 'siteurl' ), PHP_URL_PATH );
+		$path = trim( $path, '/' );
+
+		return '' === $path ? '' : '/' . $path;
+	}
+
+	/** Chemin absolu de la page de connexion, ex '/connexion' ou '/wp/connexion'. */
+	private function login_path(): string {
+		return $this->install_path() . '/' . $this->custom_login_url;
+	}
+
+	/** URL absolue de la page de connexion, avec slash final. */
+	private function login_url(): string {
+		return trailingslashit( (string) get_option( 'siteurl' ) ) . $this->custom_login_url . '/';
+	}
+
+	/**
+	 * Vérifie si un CHEMIN correspond à la connexion personnalisée.
+	 *
+	 * Le chemin est comparé en absolu, racine d'installation comprise : sur un
+	 * WordPress en sous-répertoire, la requête arrive sur '/wp/connexion' et un
+	 * motif ancré sur '/connexion' ne reconnaîtrait jamais rien — la page de
+	 * connexion deviendrait inaccessible alors que wp-login.php est bloqué.
+	 *
+	 * @param string $path Chemin de la requête, déjà extrait de l'URI.
+	 */
+	private function is_custom_login_uri( string $path ): bool {
+		$path   = '/' . ltrim( $path, '/' );
+		$target = $this->login_path();
+
+		return $path === $target || 0 === strpos( $path, $target . '/' );
 	}
 
 	/**
@@ -51,7 +81,11 @@ class LoginUrlHandler {
 
 		// Bloquer l'accès direct à wp-login.php : remplacer l'URI par une URL
 		// inexistante et laisser WordPress générer un vrai 404 via son template.
-		if ( strpos( rawurldecode( $request_uri ), 'wp-login.php' ) !== false && ! is_admin() ) {
+		//
+		// On teste le nom de fichier du CHEMIN, jamais l'URI entière : un
+		// simple ?redirect_to=…/wp-login.php — que WordPress produit lui-même —
+		// suffisait à faire répondre 404 à des pages parfaitement légitimes.
+		if ( 'wp-login.php' === basename( $path ) && ! is_admin() ) {
 			global $pagenow;
 			$pagenow = 'index.php';
 
@@ -102,7 +136,11 @@ class LoginUrlHandler {
 
 		if ( strpos( $url, 'wp-login.php' ) !== false ) {
 			$parts = explode( '?', $url, 2 );
-			$base  = home_url( $this->custom_login_url . '/' );
+
+			// site_url() et non home_url() : la connexion vit dans le répertoire
+			// d'installation de WordPress, qui diffère de l'adresse du site dès
+			// que le cœur est installé dans un sous-dossier.
+			$base = $this->login_url();
 
 			if ( isset( $parts[1] ) ) {
 				parse_str( $parts[1], $params );
