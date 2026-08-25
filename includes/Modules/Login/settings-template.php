@@ -86,7 +86,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 							value="<?php echo esc_attr( $layout['panel_bg_color'] ?? '#eaeaea' ); ?>"
 						>
 						<span class="skmt-color-field__value"><?php echo esc_html( $layout['panel_bg_color'] ?? '#eaeaea' ); ?></span>
-						<button type="button" class="skmt-color-reset" data-default="#eaeaea" title="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
+						<button type="button" class="skmt-color-reset" data-default="#eaeaea" data-skmt-tip="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
 					</div>
 				</div>
 			</div>
@@ -182,7 +182,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 					<div class="skmt-color-field">
 						<input type="color" id="skmt_bg_color" name="skmt_module_settings[form][bg_color]" value="<?php echo esc_attr( $form['bg_color'] ?? '#f7f7f7' ); ?>">
 						<span class="skmt-color-field__value"><?php echo esc_html( $form['bg_color'] ?? '#f7f7f7' ); ?></span>
-						<button type="button" class="skmt-color-reset" data-default="#f7f7f7" title="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
+						<button type="button" class="skmt-color-reset" data-default="#f7f7f7" data-skmt-tip="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
 					</div>
 				</div>
 			</div>
@@ -196,7 +196,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 					<div class="skmt-color-field">
 						<input type="color" id="skmt_btn_bg_color" name="skmt_module_settings[form][btn_bg_color]" value="<?php echo esc_attr( $form['btn_bg_color'] ?? '#615FFF' ); ?>">
 						<span class="skmt-color-field__value"><?php echo esc_html( $form['btn_bg_color'] ?? '#615FFF' ); ?></span>
-						<button type="button" class="skmt-color-reset" data-default="#615FFF" title="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
+						<button type="button" class="skmt-color-reset" data-default="#615FFF" data-skmt-tip="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
 					</div>
 				</div>
 			</div>
@@ -210,7 +210,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 					<div class="skmt-color-field">
 						<input type="color" id="skmt_btn_text_color" name="skmt_module_settings[form][btn_text_color]" value="<?php echo esc_attr( $form['btn_text_color'] ?? '#ffffff' ); ?>">
 						<span class="skmt-color-field__value"><?php echo esc_html( $form['btn_text_color'] ?? '#ffffff' ); ?></span>
-						<button type="button" class="skmt-color-reset" data-default="#ffffff" title="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
+						<button type="button" class="skmt-color-reset" data-default="#ffffff" data-skmt-tip="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
 					</div>
 				</div>
 			</div>
@@ -224,7 +224,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 					<div class="skmt-color-field">
 						<input type="color" id="skmt_link_color" name="skmt_module_settings[form][link_color]" value="<?php echo esc_attr( $form['link_color'] ?? '#615FFF' ); ?>">
 						<span class="skmt-color-field__value"><?php echo esc_html( $form['link_color'] ?? '#615FFF' ); ?></span>
-						<button type="button" class="skmt-color-reset" data-default="#615FFF" title="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
+						<button type="button" class="skmt-color-reset" data-default="#615FFF" data-skmt-tip="<?php esc_attr_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>" aria-label="<?php esc_attr_e( 'Réinitialiser la couleur', 'studio-kyne-mini-tools' ); ?>">↩</button>
 					</div>
 				</div>
 			</div>

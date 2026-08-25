@@ -223,7 +223,7 @@ $avatars = $module_settings['avatars'] ?? [];
 		 ============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
-			<h2 class="skmt-section__title"><?php esc_html_e( 'Page de profil', 'studio-kyne-mini-tools' ); ?></h2>
+			<h2 class="skmt-section__title"><?php esc_html_e( 'Page de profil', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Masquage visuel uniquement : chaque fonctionnalité reste active côté serveur. Ces cases épurent l'écran, elles ne retirent aucun droit.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></h2>
 			<p class="skmt-section__desc"><?php esc_html_e( 'Épurez la page de profil des utilisateurs (profile.php) en masquant les options superflues.', 'studio-kyne-mini-tools' ); ?></p>
 		</div>
 		<div class="skmt-section__content">
@@ -363,7 +363,7 @@ $avatars = $module_settings['avatars'] ?? [];
 
 			<!-- Texte gauche -->
 			<div class="skmt-form__group">
-				<label class="skmt-form__label" for="skmt-wl-left-text"><?php esc_html_e( 'Texte gauche du footer', 'studio-kyne-mini-tools' ); ?></label>
+				<label class="skmt-form__label" for="skmt-wl-left-text"><?php esc_html_e( 'Texte gauche du footer', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Le HTML est filtré comme un contenu d'article : scripts et attributs d'événement sont retirés à l'enregistrement.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
 				<textarea class="skmt-input" id="skmt-wl-left-text" name="skmt_module_settings[footer][left_text]" rows="2"><?php echo esc_textarea( $footer['left_text'] ?? '' ); ?></textarea>
 				<p class="skmt-form__help"><?php esc_html_e( 'Supporte le HTML basique (liens, balises em/strong). Laissez vide pour garder la valeur WordPress par défaut.', 'studio-kyne-mini-tools' ); ?></p>
 			</div>
