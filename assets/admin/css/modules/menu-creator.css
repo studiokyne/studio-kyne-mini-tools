@@ -65,7 +65,6 @@
 .skmt-wl-ep__profiles-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   padding: 10px 12px;
   border-bottom: 1px solid var(--skmt-border);
   flex-shrink: 0;
@@ -78,6 +77,14 @@
   color: var(--skmt-text);
 }
 
+.skmt-mc-hdr-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.skmt-mc-hdr-btn,
 .skmt-wl-ep__profiles-add {
   display: flex;
   align-items: center;
@@ -93,6 +100,7 @@
   transition: background 0.12s, color 0.12s;
 }
 
+.skmt-mc-hdr-btn:hover,
 .skmt-wl-ep__profiles-add:hover {
   background: var(--skmt-n200, #e5e7eb);
   color: var(--skmt-text);
@@ -177,13 +185,45 @@
 }
 
 /* Profile list */
-.skmt-wl-ep__profiles-list {
+.skmt-wl-ep__profiles-scroll {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
-  padding: 5px;
+  display: flex;
+  flex-direction: column;
+}
+
+.skmt-wl-ep__profiles-list {
+  padding: 5px 5px 0;
   display: flex;
   flex-direction: column;
   gap: 1px;
+}
+
+/* Création : bouton fantôme en fin de liste, là où le nouveau menu
+   apparaîtra — plutôt qu'une icône « + » isolée dans l'en-tête. */
+.skmt-mc-add-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 5px;
+  padding: 7px;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--skmt-text-secondary);
+  background: transparent;
+  border: 1px dashed var(--skmt-border);
+  border-radius: var(--skmt-radius-sm);
+  cursor: pointer;
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+
+.skmt-mc-add-placeholder:hover {
+  color: var(--skmt-accent);
+  border-color: color-mix(in srgb, var(--skmt-accent) 35%, transparent);
+  background: color-mix(in srgb, var(--skmt-accent) 5%, transparent);
 }
 
 /* ----------------------------------------------------------------
@@ -447,6 +487,78 @@
   color: var(--skmt-n500, #6b7280);
 }
 
+/**
+ * Icône SVG rendue en masque : la source ne donne que la forme, la couleur
+ * vient d'ici. Indispensable pour les icônes de menu monochromes, peintes
+ * pour la barre latérale sombre de wp-admin (fill blanc chez WooCommerce ou
+ * Bricks, stroke currentColor — donc noir en <img> — pour un fichier Lucide),
+ * qui seraient sinon invisibles ou hors thème sur le fond clair de l'éditeur.
+ */
+.skmt-wl-icon-mask {
+  display: inline-block;
+  background-color: currentColor;
+  -webkit-mask-repeat: no-repeat;
+          mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+          mask-position: center;
+  -webkit-mask-size: contain;
+          mask-size: contain;
+}
+
+.skmt-wl-tree-item__icon.skmt-wl-icon-mask {
+  color: var(--skmt-n500, #6b7280);
+}
+
+/* Cadenas « accès direct bloqué » */
+.skmt-wl-tree-item__lock {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--skmt-warning, #b45309);
+}
+
+.skmt-wl-tree-item__stale {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--skmt-warning, #b45309);
+}
+
+.skmt-wl-tree-item.is-stale > .skmt-wl-tree-item__row .skmt-wl-tree-item__label {
+  color: var(--skmt-text-secondary);
+  font-style: italic;
+}
+
+/* Bandeau des entrées obsolètes, au-dessus de l'arbre. */
+.skmt-mc-stale-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  line-height: 1.45;
+  color: var(--skmt-text);
+  background: color-mix(in srgb, var(--skmt-warning, #b45309) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--skmt-warning, #b45309) 28%, transparent);
+  border-radius: var(--skmt-radius-sm);
+}
+
+.skmt-mc-stale-bar__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--skmt-warning, #b45309);
+}
+
+.skmt-mc-stale-bar__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.skmt-mc-stale-bar .skmt-btn {
+  flex-shrink: 0;
+}
+
 /* Label */
 .skmt-wl-tree-item__label {
   flex: 1;
@@ -678,6 +790,14 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
+}
+
+/* Le bloc de libellé absorbe la place restante ; sans min-width:0 son texte
+   d'aide impose sa largeur intrinsèque et pousse le contrôle hors du panneau. */
+.skmt-wl-settings-row--inline > .skmt-wl-settings-row__label {
+  flex: 1;
+  min-width: 0;
 }
 
 .skmt-wl-settings-row--col {
@@ -787,10 +907,15 @@
   flex-shrink: 0;
 }
 
-.skmt-wl-icon-btn-thumb img {
+.skmt-wl-icon-btn-thumb img,
+.skmt-wl-icon-btn-thumb__i {
   width: 16px;
   height: 16px;
   object-fit: contain;
+}
+
+.skmt-wl-icon-btn-thumb .skmt-wl-icon-mask {
+  color: var(--skmt-text);
 }
 
 .skmt-wl-icon-btn-thumb .dashicons {
@@ -808,7 +933,7 @@
   border: 1px solid var(--skmt-border);
   border-radius: var(--skmt-radius-sm);
   box-shadow: var(--skmt-shadow-lg, 0 10px 40px rgba(0,0,0,.15));
-  width: 272px;
+  width: 300px;
   overflow: hidden;
 }
 
@@ -844,9 +969,97 @@
 }
 
 .skmt-wl-icon-pane {
-  padding: 0.625rem;
-  max-height: 200px;
+  max-height: 300px;
   overflow-y: auto;
+}
+
+/* Panneaux sans grille (médiathèque, code SVG) : le padding est porté par le
+   corps, pour que la barre de recherche du panneau Bibliothèque puisse rester
+   collée en haut sans marge parasite. */
+.skmt-wl-icon-pane__body {
+  padding: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.skmt-wl-icon-search-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: 0.5rem 0.625rem;
+  background: var(--skmt-surface, #fff);
+  border-bottom: 1px solid var(--skmt-border);
+}
+
+.skmt-wl-icon-search {
+  width: 100%;
+  font-size: 0.75rem;
+  padding: 0.3rem 0.5rem;
+}
+
+.skmt-wl-icon-scroll {
+  padding: 0.625rem;
+}
+
+.skmt-wl-icon-cat + .skmt-wl-icon-cat {
+  margin-top: 0.625rem;
+}
+
+.skmt-wl-icon-cat__title {
+  margin: 0 0 0.25rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--skmt-text-secondary);
+}
+
+.skmt-wl-icon-code {
+  width: 100%;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.6875rem;
+  line-height: 1.4;
+  resize: vertical;
+}
+
+/* Bouton de repli : l'aperçu de l'icône native rend le « rétablir » explicite. */
+.skmt-wl-icon-picker-footer .skmt-btn {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  line-height: 1;
+}
+
+/* Boîte de 16px centrée : sans elle, un dashicon garde son font-size de 20px
+   (il déborde et pousse le libellé) et une icône <img> se cale sur la ligne
+   de base du texte au lieu d'être centrée. */
+.skmt-wl-icon-reset-thumb {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+
+.skmt-wl-icon-reset__i {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  color: currentColor;
+}
+
+.skmt-wl-icon-reset__i.dashicons {
+  font-size: 16px;
+  line-height: 16px;
+}
+
+.skmt-mc-panel-header__action {
+  margin-left: auto;
 }
 
 .skmt-wl-icon-lib-empty {
@@ -882,20 +1095,30 @@
   border-color: var(--skmt-border);
 }
 
-.skmt-wl-icon-grid-item img {
+.skmt-wl-icon-grid-item img,
+.skmt-wl-icon-grid-item__i {
   width: 20px;
   height: 20px;
   object-fit: contain;
+  color: var(--skmt-text);
 }
 
 .skmt-wl-icon-media-preview {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 36px;
   height: 36px;
-  object-fit: contain;
   margin-top: 0.5rem;
   border: 1px solid var(--skmt-border);
   border-radius: var(--skmt-radius-xs);
+  color: var(--skmt-text);
+}
+
+.skmt-wl-icon-media-preview__i {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
 }
 
 .skmt-wl-icon-picker-footer {

@@ -110,6 +110,33 @@ abstract class AbstractModule implements ModuleInterface {
 		return $stored;
 	}
 
+	/**
+	 * Données du module à joindre à l'export de configuration, EN PLUS de son
+	 * option `skmt_module_{id}`.
+	 *
+	 * Un module qui range une partie de son état dans une option à lui
+	 * (Créateur de menu : les profils sous `skmt_wl_menu_profiles`) doit la
+	 * déclarer ici, sinon elle est absente du JSON d'export et l'utilisateur
+	 * croit avoir sauvegardé une configuration complète.
+	 *
+	 * @return array<string, mixed> Vide = rien à exporter au-delà des réglages.
+	 */
+	public function get_export_extras(): array {
+		return [];
+	}
+
+	/**
+	 * Réimporte ce qu'a produit get_export_extras().
+	 *
+	 * Même règle que pour les réglages : le contenu du fichier ne doit jamais
+	 * atterrir tel quel en base — il repasse par l'assainisseur du module.
+	 *
+	 * @param array<string, mixed> $extras Bloc lu dans le fichier importé.
+	 */
+	public function import_extras( array $extras ): void {
+		// Rien par défaut.
+	}
+
 	/* ================================================================
 	 * ASSETS (défauts vides)
 	 * ================================================================ */
