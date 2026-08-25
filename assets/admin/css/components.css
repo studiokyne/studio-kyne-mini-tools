@@ -88,6 +88,9 @@
   display: inline-block;
   width: 40px;
   height: 24px;
+  /* Dans une ligne flex, un libellé long écraserait le toggle : sa largeur
+     est fixe, il ne doit jamais servir de variable d'ajustement. */
+  flex-shrink: 0;
 }
 
 .skmt-toggle input {
@@ -862,5 +865,117 @@ details[open] .skmt-section__chevron {
 
   .skmt-module-grid {
     grid-template-columns: 1fr;
+  }
+}
+
+/* ================================================================
+   TOOLTIPS
+   ----------------------------------------------------------------
+   Singleton positionné en `fixed` par admin.js (translate3d, comme
+   Popper) : l'élément est hors du flux, donc jamais rogné par un
+   parent en `overflow:hidden` — le cas de toutes nos colonnes
+   scrollables. Le conteneur porte la position, la boîte l'animation,
+   pour que l'une n'écrase pas l'autre.
+   ================================================================ */
+
+.skmt-tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 1000000;
+  pointer-events: none;
+  visibility: hidden;
+  will-change: transform;
+}
+
+.skmt-tooltip.is-visible {
+  visibility: visible;
+}
+
+.skmt-tooltip__box {
+  position: relative;
+  /* Le singleton vit dans <body>, hors de la portée du reset du plugin :
+     sans cette ligne, max-width ne compterait pas le padding. */
+  box-sizing: border-box;
+  max-width: 260px;
+  padding: 5px 8px;
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  color: #fff;
+  background: var(--skmt-n900, #111827);
+  border-radius: var(--skmt-radius-sm, 6px);
+  box-shadow: var(--skmt-shadow-md, 0 4px 12px rgba(0, 0, 0, 0.15));
+  opacity: 0;
+  transform: scale(0.94);
+  transition: opacity 0.12s ease-out, transform 0.12s ease-out;
+}
+
+.skmt-tooltip.is-visible .skmt-tooltip__box {
+  opacity: 1;
+  transform: none;
+}
+
+/* Point d'origine de l'animation : la boîte doit sembler sortir de
+   l'élément survolé, pas se réduire vers son propre centre. */
+.skmt-tooltip[data-placement="top"] .skmt-tooltip__box    { transform-origin: bottom center; }
+.skmt-tooltip[data-placement="bottom"] .skmt-tooltip__box { transform-origin: top center; }
+.skmt-tooltip[data-placement="left"] .skmt-tooltip__box   { transform-origin: right center; }
+.skmt-tooltip[data-placement="right"] .skmt-tooltip__box  { transform-origin: left center; }
+
+.skmt-tooltip__arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  background: inherit;
+  transform: rotate(45deg);
+}
+
+.skmt-tooltip[data-placement="top"] .skmt-tooltip__arrow    { bottom: -3px; margin-left: -4px; }
+.skmt-tooltip[data-placement="bottom"] .skmt-tooltip__arrow { top: -3px;    margin-left: -4px; }
+.skmt-tooltip[data-placement="left"] .skmt-tooltip__arrow   { right: -3px;  margin-top: -4px; }
+.skmt-tooltip[data-placement="right"] .skmt-tooltip__arrow  { left: -3px;   margin-top: -4px; }
+
+/*
+ * Repère d'aide : icône Lucide `info` qui porte une précision en tooltip.
+ * Ni pastille dessinée en CSS ni soulignement pointillé sous le libellé :
+ * le premier fabrique une fausse icône, le second salit la ligne et ne se
+ * lit pas comme un contrôle. Un vrai pictogramme, discret, cliquable au
+ * clavier.
+ */
+.skmt-tip-info {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  margin-left: 5px;
+  vertical-align: -3px;
+  color: var(--skmt-n400);
+  background: none;
+  border: 0;
+  border-radius: 50%;
+  cursor: help;
+  flex-shrink: 0;
+  transition: color 0.12s;
+}
+
+.skmt-tip-info svg {
+  width: 14px;
+  height: 14px;
+  display: block;
+}
+
+.skmt-tip-info:hover,
+.skmt-tip-info:focus-visible {
+  color: var(--skmt-accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skmt-tooltip__box {
+    transition: none;
+    transform: none;
   }
 }

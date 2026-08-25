@@ -15,6 +15,7 @@
     initModalTriggers();
     initUnsavedWarning();
     initModuleAjaxToggles();
+    initTooltips();
   });
 
   /* ================================================================
@@ -377,4 +378,236 @@
       el.classList.remove("is-open");
     });
   });
+
+  /* ================================================================
+   * TOOLTIPS
+   *
+   * Usage : <button data-skmt-tip="Texte"> — et, si besoin,
+   * data-skmt-tip-placement="top|bottom|left|right" (défaut : top).
+   * Aucune initialisation à faire : tout passe par délégation, donc le
+   * markup rendu en JS après coup (arbre du créateur de menu, listes
+   * rechargées en AJAX) est couvert sans y penser.
+   *
+   * Le positionnement est en `fixed` + translate3d : un tooltip enfant
+   * d'une colonne en overflow:hidden serait rogné, et un tooltip en
+   * position absolue devrait connaître les décalages de chacun de ses
+   * parents. En contrepartie il faut suivre le défilement — d'où le
+   * recalcul sur scroll/resize, throttlé en requestAnimationFrame.
+   * ================================================================ */
+
+  var tipEl      = null;
+  var tipBox     = null;
+  var tipArrow   = null;
+  var tipText    = null;
+  var tipRef     = null;   // élément actuellement décrit
+  var tipShowT   = null;
+  var tipHideT   = null;
+  var tipRaf     = null;
+  var tipVisible = false;
+
+  var TIP_SHOW_DELAY = 140;
+  var TIP_HIDE_DELAY = 60;
+  var TIP_MARGIN     = 8;  // marge minimale avec le bord de la fenêtre
+  var TIP_OFFSET     = 8;  // distance entre l'élément et la boîte
+
+  function initTooltips() {
+    // mouseover/mouseout (et non mouseenter/leave) : seuls les premiers
+    // remontent, condition d'une délégation unique sur le document.
+    document.addEventListener("mouseover", function (e) {
+      var el = tipTarget(e.target);
+      if (el) tipScheduleShow(el);
+    });
+
+    document.addEventListener("mouseout", function (e) {
+      var el = tipTarget(e.target);
+      if (!el || el !== tipRef) return;
+      // Passage sur un enfant de la même cible : ce n'est pas une sortie.
+      if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+      tipScheduleHide();
+    });
+
+    // Clavier : même déclencheur au focus, sinon le tooltip n'existe pas
+    // pour qui navigue au Tab — c'est justement ce que `title` fait mal.
+    document.addEventListener("focusin", function (e) {
+      var el = tipTarget(e.target);
+      if (el) tipShow(el);
+    });
+    document.addEventListener("focusout", function (e) {
+      if (tipRef && tipTarget(e.target) === tipRef) tipHide();
+    });
+
+    // Un clic ouvre en général un panneau ou une modale : garder le
+    // tooltip par-dessus n'a aucun intérêt.
+    document.addEventListener("mousedown", function () { tipHide(); }, true);
+    document.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") tipHide();
+    });
+
+    window.addEventListener("scroll", tipReposition, true);
+    window.addEventListener("resize", tipReposition);
+  }
+
+  function tipTarget(node) {
+    if (!node || !node.closest) return null;
+    var el = node.closest("[data-skmt-tip]");
+    if (!el || !el.getAttribute("data-skmt-tip")) return null;
+    if (el.disabled) return null;
+    return el;
+  }
+
+  function tipEnsureEl() {
+    if (tipEl) return;
+    tipEl = document.createElement("div");
+    tipEl.className = "skmt-tooltip";
+    tipEl.setAttribute("role", "tooltip");
+    tipEl.innerHTML =
+      '<div class="skmt-tooltip__box">' +
+        '<span class="skmt-tooltip__text"></span>' +
+        '<span class="skmt-tooltip__arrow"></span>' +
+      "</div>";
+    document.body.appendChild(tipEl);
+    tipBox   = tipEl.querySelector(".skmt-tooltip__box");
+    tipText  = tipEl.querySelector(".skmt-tooltip__text");
+    tipArrow = tipEl.querySelector(".skmt-tooltip__arrow");
+  }
+
+  function tipScheduleShow(el) {
+    if (el === tipRef && tipVisible) { clearTimeout(tipHideT); return; }
+    clearTimeout(tipHideT);
+    clearTimeout(tipShowT);
+    // Un tooltip déjà ouvert : on enchaîne sans délai, comme un menu dont
+    // les entrées se survolent (réattendre 140 ms donne une UI molle).
+    if (tipVisible) { tipShow(el); return; }
+    tipShowT = setTimeout(function () { tipShow(el); }, TIP_SHOW_DELAY);
+  }
+
+  function tipScheduleHide() {
+    clearTimeout(tipShowT);
+    clearTimeout(tipHideT);
+    tipHideT = setTimeout(tipHide, TIP_HIDE_DELAY);
+  }
+
+  function tipShow(el) {
+    var text = el.getAttribute("data-skmt-tip");
+    if (!text) return;
+    tipEnsureEl();
+    clearTimeout(tipShowT);
+    clearTimeout(tipHideT);
+
+    // `title` ferait doublon avec notre boîte : on le retire, en le
+    // gardant de côté pour pouvoir le rendre si besoin.
+    var native = el.getAttribute("title");
+    if (native) {
+      el.setAttribute("data-skmt-tip-title", native);
+      el.removeAttribute("title");
+    }
+
+    tipRef = el;
+    tipText.textContent = text;
+    tipEl.setAttribute("data-placement", tipPlacementOf(el));
+    tipEl.classList.add("is-visible");
+    tipVisible = true;
+    tipPlace();
+  }
+
+  function tipHide() {
+    clearTimeout(tipShowT);
+    clearTimeout(tipHideT);
+    if (!tipEl) { tipRef = null; return; }
+    tipEl.classList.remove("is-visible");
+    tipVisible = false;
+    tipRef = null;
+  }
+
+  function tipPlacementOf(el) {
+    var p = el.getAttribute("data-skmt-tip-placement") || "top";
+    return /^(top|bottom|left|right)$/.test(p) ? p : "top";
+  }
+
+  function tipReposition() {
+    if (!tipVisible || tipRaf) return;
+    tipRaf = window.requestAnimationFrame(function () {
+      tipRaf = null;
+      tipPlace();
+    });
+  }
+
+  function tipPlace() {
+    if (!tipVisible || !tipRef) return;
+
+    // L'élément a pu disparaître (re-rendu d'une liste) ou sortir de
+    // l'écran en défilant dans sa colonne : plus rien à décrire.
+    if (!document.contains(tipRef)) { tipHide(); return; }
+    var r = tipRef.getBoundingClientRect();
+    if (!r.width && !r.height) { tipHide(); return; }
+    if (r.bottom < 0 || r.right < 0 ||
+        r.top > window.innerHeight || r.left > window.innerWidth) { tipHide(); return; }
+
+    tipBox.style.maxWidth = Math.min(260, window.innerWidth - TIP_MARGIN * 2) + "px";
+    var w = tipEl.offsetWidth;
+    var h = tipEl.offsetHeight;
+    var p = tipPlacementOf(tipRef);
+
+    // Bascule sur le côté opposé quand la place manque — et seulement si
+    // l'opposé en offre davantage, pour ne pas osciller.
+    var space = {
+      top:    r.top - TIP_OFFSET - TIP_MARGIN,
+      bottom: window.innerHeight - r.bottom - TIP_OFFSET - TIP_MARGIN,
+      left:   r.left - TIP_OFFSET - TIP_MARGIN,
+      right:  window.innerWidth - r.right - TIP_OFFSET - TIP_MARGIN,
+    };
+    var opposite = { top: "bottom", bottom: "top", left: "right", right: "left" };
+    var need = (p === "top" || p === "bottom") ? h : w;
+    if (space[p] < need && space[opposite[p]] > space[p]) p = opposite[p];
+
+    var left, top;
+    if (p === "top" || p === "bottom") {
+      left = r.left + r.width / 2 - w / 2;
+      top  = p === "top" ? r.top - h - TIP_OFFSET : r.bottom + TIP_OFFSET;
+    } else {
+      top  = r.top + r.height / 2 - h / 2;
+      left = p === "left" ? r.left - w - TIP_OFFSET : r.right + TIP_OFFSET;
+    }
+
+    // Recadrage dans la fenêtre : la boîte glisse, la flèche reste sur
+    // l'élément (sinon elle pointe à côté dans les coins).
+    var maxLeft = window.innerWidth - w - TIP_MARGIN;
+    var maxTop  = window.innerHeight - h - TIP_MARGIN;
+    left = Math.max(TIP_MARGIN, Math.min(left, Math.max(TIP_MARGIN, maxLeft)));
+    top  = Math.max(TIP_MARGIN, Math.min(top,  Math.max(TIP_MARGIN, maxTop)));
+
+    if (p === "top" || p === "bottom") {
+      tipArrow.style.top  = "";
+      tipArrow.style.left = clampArrow(r.left + r.width / 2 - left, w) + "px";
+    } else {
+      tipArrow.style.left = "";
+      tipArrow.style.top  = clampArrow(r.top + r.height / 2 - top, h) + "px";
+    }
+
+    tipEl.setAttribute("data-placement", p);
+    tipEl.style.transform = "translate3d(" + Math.round(left) + "px," + Math.round(top) + "px,0)";
+  }
+
+  function clampArrow(pos, size) {
+    return Math.max(10, Math.min(pos, size - 10));
+  }
+
+  /**
+   * API publique — utile quand le DOM bouge sous le tooltip (ligne
+   * supprimée, panneau replié) ou pour poser un texte à la volée.
+   */
+  window.skmtTooltip = {
+    hide: tipHide,
+    refresh: tipPlace,
+    set: function (el, text) {
+      if (!el) return;
+      if (text) el.setAttribute("data-skmt-tip", text);
+      else      el.removeAttribute("data-skmt-tip");
+      if (tipRef === el) {
+        if (text) tipShow(el);
+        else      tipHide();
+      }
+    },
+  };
+
 })();
