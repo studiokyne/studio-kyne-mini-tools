@@ -962,7 +962,7 @@ details[open] .skmt-section__chevron {
   transition: color 0.12s;
 }
 
-.skmt-tip-info svg {
+.skmt-tip-info__i {
   width: 14px;
   height: 14px;
   display: block;

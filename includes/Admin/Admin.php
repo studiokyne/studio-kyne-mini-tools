@@ -1007,7 +1007,13 @@ class Admin {
 			. ' data-skmt-tip="' . esc_attr( $text ) . '"'
 			. ( 'top' === $placement ? '' : ' data-skmt-tip-placement="' . esc_attr( $placement ) . '"' )
 			. ' aria-label="' . esc_attr( $text ) . '">'
-			. $this->render_icon( 'info', 'sm' )
+			// Le SVG est émis ici plutôt que par render_icon() : `.skmt-icon`
+			// force 20px en !important (pour tenir tête à wp-admin), ce qu'une
+			// règle de composant ne peut pas contredire — le marqueur ferait
+			// 20px dans un bouton de 16 et déborderait de la ligne.
+			. '<svg class="skmt-tip-info__i" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+			. ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+			. ' aria-hidden="true" focusable="false">' . $this->get_icon_paths()['info'] . '</svg>'
 			. '</button>';
 	}
 
