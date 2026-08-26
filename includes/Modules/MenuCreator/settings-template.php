@@ -20,6 +20,11 @@ $svg = [
 	'chevron-d' => '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
 	'chevron-u' => '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>',
 	'chevron-l' => '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>',
+	'lock'      => '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>',
+	'download'  => '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/></svg>',
+	'upload'    => '<svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m17 8-5-5-5 5"/><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/></svg>',
+	'warn'      => '<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+	'info'      => '<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>',
 	'menu-ph'   => '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16"/><path d="M4 12h16"/><path d="M4 19h16"/></svg>',
 ];
 ?>
@@ -32,9 +37,21 @@ $svg = [
 
 		<div class="skmt-wl-ep__profiles-header">
 			<span class="skmt-wl-ep__profiles-title"><?php esc_html_e( 'Menus', 'studio-kyne-mini-tools' ); ?></span>
-			<button type="button" class="skmt-wl-ep__profiles-add" id="skmt-mc-new-btn" title="<?php esc_attr_e( 'Nouveau menu', 'studio-kyne-mini-tools' ); ?>">
-				<?php echo $svg['plus']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
-			</button>
+			<!-- Import / export de la totalité des menus : actions de gestion,
+				 donc en icône seule dans l'en-tête, hors du flux de navigation. -->
+			<span class="skmt-mc-hdr-actions">
+				<button type="button" class="skmt-mc-hdr-btn" id="skmt-mc-import-btn"
+					data-skmt-tip="<?php esc_attr_e( 'Importer un ou plusieurs menus depuis un .json', 'studio-kyne-mini-tools' ); ?>"
+					aria-label="<?php esc_attr_e( 'Importer des menus', 'studio-kyne-mini-tools' ); ?>">
+					<?php echo $svg['upload']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				</button>
+				<button type="button" class="skmt-mc-hdr-btn" id="skmt-mc-export-all-btn"
+					data-skmt-tip="<?php esc_attr_e( 'Exporter tous les menus dans un .json', 'studio-kyne-mini-tools' ); ?>"
+					aria-label="<?php esc_attr_e( 'Exporter tous les menus', 'studio-kyne-mini-tools' ); ?>">
+					<?php echo $svg['download']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				</button>
+				<input type="file" id="skmt-mc-import-file" accept="application/json,.json" style="display:none">
+			</span>
 		</div>
 
 		<div class="skmt-wl-ep__profiles-search-wrap">
@@ -48,7 +65,15 @@ $svg = [
 			<button type="button" class="skmt-wl-ep__profiles-tab" data-filter="draft"><?php esc_html_e( 'Brouillons', 'studio-kyne-mini-tools' ); ?></button>
 		</div>
 
-		<div class="skmt-wl-ep__profiles-list" id="skmt-wl-ep-profiles-list"></div>
+		<!-- La création suit immédiatement le dernier menu (et non le bas de la
+			 colonne) : le bouton occupe la place où le nouveau menu apparaîtra. -->
+		<div class="skmt-wl-ep__profiles-scroll">
+			<div class="skmt-wl-ep__profiles-list" id="skmt-wl-ep-profiles-list"></div>
+			<button type="button" class="skmt-mc-add-placeholder" id="skmt-mc-new-btn">
+				<?php echo $svg['plus']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+				<span><?php esc_html_e( 'Nouveau menu', 'studio-kyne-mini-tools' ); ?></span>
+			</button>
+		</div>
 
 	</aside>
 
@@ -65,6 +90,10 @@ $svg = [
 				+ <?php esc_html_e( 'Lien personnalisé', 'studio-kyne-mini-tools' ); ?>
 			</button>
 		</div>
+
+		<!-- Bandeau des entrées orphelines : rempli par le JS quand le profil
+			 référence des slugs absents du menu WP courant. -->
+		<div class="skmt-mc-stale-bar" id="skmt-mc-stale-bar" style="display:none"></div>
 
 		<div class="skmt-mc-placeholder" id="skmt-mc-placeholder">
 			<span class="skmt-mc-placeholder__icon"><?php echo $svg['menu-ph']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
@@ -83,11 +112,18 @@ $svg = [
 
 		<!-- En-tête du panel (titre dynamique + bouton retour) -->
 		<div class="skmt-mc-panel-header">
-			<button type="button" class="skmt-mc-back-btn" id="skmt-mc-back-btn" style="display:none" title="<?php esc_attr_e( 'Retour aux paramètres du menu', 'studio-kyne-mini-tools' ); ?>">
+			<button type="button" class="skmt-mc-back-btn" id="skmt-mc-back-btn" style="display:none" data-skmt-tip="<?php esc_attr_e( 'Retour aux paramètres du menu', 'studio-kyne-mini-tools' ); ?>">
 				<?php echo $svg['chevron-l']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 				<span><?php esc_html_e( 'Menu', 'studio-kyne-mini-tools' ); ?></span>
 			</button>
 			<span class="skmt-mc-panel-title" id="skmt-mc-panel-title"><?php esc_html_e( 'Paramètres du menu', 'studio-kyne-mini-tools' ); ?></span>
+			<!-- Export du menu ouvert : action de gestion du menu, donc dans son
+				 en-tête et masquée sur la vue d'un élément. -->
+			<button type="button" class="skmt-mc-hdr-btn skmt-mc-panel-header__action" id="skmt-mc-export-btn"
+				data-skmt-tip="<?php esc_attr_e( 'Exporter ce menu en .json', 'studio-kyne-mini-tools' ); ?>"
+				aria-label="<?php esc_attr_e( 'Exporter ce menu', 'studio-kyne-mini-tools' ); ?>">
+				<?php echo $svg['download']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+			</button>
 		</div>
 
 		<!-- Panel profil -->
@@ -157,7 +193,8 @@ $svg = [
 			<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" id="skmt-mc-reset-menu-btn">
 				<?php esc_html_e( 'Réinitialiser', 'studio-kyne-mini-tools' ); ?>
 			</button>
-			<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary" id="skmt-mc-save-panel-btn" disabled>
+			<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary" id="skmt-mc-save-panel-btn" disabled
+				data-skmt-tip="<?php esc_attr_e( 'Enregistrer (Ctrl/Cmd+S) — Ctrl+Z annule, Ctrl+Y rétablit', 'studio-kyne-mini-tools' ); ?>">
 				<?php esc_html_e( 'Enregistrer', 'studio-kyne-mini-tools' ); ?>
 			</button>
 		</div>
@@ -176,5 +213,8 @@ window.skmtLucide = {
 	chevronR:    <?php echo wp_json_encode( $svg['chevron-r'] ); ?>,
 	chevronD:    <?php echo wp_json_encode( $svg['chevron-d'] ); ?>,
 	chevronU:    <?php echo wp_json_encode( $svg['chevron-u'] ); ?>,
+	lock:        <?php echo wp_json_encode( $svg['lock'] ); ?>,
+	warn:        <?php echo wp_json_encode( $svg['warn'] ); ?>,
+	info:        <?php echo wp_json_encode( $svg['info'] ); ?>,
 };
 </script>

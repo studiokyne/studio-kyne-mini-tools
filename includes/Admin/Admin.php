@@ -726,10 +726,20 @@ class Admin {
 			'exported' => current_time( 'c' ),
 			'global'   => get_option( 'skmt_settings', [] ),
 			'modules'  => [],
+			'extras'   => [],
 		];
 
 		foreach ( $this->modules->get_all() as $module_id => $module ) {
 			$data['modules'][ $module_id ] = get_option( 'skmt_module_' . $module_id, [] );
+
+			// Données rangées hors de skmt_module_{id} (profils de menu, etc.) :
+			// sans ce bloc, l'export se croit complet alors qu'il ne l'est pas.
+			// get_all() ne renvoie que les définitions : il faut l'instance.
+			$instance = $this->modules->get_instance( $module_id );
+			$extras   = $instance ? $instance->get_export_extras() : [];
+			if ( ! empty( $extras ) ) {
+				$data['extras'][ $module_id ] = $extras;
+			}
 		}
 
 		$filename = 'skmt-settings-' . gmdate( 'Y-m-d' ) . '.json';
@@ -782,6 +792,20 @@ class Admin {
 		if ( isset( $data['modules'] ) && is_array( $data['modules'] ) ) {
 			foreach ( $data['modules'] as $module_id => $module_settings ) {
 				$this->import_module_settings( sanitize_key( (string) $module_id ), $module_settings );
+			}
+		}
+
+		if ( isset( $data['extras'] ) && is_array( $data['extras'] ) ) {
+			foreach ( $data['extras'] as $module_id => $extras ) {
+				$module_id = sanitize_key( (string) $module_id );
+				if ( ! is_array( $extras ) || ! isset( $this->modules->get_all()[ $module_id ] ) ) {
+					continue;
+				}
+				$instance = $this->modules->get_instance( $module_id );
+				if ( $instance ) {
+					// Le module réassainit lui-même : même chemin que ses propres écrans.
+					$instance->import_extras( $extras );
+				}
 			}
 		}
 
@@ -970,6 +994,27 @@ class Admin {
 		$class = trim( 'skmt-icon skmt-icon--' . $size . ' ' . $extra_class );
 
 		return '<svg class="' . esc_attr( $class ) . '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">' . $path . '</svg>';
+	}
+
+	/**
+	 * Marqueur d'aide : icône Lucide `info` portant une précision en tooltip.
+	 *
+	 * À réserver aux réserves secondaires : ce qui décrit l'action reste dans
+	 * le texte d'aide, seule la nuance qui allongerait la ligne passe ici.
+	 */
+	public function render_help_tip( string $text, string $placement = 'top' ): string {
+		return '<button type="button" class="skmt-tip-info" tabindex="0"'
+			. ' data-skmt-tip="' . esc_attr( $text ) . '"'
+			. ( 'top' === $placement ? '' : ' data-skmt-tip-placement="' . esc_attr( $placement ) . '"' )
+			. ' aria-label="' . esc_attr( $text ) . '">'
+			// Le SVG est émis ici plutôt que par render_icon() : `.skmt-icon`
+			// force 20px en !important (pour tenir tête à wp-admin), ce qu'une
+			// règle de composant ne peut pas contredire — le marqueur ferait
+			// 20px dans un bouton de 16 et déborderait de la ligne.
+			. '<svg class="skmt-tip-info__i" width="14" height="14" viewBox="0 0 24 24" fill="none"'
+			. ' stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"'
+			. ' aria-hidden="true" focusable="false">' . $this->get_icon_paths()['info'] . '</svg>'
+			. '</button>';
 	}
 
 	private function get_icon_paths(): array {

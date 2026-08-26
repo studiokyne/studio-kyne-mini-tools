@@ -286,7 +286,8 @@
       var isSel = (folder.color || "") === c;
       return '<button type="button" class="skmt-media-swatch' + (isNone ? " is-none" : "") + (isSel ? " is-selected" : "") +
         '" data-color="' + escHtml(c) + '" ' + (c ? 'style="background:' + escHtml(c) + '" ' : "") +
-        'title="' + escHtml(isNone ? t("defaultColor", "Par défaut") : c) + '"></button>';
+        'title="' + escHtml(isNone ? t("defaultColor", "Par défaut") : c) + '" ' +
+        'data-skmt-tip="' + escHtml(isNone ? t("defaultColor", "Par défaut") : c) + '"></button>';
     }).join("");
 
     var dd = document.createElement("div");
@@ -413,7 +414,7 @@
     this.el.innerHTML =
       '<div class="skmt-media-sidebar__header">' +
       '<span class="skmt-media-sidebar__title">' + escHtml(t("folders", "Dossiers")) + "</span>" +
-      '<button type="button" class="skmt-media-sidebar__add-btn" title="' + escHtml(t("newFolder", "Nouveau dossier")) + '" aria-label="' + escHtml(t("newFolder", "Nouveau dossier")) + '">' + ICON_PLUS + "</button>" +
+      '<button type="button" class="skmt-media-sidebar__add-btn" title="' + escHtml(t("newFolder", "Nouveau dossier")) + '" data-skmt-tip="' + escHtml(t("newFolder", "Nouveau dossier")) + '" aria-label="' + escHtml(t("newFolder", "Nouveau dossier")) + '">' + ICON_PLUS + "</button>" +
       "</div>" +
       '<div class="skmt-media-sidebar__tree"><div class="skmt-media-loading">' + escHtml(t("loading", "Chargement…")) + "</div></div>";
 

@@ -97,7 +97,7 @@
     // dans le libellé de groupe « WordPress (wp_) ».
     var label = t.name;
     var rows  = t.rows.toLocaleString();
-    return '<div class="skmt-db__table-item" data-table="' + escHtml(t.name) + '" title="' + escHtml(t.name) + '">' +
+    return '<div class="skmt-db__table-item" data-table="' + escHtml(t.name) + '" data-skmt-tip="' + escHtml(t.name) + '" data-skmt-tip-placement="right">' +
            '<span class="skmt-db__table-item-name">' + escHtml(label) + '</span>' +
            '<span class="skmt-db__table-item-rows">' + rows + '</span>' +
            '</div>';
@@ -216,7 +216,7 @@
         });
         html += '<td class="skmt-db__col-actions">';
         if (primary) {
-          html += '<button type="button" class="skmt-db__delete-row" title="' + escHtml(t('delete', 'Supprimer')) + '" aria-label="' + escHtml(t('delete', 'Supprimer')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>';
+          html += '<button type="button" class="skmt-db__delete-row" data-skmt-tip="' + escHtml(t('delete', 'Supprimer')) + '" aria-label="' + escHtml(t('delete', 'Supprimer')) + '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3,6 5,6 21,6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>';
         }
         html += '</td></tr>';
       });

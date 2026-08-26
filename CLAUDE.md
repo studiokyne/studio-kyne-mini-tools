@@ -59,7 +59,9 @@ Each module is a class extending `AbstractModule` (which implements `ModuleInter
 - `static get_defaults(): array` — nested array of defaults, merged recursively by `get_module_settings()`
 - `static get_uninstall_keys(): array` — declare `options`, `meta` (**post** meta) and `user_meta` keys for uninstall cleanup. The two meta channels live in different tables: a user meta declared under `meta` is never deleted.
 
-Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `to_form_payload()`, `on_activate()`, `on_deactivate()`.
+Optional overrides: `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `to_form_payload()`, `get_export_extras()` / `import_extras()`, `on_activate()`, `on_deactivate()`.
+
+`get_export_extras()` / `import_extras()` déclarent l'état du module rangé **hors** de `skmt_module_{id}` (MenuCreator : les profils sous `skmt_wl_menu_profiles`). Sans ça, l'export de configuration se croit complet alors qu'il laisse cette option de côté. Le bloc atterrit sous `extras.{module_id}` dans le JSON, et l'import le renvoie au module — qui le réassainit lui-même, comme `to_form_payload()` pour les réglages.
 
 `get_admin_js_deps()` returns handles of already-registered scripts the module's JS depends on. Use it for shared third-party libraries rather than returning their URL from `get_admin_js()`: two modules doing the latter produce two handles for the same file, which WordPress cannot deduplicate. `skmt-sortable-js` is registered by `Admin::enqueue_assets()` and consumed this way by MenuCreator; the Media module enqueues the same handle.
 
@@ -143,7 +145,23 @@ Orchestrator (`Module.php`) over `ImageProcessor` (conversion/resize), `MediaLib
 
 Applies the `MenuProfileManager` profiles to the actual wp-admin menu: `custom_menu_order` (enabled per-user via `maybe_enable_custom_order`, not blindly) + `menu_order` filter for ordering, `admin_menu` action for visibility/relabeling/separators/custom links (including child/submenu reordering), `admin_head` for injecting per-item icon CSS overrides (base64 SVG or URL), custom-link `target` attributes, and a global menu-icon opacity fix (registered unconditionally). Menu-transforming hooks only register in `init()` if at least one profile is `status === 'active'`. `apply_menu_visibility()` snapshots the untouched WP menu into `self::$pristine_menu`/`$pristine_submenu` **before** mutating the globals, so the editor is fed the real WP menu (not our already-injected separators/custom links).
 
-The editor gets its data through `get_admin_js_data()` (keys `mcProfiles`, `wpMenu`, `wpSubmenu`, `wpRoles`, `wpRecentUsers`, `iconLibrary`) — there is **no** `ajax_get_wp_menu` endpoint. Drag-and-drop reordering uses vendored SortableJS (`assets/admin/js/vendor/sortable.min.js`). Ships its own AJAX endpoints (`skmt_wl_*` action names despite living in the MenuCreator module) and embeds a Lucide icon library inline in `get_lucide_icons()` for the icon picker.
+**Blocage d'accès.** Masquer un item ne fait que le retirer de la barre latérale : l'URL reste ouvrable. La case « Bloquer l'accès direct » (`block_access`, uniquement sur un item déjà masqué — `sanitize_menu_items()` force `false` sur un item visible) ajoute le refus côté serveur via `enforce_blocked_pages()` sur `admin_init` @1. `request_matches_slug()` reconstruit la requête attendue depuis le slug de menu (`slug_to_request()` gère les trois formes : `upload.php`, `edit.php?post_type=page`, et le slug de page d'extension servi par admin.php, y compris `wc-admin&path=/analytics/overview`) : les paramètres du slug doivent tous correspondre, et un slug sans `post_type`/`taxonomy`/`page` ne doit pas matcher une requête qui en porte un — sinon bloquer `edit.php` bloquerait aussi `edit.php?post_type=page`. Jamais actif sur `admin-ajax.php`/`admin-post.php`/`async-upload.php` (un refus y casserait des requêtes légitimes), et `index.php` renvoie un `wp_die` 403 au lieu de la redirection (qui pointe vers lui — boucle). Le message passe par un **toast** (`render_denied_toast()` sur `admin_footer`), pas par une `admin_notice` : celle-ci serait captée par le centre de notifications du plugin et n'apparaîtrait que sous la cloche, alors que l'utilisateur vient d'être redirigé et doit comprendre tout de suite. Le paramètre `skmt_denied` est retiré de l'URL en JS pour qu'un rechargement ne rejoue pas le message. **Ce n'est pas un système de permissions** : REST, WP-CLI et les capacités WP ne sont pas concernés.
+
+**Export.** Les profils vivent sous `skmt_wl_menu_profiles`, hors de `skmt_module_menu_creator` : ils sortent de l'export global par le point d'extension `AbstractModule::get_export_extras()` / `import_extras()` (bloc `extras` du JSON, à côté de `modules`). Ces deux méthodes sont génériques — tout module rangeant son état dans une option à lui doit les surcharger. L'import fusionne par id (`MenuProfileManager::save()` écrase l'entrée de même id, ajoute sinon) : un fichier partiel ne supprime aucun menu. L'éditeur a en plus son propre export/import : deux boutons en icône seule dans l'en-tête de la colonne Menus — importer (upload) et « tout exporter » (download), tous les menus lus depuis `mcProfiles` — l'état en base, pas l'éditeur, pour ne pas embarquer des modifications non enregistrées) et « Exporter » dans le pied du panneau (le menu ouvert, état à l'écran compris). `ajax_import_profile` avale les trois formes (`{profiles:[…]}`, `{profile:…}`, profil nu), repasse chaque menu par `sanitize_profile()` et les crée en brouillon.
+
+**Restriction par rôle des liens personnalisés.** Un item WP est déjà filtré par sa propre capacité ; un lien personnalisé n'est rattaché à rien, d'où le champ `roles` (vide = tout le monde). Le filtrage se fait en **n'ajoutant pas** l'entrée dans `apply_menu_visibility()` (`current_user_has_role()`) : la capacité d'`add_menu_page()` ne peut pas exprimer « ces rôles-là », WordPress ne raisonnant qu'en capacités.
+
+**Historique et raccourcis.** Toute mutation de l'éditeur se termine par `setDirty(true)` : c'est donc `setDirty()` qui empile l'instantané (`pushHistory()`), plutôt qu'un appel par poignée — l'arbre, les champs et le picker en oublieraient un. L'instantané reprend `collectProfile()`, parce que les champs du panneau vivent dans le DOM et pas dans `ed.profile`, mais garde les items avec leurs propriétés d'exécution (`_uid`, `_wpLabel`), sans quoi le retour en arrière casserait la sélection. Deux instantanés à moins de 400 ms fusionnent, sinon chaque caractère tapé coûterait un Ctrl+Z. `applyHistory()` pose `hist.lock` pour que le `setDirty()` du re-rendu ne réempile pas, et revenir à l'index 0 remet le menu en état « enregistré ». Côté clavier : Ctrl/Cmd+S est toujours intercepté, Ctrl+Z / Ctrl+Y sont **laissés au champ** quand le focus est dans une saisie (l'annulation de texte native y est attendue).
+
+**Entrées obsolètes.** `mergeWpMenu()` **conserve** les items dont le slug n'existe plus dans le menu WP courant et les marque `_stale` (badge Lucide `triangle-alert` dans l'arbre + bandeau `#skmt-mc-stale-bar` au-dessus, avec une action « Nettoyer »). Les purger en silence — ce que faisait la version précédente — effaçait le paramétrage d'une extension simplement désactivée le temps d'une mise à jour. Un slug inconnu est inoffensif côté application : `remove_menu_page()` ne fait rien et `apply_menu_order()` passe par un `array_diff`.
+
+**Libellés.** `clean_menu_label()` retire les `<span>` **avec leur contenu** avant `wp_strip_all_tags()` : WP et les extensions collent leurs compteurs dans le titre lui-même (`Commentaires <span class="awaiting-mod">0</span>`), et un simple strip laissait des libellés du type « Commentaires 00 commentaire en modération » dans l'éditeur.
+
+**Picker d'icônes.** Bibliothèque de ~150 SVG Lucide **repris tels quels de lucide-static v1.34.0** et groupés par catégorie dans `get_icon_library()` (`get_lucide_icons()` aplatit pour le JS, `get_icon_categories()` alimente les en-têtes) — voir la règle « jamais de SVG dessiné à la main » plus haut : pour en ajouter, récupérer le fichier officiel, pas approximer. Trois onglets : Bibliothèque (recherche + catégories), Médiathèque, Code SVG. Ce dernier passe par `ajax_sanitize_svg`, qui réutilise `ImageOptimizer\SvgHandler::sanitize()` — même risque, même liste blanche, on n'écrit pas un second nettoyeur. La recherche interroge `get_icon_aliases()` (slug → mots-clés FR/EN, servi comme `iconAliases`) et pas seulement le slug : ceux de Lucide sont anglais et rarement devinables depuis une interface française (`funnel` pour un filtre, `banknote` pour un billet, `boxes` pour un stock). Côté JS, `foldAccents()` replie les accents des deux côtés de la comparaison — inutile de doubler les entrées — et chaque mot saisi doit être trouvé, dans n'importe quel ordre. Une icône sans alias reste cherchable par son nom.
+
+**Icônes — deux pièges structurels.** `inject_menu_icon_overrides()` cible le `<li>` par son attribut `id` (index 5 de `$menu`, reproduit par `menu_dom_id()`), **jamais** par une recherche de sous-chaîne dans le `href` : WooCommerce enregistre « Marketing » sous le slug `woocommerce-marketing` puis réécrit l'URL du menu en `admin.php?page=wc-admin&path=/marketing` — le href ne contient plus le slug, et l'icône n'était jamais appliquée (même chose pour le top-level `woocommerce` → `page=wc-admin`). Le href reste un repli pour les entrées sans hookname. Second piège : une icône de menu SVG est monochrome et peinte pour la barre latérale **sombre** (fill `#f3f1f1` chez WooCommerce/Bricks, `stroke="currentColor"` dans un fichier Lucide uploadé). Rendue en `<img>`, `currentColor` n'hérite de rien et retombe au **noir** ; rendue dans l'éditeur (fond clair), le fill blanc est invisible. Les SVG **monochromes** (`svg_is_monochrome()` : `currentColor`, aucune couleur déclarée, ou une seule — même test dupliqué en JS) sont donc rendus en **masque CSS** (`.skmt-mc-icon` côté menu réel, `.skmt-wl-icon-mask` côté éditeur) : la source ne donne que la forme, la couleur vient de la feuille de style. Les autres médias (PNG, SVG multicolore — le logo du plugin lui-même, carré blanc + glyphe noir, qu'un masque aplatirait en carré plein) restent en `<img>` pour garder leurs couleurs. `resolve_icon_render()` tranche en lisant le fichier local via `read_local_svg()` ; côté éditeur, un SVG servi par URL est récupéré en `fetch` same-origin, mis en cache et l'arbre redessiné une fois.
+
+The editor gets its data through `get_admin_js_data()` (keys `mcProfiles`, `wpMenu`, `wpSubmenu`, `wpRoles`, `wpRecentUsers`, `iconLibrary`, `iconCategories`, `iconAliases`) — there is **no** `ajax_get_wp_menu` endpoint. Drag-and-drop reordering uses vendored SortableJS (`assets/admin/js/vendor/sortable.min.js`). Ships its own AJAX endpoints (`skmt_wl_*` action names despite living in the MenuCreator module) and embeds a Lucide icon library inline in `get_lucide_icons()` for the icon picker.
 
 ### Login
 
@@ -280,6 +298,56 @@ La classe `.skmt-modal-close` et le clic hors-boîte sont gérés automatiquemen
 <button class="skmt-btn skmt-btn--danger">Danger</button>
 <!-- Tailles : ajouter --sm pour petit -->
 ```
+
+Un bouton peut être un `<a>` (« Ouvrir la médiathèque … »). `buttons.css` redéclare
+donc la couleur sur `a.skmt-btn:hover/:focus/:active` par variante : sans ça,
+`a:hover { color:#135e96 }` de wp-admin l'emporte (l'état ajoute une pseudo-classe
+à la spécificité de `.skmt-btn--primary`) et le libellé vire au bleu au survol.
+
+### Tooltips
+
+```html
+<button data-skmt-tip="Exporter ce menu en .json">…</button>
+<button data-skmt-tip="…" data-skmt-tip-placement="right">…</button>   <!-- top par défaut -->
+<?php echo $this->render_help_tip( __( 'Précision', 'studio-kyne-mini-tools' ) ); ?>  <!-- marqueur (i), dans le <label> -->
+```
+
+Système maison (pas de tippy.js : il tire Popper, et le plugin n'a ni build
+ni bundler), défini dans `components.css` + `admin.js`. **Aucune
+initialisation** : tout passe par délégation sur le `document`, donc le markup
+rendu en JS après coup (arbre du créateur de menu, listes AJAX) est couvert
+sans y penser. API : `window.skmtTooltip.hide()`, `.refresh()`, `.set(el, texte)`.
+
+Trois points structurels :
+- Le singleton est en `position:fixed` + `translate3d`, appendé au `<body>` :
+  un tooltip enfant serait rogné par la première colonne en `overflow:hidden`
+  (elles le sont toutes), et en `absolute` il devrait connaître les décalages
+  de chacun de ses parents. Contrepartie : il faut suivre le défilement, d'où
+  le recalcul sur `scroll`/`resize` throttlé en `requestAnimationFrame`, et le
+  masquage automatique quand la référence sort de l'écran ou du DOM.
+- La bascule (`top` → `bottom`…) n'a lieu que si le côté opposé offre **plus**
+  de place, sinon la boîte oscille entre deux positions également trop petites.
+  Après recadrage dans la fenêtre, la flèche est repositionnée sur la
+  référence : sans ça elle pointe à côté dans les coins.
+- Un `title` sur le même élément est retiré au premier survol (sauvegardé dans
+  `data-skmt-tip-title`), sinon la bulle native double la nôtre. Les modules
+  qui tournent **hors** des pages SKMT — `media.js`, chargé par
+  `wp_enqueue_media` là où `admin.js` est absent — gardent donc les deux
+  attributs : `title` sert de repli, `data-skmt-tip` prend le relais quand
+  notre JS est là.
+
+Pour une **précision secondaire** — la réserve qui compte mais qui allongerait
+la ligne — `Admin::render_help_tip( $texte )` pose un marqueur dans le
+`<label>` : l'icône Lucide `info` (`.skmt-tip-info`), pas une pastille dessinée
+en CSS ni un soulignement pointillé sous le libellé — la première fabrique une
+fausse icône, le second salit la ligne et ne se lit pas comme un contrôle.
+`menu-creator.js` en a l'équivalent JS (`helpTip()`, icône servie par
+`window.skmtLucide.info`). Ce qui **décrit** l'option reste dans le texte
+d'aide visible ; seul le détail passe sous le marqueur.
+
+Le survol comme le focus déclenchent la bulle (ce que `title` ne fait pas) ;
+un tooltip déjà ouvert enchaîne sans délai sur le suivant. Sur les pages du
+plugin, préférer `data-skmt-tip` à `title` pour tout contrôle en icône seule.
 
 ### Toasts / notifications
 

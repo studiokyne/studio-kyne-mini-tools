@@ -277,7 +277,7 @@
       extra +
       '" data-action="' +
       action +
-      '" title="' +
+      '" data-skmt-tip="' +
       escHtml(title) +
       '">' +
       icon +

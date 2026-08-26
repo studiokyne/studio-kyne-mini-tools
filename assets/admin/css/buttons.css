@@ -67,3 +67,37 @@
   color: var(--skmt-white);
   border-color: var(--skmt-danger);
 }
+
+/*
+ * Boutons-liens : wp-admin colore `a:hover`/`a:focus` en bleu, et cette règle
+ * l'emporte sur la couleur posée par `.skmt-btn--*` (l'état ajoute une
+ * pseudo-classe). Chaque état doit donc redéclarer la couleur, sinon un
+ * `<a class="skmt-btn">` vire au bleu au survol.
+ */
+a.skmt-btn:hover,
+a.skmt-btn:focus,
+a.skmt-btn:active {
+  color: var(--skmt-text);
+  box-shadow: none;
+}
+
+a.skmt-btn--primary:hover,
+a.skmt-btn--primary:focus,
+a.skmt-btn--primary:active {
+  color: var(--skmt-white);
+}
+
+a.skmt-btn--secondary:hover,
+a.skmt-btn--secondary:focus,
+a.skmt-btn--secondary:active {
+  color: var(--skmt-text);
+}
+
+a.skmt-btn--danger:hover,
+a.skmt-btn--danger:active {
+  color: var(--skmt-white);
+}
+
+a.skmt-btn--danger:focus {
+  color: var(--skmt-danger);
+}

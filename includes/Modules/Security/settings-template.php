@@ -202,6 +202,11 @@ $ip_sources = [
 				<div class="skmt-form__group">
 					<label for="custom_login_url" class="skmt-form__label">
 						<?php esc_html_e( 'Slug personnalisé', 'studio-kyne-mini-tools' ); ?>
+						<?php
+						// Le filet de sécurité est vital mais secondaire : il n'a pas à
+						// occuper une ligne sous chaque champ tant que rien n'est perdu.
+						echo $this->render_help_tip( __( "Slug oublié ? Poser define( 'SKMT_DISABLE_LOGIN_URL', true ); dans wp-config.php réactive wp-login.php.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+						?>
 					</label>
 					<div class="skmt-custom-login-url">
 						<span class="skmt-custom-login-url__base"><?php echo esc_html( trailingslashit( site_url() ) ); ?></span>
@@ -216,9 +221,6 @@ $ip_sources = [
 					</div>
 					<p class="skmt-form__help">
 						<?php esc_html_e( 'Exemples : connexion, login, admin, etc.', 'studio-kyne-mini-tools' ); ?>
-					</p>
-					<p class="skmt-form__help">
-						<?php esc_html_e( "En cas d'oubli, poser define( 'SKMT_DISABLE_LOGIN_URL', true ); dans wp-config.php reactive wp-login.php.", 'studio-kyne-mini-tools' ); ?>
 					</p>
 					<?php if ( \StudioKyne\MiniTools\Modules\Security\Module::login_url_disabled() ) : ?>
 						<p class="skmt-form__help">
@@ -248,6 +250,7 @@ $ip_sources = [
 				<div class="skmt-option__content">
 					<label for="skmt_disable_xmlrpc" class="skmt-option__label">
 						<?php esc_html_e( 'Désactiver XML-RPC.', 'studio-kyne-mini-tools' ); ?>
+						<?php echo $this->render_help_tip( __( "XML-RPC sert encore à l'application mobile WordPress, à Jetpack et aux pingbacks : coupez-le seulement si rien ne s'y connecte.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</label>
 					<p class="skmt-option__desc">
 						<?php esc_html_e( 'Désactive l\'API XML-RPC', 'studio-kyne-mini-tools' ); ?>
@@ -273,6 +276,7 @@ $ip_sources = [
 				<div class="skmt-option__content">
 					<label for="skmt_prevent_user_enum" class="skmt-option__label">
 						<?php esc_html_e( 'Empêcher l\'énumération des utilisateurs', 'studio-kyne-mini-tools' ); ?>
+						<?php echo $this->render_help_tip( __( "Ferme les deux voies les plus utilisées, pas toutes : le formulaire de connexion distingue toujours un identifiant inconnu d'un mot de passe erroné.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</label>
 					<p class="skmt-option__desc">
 						<?php esc_html_e( 'Bloque les requêtes ?author= et l\'accès REST aux utilisateurs.', 'studio-kyne-mini-tools' ); ?>
@@ -298,6 +302,7 @@ $ip_sources = [
 				<div class="skmt-option__content">
 					<label for="skmt_hide_wp_version" class="skmt-option__label">
 						<?php esc_html_e( 'Masquer la version WordPress', 'studio-kyne-mini-tools' ); ?>
+						<?php echo $this->render_help_tip( __( "Cosmétique : la version reste déductible des fichiers du cœur et des scripts versionnés. Utile contre les scans automatisés les plus simples, pas contre un examen manuel.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</label>
 					<p class="skmt-option__desc">
 						<?php esc_html_e( 'Retire la version WordPress des headers HTTP et du meta generator.', 'studio-kyne-mini-tools' ); ?>

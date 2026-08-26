@@ -41,7 +41,7 @@ $module_settings = $instance->get_settings();
 
 			<div class="skmt-option">
 				<div class="skmt-option__content">
-					<label for="skmt_format_mode" class="skmt-option__label"><?php echo esc_html__( 'Format de sortie', 'studio-kyne-mini-tools' ); ?></label>
+					<label for="skmt_format_mode" class="skmt-option__label"><?php echo esc_html__( 'Format de sortie', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "« Auto » prend AVIF si le serveur sait l'encoder, sinon WebP. Un format choisi explicitement mais non supporté ne convertit rien du tout : il n'y a pas de repli.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
 					<p class="skmt-option__desc"><?php echo esc_html__( 'Format de conversion automatique des images.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
@@ -118,7 +118,7 @@ $module_settings = $instance->get_settings();
 		<div class="skmt-section__content">
 			<div class="skmt-option">
 				<div class="skmt-option__content">
-					<label for="skmt_strip_exif" class="skmt-option__label"><?php echo esc_html__( 'Supprimer les métadonnées EXIF', 'studio-kyne-mini-tools' ); ?></label>
+					<label for="skmt_strip_exif" class="skmt-option__label"><?php echo esc_html__( 'Supprimer les métadonnées EXIF', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Irréversible, et le nettoyage emporte tout le bloc : mention de copyright et profil colorimétrique compris. À laisser actif sauf si le site publie des photos d'auteur.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
 					<p class="skmt-option__desc"><?php echo esc_html__( 'Retire les données GPS, appareil photo, etc.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
@@ -135,7 +135,7 @@ $module_settings = $instance->get_settings();
 
 			<div class="skmt-option">
 				<div class="skmt-option__content">
-					<label for="skmt_generate_alt" class="skmt-option__label"><?php echo esc_html__( 'Générer le texte alternatif', 'studio-kyne-mini-tools' ); ?></label>
+					<label for="skmt_generate_alt" class="skmt-option__label"><?php echo esc_html__( 'Générer le texte alternatif', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Ne s'applique qu'aux nouveaux téléversements et n'écrase jamais un texte alternatif déjà saisi. Le nom du fichier vaut ce qu'il vaut : à relire pour les images porteuses de sens.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
 					<p class="skmt-option__desc"><?php echo esc_html__( 'Crée automatiquement le alt text depuis le nom du fichier.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
@@ -152,7 +152,7 @@ $module_settings = $instance->get_settings();
 
 			<div class="skmt-option">
 				<div class="skmt-option__content">
-					<label for="skmt_keep_original" class="skmt-option__label"><?php echo esc_html__( 'Conserver l\'original', 'studio-kyne-mini-tools' ); ?></label>
+					<label for="skmt_keep_original" class="skmt-option__label"><?php echo esc_html__( 'Conserver l\'original', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Double l'espace disque occupé par la médiathèque. À garder tant que la conversion n'a pas été validée sur le site, à couper ensuite.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
 					<p class="skmt-option__desc"><?php echo esc_html__( 'Garde une copie du fichier source en plus du format converti.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">

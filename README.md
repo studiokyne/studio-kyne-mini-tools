@@ -57,6 +57,11 @@ Dans Réglages > Mises à jour GitHub :
 
 - Réorganisation et masquage des entrées du menu wp-admin (drag & drop)
 - Renommage, séparateurs, liens personnalisés, icônes (bibliothèque Lucide)
+- Blocage optionnel de l'accès direct aux pages masquées, liens réservés à certains rôles
+- Import / export des menus (globalement ou menu par menu)
+- Raccourcis clavier : Ctrl/Cmd+S enregistre, Ctrl+Z / Ctrl+Y annulent et rétablissent
+- Signalement des entrées obsolètes (slug absent du menu WordPress courant)
+- Recherche d'icônes en français (« filtre », « panier », « facture »…), accents ignorés
 
 ### Login
 
