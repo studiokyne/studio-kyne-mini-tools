@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Login;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**
@@ -44,6 +46,10 @@ class Module extends AbstractModule {
 
 		if ( ! empty( $this->settings['form']['hide_back_to_blog'] ) ) {
 			add_action( 'login_head', [ $this, 'hide_back_to_blog_css' ], 99 );
+		}
+
+		if ( ! empty( $this->settings['form']['hide_privacy_policy'] ) ) {
+			add_action( 'login_head', [ $this, 'hide_privacy_policy_css' ], 99 );
 		}
 
 		// Charge le media uploader WP sur la page de réglages du module.
@@ -134,6 +140,16 @@ class Module extends AbstractModule {
 	 */
 	public function hide_back_to_blog_css(): void {
 		echo '<style>#backtoblog{display:none!important}</style>';
+	}
+
+	/**
+	 * Injecte un style pour masquer le lien "Politique de confidentialité".
+	 *
+	 * Masquage CSS et non filtre `the_privacy_policy_link` : ce filtre est global,
+	 * il retirerait aussi le lien du pied de page public du thème.
+	 */
+	public function hide_privacy_policy_css(): void {
+		echo '<style>.privacy-policy-page-link{display:none!important}</style>';
 	}
 
 	/**
@@ -264,6 +280,7 @@ class Module extends AbstractModule {
 			$current['form']['hide_language_switcher'] = ! empty( $settings['form']['hide_language_switcher'] );
 			$current['form']['hide_lost_password']     = ! empty( $settings['form']['hide_lost_password'] );
 			$current['form']['hide_back_to_blog']      = ! empty( $settings['form']['hide_back_to_blog'] );
+			$current['form']['hide_privacy_policy']    = ! empty( $settings['form']['hide_privacy_policy'] );
 			$current['form']['bg_color']               = $this->sanitize_color( $settings['form']['bg_color']      ?? '', '#f7f7f7' );
 			$current['form']['btn_bg_color']           = $this->sanitize_color( $settings['form']['btn_bg_color']  ?? '', '#615FFF' );
 			$current['form']['btn_text_color']         = $this->sanitize_color( $settings['form']['btn_text_color'] ?? '', '#ffffff' );
@@ -291,6 +308,7 @@ class Module extends AbstractModule {
 				'hide_language_switcher' => true,
 				'hide_lost_password'     => false,
 				'hide_back_to_blog'      => true,
+				'hide_privacy_policy'    => false,
 				'bg_color'               => '#f7f7f7',
 				'btn_bg_color'           => '#615FFF',
 				'btn_text_color'         => '#ffffff',
