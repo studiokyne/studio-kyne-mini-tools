@@ -1,7 +1,10 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Files;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
+use StudioKyne\MiniTools\Admin\Admin;
 
 /**
  * Module Fichiers — gestionnaire de fichiers WordPress.
@@ -80,7 +83,7 @@ class Module extends AbstractModule {
 	 * idempotent. On récupère au passage les réglages à passer au JS.
 	 */
 	public function enqueue_code_editor(): void {
-		if ( ! $this->is_files_screen() || ! current_user_can( 'manage_options' ) ) {
+		if ( ! $this->is_files_screen() || ! current_user_can( static::get_required_capability() ) ) {
 			return;
 		}
 
@@ -104,10 +107,51 @@ class Module extends AbstractModule {
 	 * SÉCURITÉ
 	 * ================================================================ */
 
+	/**
+	 * Sous multisite, `manage_options` est une capacité par site : ce module
+	 * donne accès aux fichiers du RÉSEAU. Voir AbstractModule.
+	 */
+	public static function get_required_capability(): string {
+		return is_multisite() ? 'manage_network_options' : 'manage_options';
+	}
+
 	private function check_nonce(): void {
 		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'skmt_admin_nonce' ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! wp_verify_nonce( $nonce, 'skmt_admin_nonce' ) || ! current_user_can( static::get_required_capability() ) ) {
 			wp_send_json_error( [ 'message' => __( 'Permission refusée.', 'studio-kyne-mini-tools' ) ], 403 );
+		}
+	}
+
+	/**
+	 * Refuse toute écriture quand l'administrateur a posé DISALLOW_FILE_MODS ou
+	 * DISALLOW_FILE_EDIT dans wp-config.php.
+	 *
+	 * Ces deux constantes ne sont pas un réglage cosmétique : elles disent
+	 * « personne ne modifie de fichier depuis le navigateur sur ce site ».
+	 * Un gestionnaire de fichiers qui les ignore vide de son sens le geste de
+	 * l'administrateur qui les a posées — et il est plus permissif que
+	 * l'éditeur du cœur qu'elles désactivent.
+	 *
+	 * Les deux ne portent pas sur la même chose :
+	 *  - DISALLOW_FILE_EDIT désigne l'ÉDITION de code depuis l'admin. On refuse
+	 *    donc l'enregistrement d'un contenu et le téléversement ;
+	 *  - DISALLOW_FILE_MODS est plus large (aucune modification de fichier,
+	 *    installation comprise) : on refuse alors toute mutation, y compris
+	 *    renommer, déplacer, supprimer, créer un dossier, zipper, extraire.
+	 *
+	 * La lecture (listing, aperçu, téléchargement) reste ouverte dans les deux
+	 * cas : aucune des deux constantes ne parle de lecture.
+	 *
+	 * @param bool $edition true si l'appel écrit un CONTENU (édition/upload).
+	 */
+	private function check_file_mods( bool $edition = false ): void {
+		$bloque = ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS )
+			|| ( $edition && defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT );
+
+		if ( $bloque ) {
+			wp_send_json_error( [
+				'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS dans wp-config.php).', 'studio-kyne-mini-tools' ),
+			], 403 );
 		}
 	}
 
@@ -145,6 +189,7 @@ class Module extends AbstractModule {
 
 	public function ajax_delete(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$paths  = isset( $_POST['paths'] ) ? (array) wp_unslash( $_POST['paths'] ) : [];
 		$errors = [];
 
@@ -165,6 +210,7 @@ class Module extends AbstractModule {
 
 	public function ajax_rename(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$path     = $this->get_post_path();
 		$new_name = isset( $_POST['new_name'] ) ? sanitize_file_name( wp_unslash( $_POST['new_name'] ) ) : '';
 
@@ -178,6 +224,7 @@ class Module extends AbstractModule {
 
 	public function ajax_move(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$src = $this->get_post_path( 'src' );
 		$dst = $this->get_post_path( 'dst' );
 
@@ -191,6 +238,7 @@ class Module extends AbstractModule {
 
 	public function ajax_mkdir(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$parent = $this->get_post_path( 'parent' );
 		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : '';
 		$rel    = ( $parent !== '' ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
@@ -205,6 +253,7 @@ class Module extends AbstractModule {
 
 	public function ajax_zip(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$paths  = isset( $_POST['paths'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['paths'] ) ) : [];
 		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : 'archive.zip';
 		$parent = $this->get_post_path( 'parent' );
@@ -226,6 +275,7 @@ class Module extends AbstractModule {
 
 	public function ajax_extract(): void {
 		$this->check_nonce();
+		$this->check_file_mods( false );
 		$path = $this->get_post_path();
 
 		try {
@@ -250,6 +300,7 @@ class Module extends AbstractModule {
 
 	public function ajax_save_content(): void {
 		$this->check_nonce();
+		$this->check_file_mods( true );
 		$path    = $this->get_post_path();
 		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : '';
 
@@ -263,9 +314,10 @@ class Module extends AbstractModule {
 
 	public function ajax_upload(): void {
 		$nonce = isset( $_POST['nonce'] ) ? sanitize_text_field( wp_unslash( $_POST['nonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'skmt_admin_nonce' ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! wp_verify_nonce( $nonce, 'skmt_admin_nonce' ) || ! current_user_can( static::get_required_capability() ) ) {
 			wp_send_json_error( [ 'message' => __( 'Permission refusée.', 'studio-kyne-mini-tools' ) ], 403 );
 		}
+		$this->check_file_mods( true );
 
 		$dir   = isset( $_POST['path'] ) ? sanitize_text_field( wp_unslash( $_POST['path'] ) ) : '';
 		$files = $_FILES['files'] ?? null; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
@@ -320,7 +372,7 @@ class Module extends AbstractModule {
 
 	public function handle_download(): void {
 		$nonce = isset( $_GET['_wpnonce'] ) ? sanitize_text_field( wp_unslash( $_GET['_wpnonce'] ) ) : '';
-		if ( ! wp_verify_nonce( $nonce, 'skmt_files_download' ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ! wp_verify_nonce( $nonce, 'skmt_files_download' ) || ! current_user_can( static::get_required_capability() ) ) {
 			wp_die( esc_html__( 'Permission refusée.', 'studio-kyne-mini-tools' ) );
 		}
 
@@ -343,7 +395,7 @@ class Module extends AbstractModule {
 
 		$mime = mime_content_type( $abs ) ?: 'application/octet-stream';
 		header( 'Content-Type: ' . $mime );
-		header( 'Content-Disposition: attachment; filename="' . basename( $abs ) . '"' );
+		header( 'Content-Disposition: ' . Admin::content_disposition( basename( $abs ) ) );
 		header( 'Content-Length: ' . filesize( $abs ) );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
@@ -377,7 +429,7 @@ class Module extends AbstractModule {
 
 		$filename = basename( $abs ) . '.zip';
 		header( 'Content-Type: application/zip' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Disposition: ' . Admin::content_disposition( $filename ) );
 		header( 'Content-Length: ' . filesize( $tmp ) );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile

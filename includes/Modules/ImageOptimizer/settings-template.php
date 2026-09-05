@@ -5,6 +5,8 @@
  * Variables disponibles : $instance, $tab, $module_id, $module
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $module_settings = $instance->get_settings();
 ?>
 

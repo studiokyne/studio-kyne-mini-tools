@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Base commune pour les modules SKMT.
  *
@@ -182,6 +184,28 @@ abstract class AbstractModule implements ModuleInterface {
 	 * Surcharger pour nettoyer les crons, etc.
 	 */
 	public function on_deactivate(): void {}
+
+	/* ================================================================
+	 * CAPACITÉ REQUISE
+	 * ================================================================ */
+
+	/**
+	 * Capacité exigée pour ouvrir l'écran du module et appeler ses endpoints.
+	 *
+	 * `manage_options` par défaut, comme le reste de l'extension. À surcharger
+	 * par tout module dont le pouvoir dépasse le site courant : sous multisite,
+	 * `manage_options` est une capacité PAR SITE, si bien que l'administrateur
+	 * d'un simple sous-site l'obtient. Un gestionnaire de fichiers ou un
+	 * éditeur SQL lui livrent alors le réseau entier — les fichiers et la base
+	 * sont communs, eux.
+	 *
+	 * Les écrans concernés surchargent donc vers `manage_network_options`, que
+	 * seul un super-administrateur détient (et que personne ne détient hors
+	 * multisite : d'où le test).
+	 */
+	public static function get_required_capability(): string {
+		return 'manage_options';
+	}
 
 	/* ================================================================
 	 * INSTALL / UNINSTALL

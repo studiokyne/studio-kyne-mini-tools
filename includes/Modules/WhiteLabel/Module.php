@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\WhiteLabel;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**

@@ -3,6 +3,8 @@
  * Composant sidebar réutilisable.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $tab     = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
 $modules = $this->modules->get_all();
 

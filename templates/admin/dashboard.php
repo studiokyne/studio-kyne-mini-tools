@@ -3,6 +3,8 @@
  * Template du tableau de bord.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $modules      = $this->modules->get_all();
 $active_count = count( array_filter( $modules, function( $id ) {
 	return $this->modules->is_active( $id );

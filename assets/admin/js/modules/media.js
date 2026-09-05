@@ -30,6 +30,22 @@
   var UNASSIGNED = cfg.unassigned || "__none__";
   var COLORS = cfg.colors || [];
 
+  /**
+   * L'utilisateur peut-il modifier l'ARBORESCENCE (créer, renommer, supprimer,
+   * déplacer, colorer un dossier) ?
+   *
+   * Miroir de Media\Module::CAP_MANAGE. Purement cosmétique : la décision
+   * appartient à guard_manage() côté serveur, qui ne lit rien de ce que le
+   * client envoie. On s'en sert pour ne pas montrer des commandes qui ne
+   * feraient que renvoyer un refus.
+   *
+   * PIÈGE — wp_localize_script() convertit TOUTES les valeurs en chaînes : un
+   * `false` PHP arrive ici en `""`, et un `true` en `"1"`. Un test du genre
+   * `cfg.canManage !== false` serait donc toujours vrai, et le drapeau
+   * n'aurait jamais rien masqué. On compare aux deux formes possibles.
+   */
+  var CAN_MANAGE = cfg.canManage === true || cfg.canManage === "1";
+
   /** Valeur du filtre « aucun dossier sélectionné ». */
   var ALL = "";
 
@@ -414,12 +430,16 @@
     this.el.innerHTML =
       '<div class="skmt-media-sidebar__header">' +
       '<span class="skmt-media-sidebar__title">' + escHtml(t("folders", "Dossiers")) + "</span>" +
-      '<button type="button" class="skmt-media-sidebar__add-btn" title="' + escHtml(t("newFolder", "Nouveau dossier")) + '" data-skmt-tip="' + escHtml(t("newFolder", "Nouveau dossier")) + '" aria-label="' + escHtml(t("newFolder", "Nouveau dossier")) + '">' + ICON_PLUS + "</button>" +
+      (CAN_MANAGE
+        ? '<button type="button" class="skmt-media-sidebar__add-btn" title="' + escHtml(t("newFolder", "Nouveau dossier")) + '" data-skmt-tip="' + escHtml(t("newFolder", "Nouveau dossier")) + '" aria-label="' + escHtml(t("newFolder", "Nouveau dossier")) + '">' + ICON_PLUS + "</button>"
+        : "") +
       "</div>" +
       '<div class="skmt-media-sidebar__tree"><div class="skmt-media-loading">' + escHtml(t("loading", "Chargement…")) + "</div></div>";
 
-    this.el.querySelector(".skmt-media-sidebar__add-btn")
-      .addEventListener("click", function () { openCreateModal(0); });
+    var addBtn = this.el.querySelector(".skmt-media-sidebar__add-btn");
+    if (addBtn) {
+      addBtn.addEventListener("click", function () { openCreateModal(0); });
+    }
 
     this.renderTree();
     return this;
@@ -458,7 +478,7 @@
     var count = o.count === null || o.count === undefined
       ? ""
       : '<span class="skmt-media-folder__count">' + parseInt(o.count, 10) + "</span>";
-    var menu = isFolder
+    var menu = isFolder && CAN_MANAGE
       ? '<button type="button" class="skmt-media-folder__menu-btn" data-folder-id="' + escHtml(value) + '" aria-label="Actions">' + ICON_DOTS + "</button>"
       : "";
     var indent = o.depth ? ' style="--skmt-depth:' + parseInt(o.depth, 10) + '"' : "";
@@ -518,6 +538,12 @@
       var key = mode === "add" ? "itemsAdded" : mode === "remove" ? "itemsRemoved" : "itemsMoved";
       toast(n + " " + t(key, "média(s) déplacé(s)."), "success");
 
+      // Le serveur écarte les médias que l'utilisateur n'a pas le droit
+      // d'éditer. Le taire ferait passer un refus légitime pour un bug.
+      if (data && data.refused) {
+        toast(data.refused + " " + t("itemsRefused", "média(s) ignoré(s)."), "warning");
+      }
+
       // Un média sorti du dossier affiché doit disparaître de la vue.
       if (self.current() !== ALL) self.target.refresh();
     });
@@ -547,6 +573,11 @@
    */
   FolderPanel.prototype.bindFolderDrag = function () {
     if (typeof Sortable === "undefined") return;
+
+    // Re-parenter un dossier est une mutation de l'arborescence : sans droit,
+    // le geste n'est même pas proposé (guard_manage() le refuserait de toute
+    // façon). Le dépôt de MÉDIAS dans un dossier reste ouvert, lui.
+    if (!CAN_MANAGE) return;
 
     var tree = this.el.querySelector(".skmt-media-sidebar__tree");
     if (!tree) return;

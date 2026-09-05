@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\MenuCreator;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 use StudioKyne\MiniTools\Modules\ImageOptimizer\SvgHandler;
 use StudioKyne\MiniTools\Modules\WhiteLabel\MenuProfileManager;

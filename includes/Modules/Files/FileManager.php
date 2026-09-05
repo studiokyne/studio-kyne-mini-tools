@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Files;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Moteur des opérations fichier, strictement limité à un répertoire racine.
  * Toute tentative de sortir de la racine lève une InvalidArgumentException.

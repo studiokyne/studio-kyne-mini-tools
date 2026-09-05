@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Security;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gestionnaire de l'URL de connexion.
  *

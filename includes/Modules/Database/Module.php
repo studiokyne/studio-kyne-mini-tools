@@ -1,7 +1,10 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Database;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
+use StudioKyne\MiniTools\Admin\Admin;
 
 /**
  * Module Base de données — exploration, édition et export des tables WordPress.
@@ -12,7 +15,25 @@ class Module extends AbstractModule {
 	const QUERY_ROW_CAP = 1000;
 
 	/** Mots-clés interdits dans l'éditeur SQL libre (opérations hors périmètre / destructrices au niveau serveur). */
-	const FORBIDDEN_KEYWORDS = [ 'DROP DATABASE', 'DROP SCHEMA', 'CREATE USER', 'DROP USER', 'GRANT', 'REVOKE', 'SHUTDOWN', 'CREATE DATABASE' ];
+	const FORBIDDEN_KEYWORDS = [
+		'DROP DATABASE',
+		'DROP SCHEMA',
+		'CREATE USER',
+		'DROP USER',
+		'ALTER USER',
+		'SET PASSWORD',
+		'GRANT',
+		'REVOKE',
+		'SHUTDOWN',
+		'CREATE DATABASE',
+		// Écriture / lecture de fichiers depuis le serveur MySQL. INTO OUTFILE
+		// se cache derrière un SELECT — c'est-à-dire derrière la classification
+		// « lecture » — et écrit pourtant sur le disque du serveur de bases.
+		'INTO OUTFILE',
+		'INTO DUMPFILE',
+		'LOAD DATA',
+		'LOAD_FILE',
+	];
 
 	public function init(): void {
 		add_action( 'wp_ajax_skmt_db_get_tables',    [ $this, 'ajax_get_tables' ] );
@@ -82,9 +103,18 @@ class Module extends AbstractModule {
 	 * SÉCURITÉ
 	 * ================================================================ */
 
+	/**
+	 * Sous multisite, `manage_options` est une capacité par site, alors que la
+	 * base est commune au réseau : un administrateur de sous-site obtiendrait
+	 * ici l'édition SQL de tout le réseau. Voir AbstractModule.
+	 */
+	public static function get_required_capability(): string {
+		return is_multisite() ? 'manage_network_options' : 'manage_options';
+	}
+
 	private function guard(): void {
 		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( static::get_required_capability() ) ) {
 			wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ] );
 		}
 		// Empêche $wpdb->print_error() d'ÉCHO du HTML d'erreur avant notre JSON
@@ -455,17 +485,7 @@ class Module extends AbstractModule {
 	 * qui est exécutée ensuite.
 	 */
 	private function find_forbidden_keyword( string $sql ): ?string {
-		// Neutralise le contenu des littéraux ('…' et "…") : une valeur n'est
-		// jamais une instruction.
-		$sans_litteraux = preg_replace(
-			[ "#'[^']*'#", '#"[^"]*"#' ],
-			[ "''", '""' ],
-			$sql
-		);
-
-		// preg_replace peut échouer (chaîne non close, limite de récursion) :
-		// on retombe alors sur la requête brute plutôt que de ne rien vérifier.
-		$sujet = ( null === $sans_litteraux ) ? $sql : $sans_litteraux;
+		$sujet = $this->normalize_sql( $sql );
 
 		foreach ( self::FORBIDDEN_KEYWORDS as $kw ) {
 			$motif = '/\b' . str_replace( ' ', '\s+', preg_quote( $kw, '/' ) ) . '\b/i';
@@ -475,6 +495,92 @@ class Module extends AbstractModule {
 		}
 
 		return null;
+	}
+
+	/**
+	 * Réduit une requête à une forme comparable, pour les seuls tests de
+	 * garde-fou. La requête EXÉCUTÉE reste l'originale.
+	 *
+	 * Trois passes, dans cet ordre — l'ordre est le fond du sujet :
+	 *
+	 *  1. neutraliser les littéraux ('…', "…") et les identifiants entre
+	 *     accents graves. Une valeur n'est jamais une instruction, et il faut
+	 *     le faire EN PREMIER : une ouverture de commentaire à l'intérieur
+	 *     d'une chaîne n'ouvre rien du tout, et la traiter comme telle
+	 *     tronquerait la requête normalisée, donc masquerait ce qui suit ;
+	 *  2. retirer les commentaires. C'est le trou que l'audit a exploité :
+	 *     MySQL accepte un commentaire vide comme séparateur de mots, si bien
+	 *     qu'un DROP suivi d'un commentaire vide puis de DATABASE ne
+	 *     ressemblait à aucun mot-clé interdit tout en étant exécuté comme
+	 *     « DROP DATABASE ». Étendre la liste noire n'y changeait rien : il y a
+	 *     une infinité de façons d'écrire l'espace ;
+	 *  3. réduire toute suite d'espaces (y compris les retours à la ligne) à
+	 *     un espace simple, pour que `\s+` des motifs ait un terrain régulier.
+	 *
+	 * Chaque `preg_replace` peut échouer (chaîne non close, limite de
+	 * récursion) ; on conserve alors l'état précédent plutôt que de laisser une
+	 * chaîne vide passer tous les tests.
+	 */
+	private function normalize_sql( string $sql ): string {
+		$out = preg_replace(
+			[ "#'[^']*'#", '#"[^"]*"#', '#`[^`]*`#' ],
+			[ "''", '""', '``' ],
+			$sql
+		);
+		$out = ( null === $out ) ? $sql : $out;
+
+		$sans_commentaires = preg_replace(
+			[
+				'#/\*.*?\*/#s',   // /* … */, y compris sur plusieurs lignes
+				'#--[^\n]*#',     // -- jusqu'à la fin de la ligne
+				'#\#[^\n]*#',     // #  jusqu'à la fin de la ligne
+			],
+			' ',
+			$out
+		);
+		$out = ( null === $sans_commentaires ) ? $out : $sans_commentaires;
+
+		$compacte = preg_replace( '/\s+/', ' ', $out );
+		$out      = ( null === $compacte ) ? $out : $compacte;
+
+		return trim( $out );
+	}
+
+	/**
+	 * La requête est-elle une simple lecture ?
+	 *
+	 * Ne fonder la réponse que sur le premier mot ne suffit pas : un `SELECT`
+	 * peut écrire (`INTO OUTFILE`), un `WITH … AS (…) DELETE …` commence par un
+	 * mot de lecture, et `SELECT 1; DELETE FROM …` en cache une derrière un
+	 * point-virgule. La classification décide de la confirmation d'écriture ET
+	 * du plafond de lignes : se tromper dans ce sens-là laisse passer une
+	 * modification sans confirmation.
+	 *
+	 * On exige donc trois choses : un mot d'ouverture de lecture, aucun verbe
+	 * d'écriture ailleurs dans la requête, et aucun point-virgule interne.
+	 *
+	 * Le sens de l'erreur est assumé : classer une lecture en écriture ne coûte
+	 * qu'une confirmation de plus, l'inverse coûte une table.
+	 */
+	private function is_read_query( string $normalized ): bool {
+		if ( ! preg_match( '/^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|WITH)\b/i', $normalized ) ) {
+			return false;
+		}
+
+		// `SHOW CREATE TABLE` reste une lecture : CREATE et DROP ne figurent pas
+		// dans cette liste, ils ne peuvent de toute façon pas commencer une
+		// requête classée en lecture.
+		if ( preg_match( '/\b(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|RENAME|INTO\s+(OUTFILE|DUMPFILE)|LOAD\s+DATA)\b/i', $normalized ) ) {
+			return false;
+		}
+
+		// Un point-virgule ailleurs qu'en fin de requête annonce une seconde
+		// instruction, que ce test-ci n'a pas examinée.
+		if ( preg_match( '/;\s*\S/', $normalized ) ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	public function ajax_run_query(): void {
@@ -492,8 +598,10 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => sprintf( __( 'Opération interdite dans cet éditeur : %s.', 'studio-kyne-mini-tools' ), $forbidden ) ] );
 		}
 
-		// Détecter si c'est une requête de lecture.
-		$is_select = preg_match( '/^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|PRAGMA|WITH)\b/i', $sql );
+		// Détecter si c'est une requête de lecture. Le test porte sur la forme
+		// normalisée : un commentaire suffisait sinon à déguiser une écriture.
+		$normalized = $this->normalize_sql( $sql );
+		$is_select  = $this->is_read_query( $normalized );
 
 		// Garde-fou 2 : toute requête d'écriture exige une confirmation explicite côté client.
 		if ( ! $is_select && empty( $_POST['confirm'] ) ) {
@@ -510,7 +618,16 @@ class Module extends AbstractModule {
 			$capped = $sql;
 			$truncated = false;
 			$bare = rtrim( $sql, "; \t\n\r" );
-			if ( ! preg_match( '/\bLIMIT\b/i', $bare ) ) {
+			// Seuls SELECT et WITH peuvent ramener un volume non borné. SHOW,
+			// DESCRIBE et EXPLAIN rendent un jeu déjà fini — et n'acceptent pas
+			// de LIMIT : le plafond transformait « SHOW CREATE TABLE x » en
+			// erreur de syntaxe.
+			//
+			// La présence d'un LIMIT se lit sur la forme normalisée : un
+			// « /* LIMIT 1 */ » en commentaire faisait sauter le plafond.
+			$plafonnable = (bool) preg_match( '/^\s*(SELECT|WITH)\b/i', $normalized );
+
+			if ( $plafonnable && ! preg_match( '/\bLIMIT\b/i', $normalized ) ) {
 				$capped    = $bare . ' LIMIT ' . self::QUERY_ROW_CAP;
 				$truncated = true;
 			}
@@ -544,7 +661,7 @@ class Module extends AbstractModule {
 
 	public function ajax_export_sql(): void {
 		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
-		if ( ! current_user_can( 'manage_options' ) ) {
+		if ( ! current_user_can( static::get_required_capability() ) ) {
 			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 		}
 
@@ -558,7 +675,7 @@ class Module extends AbstractModule {
 
 		nocache_headers();
 		header( 'Content-Type: application/octet-stream' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Disposition: ' . Admin::content_disposition( $filename ) );
 
 		// Colonnes + typage : détermine quelles valeurs sont numériques (non quotées) ou binaires (hex).
 		$columns   = $this->get_columns_map( $table );

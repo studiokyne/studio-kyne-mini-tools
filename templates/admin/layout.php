@@ -3,6 +3,8 @@
  * Template principal de l'interface admin.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
 ?>
 <div class="skmt-admin-wrap">

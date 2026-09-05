@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Support SVG sécurisé pour la médiathèque.
  *
@@ -227,8 +229,97 @@ class SvgHandler {
 			}
 
 			$this->clean_attributes( $child );
+
+			// <style> est sur la liste blanche, mais seuls ses ATTRIBUTS étaient
+			// nettoyés : le nœud texte à l'intérieur traversait l'assainisseur
+			// intact. Un `@import url("//evil.tld/x.css")` survivait donc à
+			// l'upload et déclenchait une requête sortante à chaque rendu du
+			// SVG — traçage, et CSS arbitraire si le SVG est intégré en ligne.
+			if ( 'style' === $tag ) {
+				$this->clean_style_element( $child );
+				continue;
+			}
+
 			$this->clean_node( $child );
 		}
+	}
+
+	/**
+	 * Assainit le contenu textuel d'un élément <style>.
+	 *
+	 * Le CSS n'a rien d'inerte : `@import` et `url()` sont des requêtes
+	 * réseau, `expression()` et `-moz-binding` ont été des vecteurs
+	 * d'exécution. On applique aux ressources la MÊME liste blanche que
+	 * `is_safe_href()` — ancres internes et images en data: — pour ne pas
+	 * entretenir deux définitions du « sûr » qui finiraient par diverger.
+	 */
+	private function clean_style_element( \DOMElement $el ): void {
+		$css = $el->textContent;
+
+		$propre = $this->sanitize_css( (string) $css );
+
+		while ( $el->firstChild ) {
+			$el->removeChild( $el->firstChild );
+		}
+
+		if ( '' !== trim( $propre ) ) {
+			$el->appendChild( $el->ownerDocument->createTextNode( $propre ) );
+		}
+	}
+
+	/**
+	 * Retire d'une feuille de style tout ce qui sort du document ou s'exécute.
+	 *
+	 * Deux précautions d'ordre, comme pour la requête SQL de l'éditeur de base
+	 * de données :
+	 *  - les commentaires CSS partent EN PREMIER : `@imp/⁎ ⁎/ort` n'est pas un
+	 *    at-rule valide, mais un `url(/⁎ ⁎/…)` suffisait à brouiller un motif ;
+	 *  - les échappements hexadécimaux sont décodés avant tout test. `\40 import`
+	 *    EST `@import` pour le navigateur ; ne pas le décoder, c'est ne
+	 *    reconnaître que la forme naïve de l'attaque.
+	 */
+	private function sanitize_css( string $css ): string {
+		$sans_commentaires = preg_replace( '#/\*.*?\*/#s', ' ', $css );
+		$css               = ( null === $sans_commentaires ) ? $css : $sans_commentaires;
+
+		if ( function_exists( 'mb_chr' ) ) {
+			$decode = preg_replace_callback(
+				'/\\\\([0-9a-fA-F]{1,6})[ \t\n]?/',
+				static function ( array $m ) {
+					$cp = hexdec( $m[1] );
+					return ( $cp > 0 && $cp < 0x110000 ) ? (string) mb_chr( $cp, 'UTF-8' ) : '';
+				},
+				$css
+			);
+			$css = ( null === $decode ) ? $css : $decode;
+		}
+
+		// At-rules qui chargent une ressource externe.
+		$css = (string) preg_replace( '/@\s*(import|namespace)\b[^;{]*(;|\{[^}]*\})?/i', '', $css );
+
+		// Vecteurs d'exécution historiques. On retire la DÉCLARATION entière et
+		// pas le seul mot-clé : effacer « expression( » laissait « alert(1)) »
+		// derrière soi, c'est-à-dire du CSS invalide dans un fichier qu'on vient
+		// de déclarer propre.
+		$css = (string) preg_replace( '/[\w-]+\s*:[^;}]*expression\s*\([^;}]*/i', '', $css );
+		$css = (string) preg_replace( '/(-moz-binding|behavior)\s*:[^;}]*/i', '', $css );
+
+		// url() : seules les ancres internes et les images en data: passent.
+		$css = (string) preg_replace_callback(
+			'/url\(\s*([\'"]?)([^)\'"]*)\1\s*\)/i',
+			function ( array $m ) {
+				return $this->is_safe_href( $m[2] ) ? $m[0] : 'none';
+			},
+			$css
+		);
+
+		// Filet : si un schéma exécutable subsiste malgré tout, on ne cherche
+		// pas à réparer la feuille — on la jette.
+		if ( preg_match( '/(javascript|vbscript|data\s*:\s*text\/html)\s*:/i', $css ) ) {
+			return '';
+		}
+
+		return $css;
 	}
 
 	/**

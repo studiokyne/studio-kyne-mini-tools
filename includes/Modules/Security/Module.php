@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Security;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**
@@ -43,6 +45,21 @@ class Module extends AbstractModule {
 			add_filter( 'authenticate', [ $this->rate_limiter, 'maybe_block_login' ], 999 );
 			add_action( 'wp_login', [ $this, 'handle_login_success' ], 10, 2 );
 			add_action( 'wp_login_failed', [ $this, 'handle_login_failed' ] );
+
+			// Les mots de passe d'application ne traversent PAS wp_authenticate() :
+			// wp_validate_application_password() appelle directement
+			// wp_authenticate_application_password(). Le filtre `authenticate` —
+			// donc maybe_block_login() — n'est jamais consulté, et aucun
+			// `wp_login_failed` n'est déclenché. Ils étaient donc devinables sans
+			// aucune limite, y compris depuis une IP déjà bloquée sur le formulaire.
+			//
+			// Le cœur n'offre pas de filtre de blocage sur ce chemin ; le seul
+			// point d'arrêt antérieur à la vérification du mot de passe est
+			// `application_password_is_api_request`. Répondre `false` fait sortir
+			// la fonction avant toute comparaison : la requête redevient anonyme
+			// et repart en 401, ce qui est exactement le refus voulu.
+			add_filter( 'application_password_is_api_request', [ $this, 'filter_application_password_allowed' ], 999 );
+			add_action( 'application_password_failed_authentication', [ $this, 'handle_application_password_failed' ] );
 		}
 
 		if ( ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) && ! self::login_url_disabled() ) {
@@ -61,12 +78,23 @@ class Module extends AbstractModule {
 		}
 
 		if ( $this->settings['hardening']['prevent_user_enum'] ?? false ) {
-			add_action( 'template_redirect', [ $this->hardening, 'prevent_user_enumeration' ] );
+			// parse_request @1 : avant redirect_canonical, qui divulguait
+			// l'identifiant dans l'en-tête Location. Voir HardeningService.
+			add_action( 'parse_request', [ $this->hardening, 'block_author_query' ], 1 );
+			add_action( 'template_redirect', [ $this->hardening, 'prevent_user_enumeration' ], 1 );
 			add_filter( 'rest_request_before_callbacks', [ $this->hardening, 'prevent_rest_user_enumeration' ], 10, 3 );
+			add_filter( 'oembed_response_data', [ $this->hardening, 'filter_oembed_response_data' ], PHP_INT_MAX );
+			add_filter( 'wp_sitemaps_add_provider', [ $this->hardening, 'filter_sitemap_providers' ], 10, 2 );
+			add_filter( 'wp_login_errors', [ $this->hardening, 'filter_login_errors' ], PHP_INT_MAX, 2 );
+			add_action( 'lost_password', [ $this->hardening, 'mask_lost_password_oracle' ], PHP_INT_MAX );
 		}
 
 		if ( $this->settings['hardening']['hide_wp_version'] ?? false ) {
 			add_filter( 'wp_headers', [ $this->hardening, 'hide_wp_version_headers' ] );
+			// Priorité 0 : header_remove() n'a d'effet que tant que les en-têtes
+			// ne sont pas partis.
+			add_action( 'init', [ $this->hardening, 'remove_powered_by_header' ], 0 );
+			add_action( 'send_headers', [ $this->hardening, 'remove_powered_by_header' ], 0 );
 			add_action( 'init', [ $this->hardening, 'remove_wp_version_generators' ] );
 			add_filter( 'the_generator', '__return_empty_string', PHP_INT_MAX );
 			add_filter( 'script_loader_src', [ $this->hardening, 'obfuscate_version_in_src' ], PHP_INT_MAX );
@@ -94,6 +122,38 @@ class Module extends AbstractModule {
 	 * @return void
 	 */
 	public function handle_login_failed( string $username ): void {
+		$this->rate_limiter->log_failed_attempt( $this->get_client_ip() );
+	}
+
+	/**
+	 * Filtre application_password_is_api_request — refuse l'authentification par
+	 * mot de passe d'application tant que l'IP est bloquée.
+	 *
+	 * Répondre `false` fait sortir wp_authenticate_application_password() avant
+	 * la moindre comparaison de mot de passe : rien n'est vérifié, donc rien
+	 * n'est devinable. Voir le commentaire du branchement dans init().
+	 *
+	 * @param bool $is_api_request Décision du cœur.
+	 * @return bool
+	 */
+	public function filter_application_password_allowed( $is_api_request ): bool {
+		if ( ! $is_api_request ) {
+			return (bool) $is_api_request;
+		}
+
+		return ! $this->rate_limiter->is_locked();
+	}
+
+	/**
+	 * Hook application_password_failed_authentication — compte l'échec.
+	 *
+	 * Ce chemin ne déclenche aucun `wp_login_failed` : sans ce branchement, mille
+	 * essais de mot de passe d'application laisseraient le compteur à zéro.
+	 *
+	 * @param \WP_Error $error Erreur d'authentification remontée par le cœur.
+	 * @return void
+	 */
+	public function handle_application_password_failed( $error = null ): void {
 		$this->rate_limiter->log_failed_attempt( $this->get_client_ip() );
 	}
 

@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Media;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**
@@ -297,6 +299,11 @@ class Module extends AbstractModule {
 			'colors'     => self::FOLDER_COLORS,
 			'queryVar'   => self::QUERY_VAR,
 			'unassigned' => self::UNASSIGNED,
+			// L'interface doit refléter la garde serveur : sans ce drapeau, un
+			// auteur voit les boutons « Nouveau dossier » / « Supprimer » et ne
+			// récolte qu'un refus après coup. Le serveur reste seul juge —
+			// guard_manage() ne dépend d'aucune valeur envoyée par le client.
+			'canManage'  => current_user_can( self::CAP_MANAGE ),
 			'i18n'       => [
 				'folders'         => __( 'Dossiers', 'studio-kyne-mini-tools' ),
 				'color'           => __( 'Couleur', 'studio-kyne-mini-tools' ),
@@ -323,6 +330,7 @@ class Module extends AbstractModule {
 				'itemsRemoved'    => __( 'média(s) retiré(s) du dossier.', 'studio-kyne-mini-tools' ),
 				'noFolder'        => __( 'Aucun dossier', 'studio-kyne-mini-tools' ),
 				'folderUpdated'   => __( 'Dossiers mis à jour.', 'studio-kyne-mini-tools' ),
+				'itemsRefused'    => __( 'média(s) ignoré(s) : vous n\'avez pas le droit de les modifier.', 'studio-kyne-mini-tools' ),
 			],
 		] );
 	}
@@ -354,11 +362,35 @@ class Module extends AbstractModule {
 	 * AJAX
 	 * ================================================================ */
 
-	/** Garde commune à tous les endpoints du module. */
+	/**
+	 * Capacité exigée pour MODIFIER l'arborescence (créer, renommer, supprimer,
+	 * déplacer, colorer un dossier).
+	 *
+	 * `upload_files` — la seule garde d'origine — est la capacité de TÉLÉVERSER,
+	 * pas celle d'organiser la bibliothèque du site. Un simple auteur pouvait
+	 * donc renommer les dossiers d'autrui et en supprimer un avec toute sa
+	 * descendance, d'un seul appel. Les dossiers sont une taxonomie : la
+	 * capacité qui décrit ce pouvoir est `manage_categories`, détenue à partir
+	 * du rôle éditeur.
+	 */
+	const CAP_MANAGE = 'manage_categories';
+
+	/** Capacité exigée pour LIRE l'arborescence et classer ses propres médias. */
+	const CAP_USE = 'upload_files';
+
+	/** Garde de lecture : voir les dossiers, filtrer la médiathèque. */
 	private function guard(): void {
 		check_ajax_referer( 'skmt_admin_nonce', 'nonce' );
-		if ( ! current_user_can( 'upload_files' ) ) {
+		if ( ! current_user_can( self::CAP_USE ) ) {
 			wp_send_json_error( [ 'message' => __( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) ] );
+		}
+	}
+
+	/** Garde d'écriture : toute mutation de l'arborescence elle-même. */
+	private function guard_manage(): void {
+		$this->guard();
+		if ( ! current_user_can( self::CAP_MANAGE ) ) {
+			wp_send_json_error( [ 'message' => __( 'Vous n\'avez pas le droit de modifier l\'organisation de la médiathèque.', 'studio-kyne-mini-tools' ) ] );
 		}
 	}
 
@@ -541,7 +573,7 @@ class Module extends AbstractModule {
 	}
 
 	public function ajax_create_folder(): void {
-		$this->guard();
+		$this->guard_manage();
 
 		$name      = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
 		$parent_id = (int) ( $_POST['parent_id'] ?? 0 );
@@ -562,7 +594,7 @@ class Module extends AbstractModule {
 	}
 
 	public function ajax_rename_folder(): void {
-		$this->guard();
+		$this->guard_manage();
 
 		$id   = (int) ( $_POST['id'] ?? 0 );
 		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
@@ -591,7 +623,7 @@ class Module extends AbstractModule {
 	 * des sous-dossiers censés disparaître.
 	 */
 	public function ajax_delete_folder(): void {
-		$this->guard();
+		$this->guard_manage();
 
 		$id = (int) ( $_POST['id'] ?? 0 );
 		if ( ! $id || ! term_exists( $id, self::TAXONOMY ) ) {
@@ -658,9 +690,24 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => __( 'Dossier cible requis.', 'studio-kyne-mini-tools' ) ] );
 		}
 
-		$moved = 0;
+		$moved   = 0;
+		$refuses = 0;
+
 		foreach ( $attachment_ids as $att_id ) {
 			if ( 'attachment' !== get_post_type( $att_id ) ) {
+				continue;
+			}
+
+			// Contrôle PAR PIÈCE JOINTE : la garde d'entrée dit seulement que
+			// l'appelant a le droit d'utiliser la médiathèque, pas qu'il a le
+			// droit de toucher CE média-là. Sans ce test, un auteur reclassait
+			// les médias de l'administrateur en envoyant leurs identifiants.
+			//
+			// `edit_post` sur une pièce jointe se résout en edit_posts /
+			// edit_others_posts selon le propriétaire : c'est exactement la règle
+			// que WordPress applique déjà à l'édition d'un média.
+			if ( ! current_user_can( 'edit_post', $att_id ) ) {
+				$refuses++;
 				continue;
 			}
 
@@ -676,8 +723,10 @@ class Module extends AbstractModule {
 			$moved++;
 		}
 
+		// `refused` remonte à l'interface : un déplacement silencieusement partiel
+		// se lirait comme un bug, alors que c'est le refus qui est correct.
 		wp_send_json_success( array_merge(
-			[ 'moved' => $moved, 'mode' => $mode ],
+			[ 'moved' => $moved, 'mode' => $mode, 'refused' => $refuses ],
 			$this->get_folder_payload()
 		) );
 	}
@@ -686,7 +735,7 @@ class Module extends AbstractModule {
 	 * Re-parente un dossier (drag dossier → dossier).
 	 */
 	public function ajax_move_folder(): void {
-		$this->guard();
+		$this->guard_manage();
 
 		$id        = (int) ( $_POST['id'] ?? 0 );
 		$parent_id = (int) ( $_POST['parent_id'] ?? 0 );
@@ -719,7 +768,7 @@ class Module extends AbstractModule {
 	}
 
 	public function ajax_set_folder_color(): void {
-		$this->guard();
+		$this->guard_manage();
 
 		$id    = (int) ( $_POST['id'] ?? 0 );
 		$color = sanitize_text_field( wp_unslash( $_POST['color'] ?? '' ) );

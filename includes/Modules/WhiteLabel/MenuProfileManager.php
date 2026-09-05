@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\WhiteLabel;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gestion du stockage et de la résolution des profils de menu.
  */
