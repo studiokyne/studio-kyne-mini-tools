@@ -788,8 +788,36 @@
   }
 
   // Détecte une requête de lecture (miroir de la logique serveur).
+  /**
+   * Miroir de Module::normalize_sql(). Purement cosmétique : le serveur
+   * refait le même travail et ne fait aucune confiance à ce qui arrive.
+   * Sans ce miroir, l'utilisateur n'obtiendrait pas la confirmation attendue
+   * et le serveur répondrait « needs_confirm » sur une requête que l'interface
+   * croyait inoffensive.
+   */
+  function normalizeSql(sql) {
+    return String(sql)
+      // Littéraux d'abord : une ouverture de commentaire dans une chaîne
+      // n'ouvre pas de commentaire.
+      .replace(/'[^']*'/g, "''")
+      .replace(/"[^"]*"/g, '""')
+      .replace(/`[^`]*`/g, '``')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/--[^\n]*/g, ' ')
+      .replace(/#[^\n]*/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  /** Miroir de Module::is_read_query(). */
   function isReadQuery(sql) {
-    return /^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|PRAGMA|WITH)\b/i.test(sql);
+    var q = normalizeSql(sql);
+
+    if (!/^\s*(SELECT|SHOW|DESCRIBE|DESC|EXPLAIN|WITH)\b/i.test(q)) return false;
+    if (/\b(INSERT|UPDATE|DELETE|REPLACE|TRUNCATE|ALTER|RENAME|INTO\s+(OUTFILE|DUMPFILE)|LOAD\s+DATA)\b/i.test(q)) return false;
+    if (/;\s*\S/.test(q)) return false;
+
+    return true;
   }
 
   function runQuery() {

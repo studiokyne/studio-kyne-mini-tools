@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Security;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gestionnaire de rate limiting par IP.
  * Stocke les tentatives via transients WordPress (TTL auto-expiration).
@@ -101,6 +103,23 @@ class RateLimiter {
 		}
 
 		return $user;
+	}
+
+	/**
+	 * L'IP courante est-elle sous blocage ?
+	 *
+	 * Extrait de maybe_block_login() pour les chemins d'authentification qui ne
+	 * traversent pas le filtre `authenticate` et n'ont donc pas de WP_Error à
+	 * rendre — les mots de passe d'application, notamment.
+	 */
+	public function is_locked(): bool {
+		if ( $this->is_whitelisted() ) {
+			return false;
+		}
+
+		$data = $this->get_attempt_data( $this->get_client_ip() );
+
+		return $data['locked_until'] > 0 && time() < $data['locked_until'];
 	}
 
 	public function log_failed_attempt( string $ip ): void {

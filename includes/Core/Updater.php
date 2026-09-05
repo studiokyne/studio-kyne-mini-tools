@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Updater GitHub pour le plugin.
  * Vérifie les mises à jour depuis un dépôt GitHub.

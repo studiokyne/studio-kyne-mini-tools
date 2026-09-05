@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gère le workflow d'optimisation en masse :
  * AJAX start/status, traitement par batch, planification cron.

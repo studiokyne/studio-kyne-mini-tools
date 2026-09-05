@@ -316,6 +316,30 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 				</div>
 			</div>
 
+			<!-- Masquer le lien Politique de confidentialité -->
+			<div class="skmt-option">
+				<div class="skmt-option__content">
+					<label for="skmt_hide_privacy_policy" class="skmt-option__label">
+						<?php esc_html_e( 'Masquer le lien « Politique de confidentialité »', 'studio-kyne-mini-tools' ); ?>
+					</label>
+					<p class="skmt-option__desc">
+						<?php esc_html_e( 'Cache le lien affiché par WordPress quand une page de politique de confidentialité est définie.', 'studio-kyne-mini-tools' ); ?>
+					</p>
+				</div>
+				<div class="skmt-option__control">
+					<label class="skmt-toggle">
+						<input
+							type="checkbox"
+							id="skmt_hide_privacy_policy"
+							name="skmt_module_settings[form][hide_privacy_policy]"
+							value="1"
+							<?php checked( ! empty( $form['hide_privacy_policy'] ) ); ?>
+						>
+						<span class="skmt-toggle__slider"></span>
+					</label>
+				</div>
+			</div>
+
 		</div>
 	</div>
 

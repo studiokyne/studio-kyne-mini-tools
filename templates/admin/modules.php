@@ -3,6 +3,8 @@
  * Template de la page Modules.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $modules = $this->modules->get_all();
 ?>
 <div class="skmt-page">

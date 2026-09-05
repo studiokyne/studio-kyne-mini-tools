@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gère l'enregistrement et le chargement des modules.
  */

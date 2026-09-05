@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Gère la désactivation du plugin.
  */

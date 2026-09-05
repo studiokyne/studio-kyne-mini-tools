@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Admin\Admin;
 
 /**

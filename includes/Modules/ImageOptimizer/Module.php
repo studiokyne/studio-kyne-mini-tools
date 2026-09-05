@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\AbstractModule;
 use StudioKyne\MiniTools\Admin\Admin;
 

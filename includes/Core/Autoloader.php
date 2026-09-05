@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Core;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Autoloader simple PSR-4 pour le plugin.
  */

@@ -3,6 +3,8 @@
  * Template des réglages d'un module.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 $module_id = substr( $tab, 7 );
 $module    = $this->modules->get( $module_id );
 $instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;

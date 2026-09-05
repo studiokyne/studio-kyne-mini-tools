@@ -3,6 +3,8 @@
  * Template de la page Réglages globaux.
  */
 
+defined( 'ABSPATH' ) || exit;
+
 global $wpdb;
 
 $global         = $this->settings->get( 'global', [] );

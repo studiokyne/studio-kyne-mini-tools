@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Intégration UI de la médiathèque WordPress pour l'Image Optimizer :
  * colonne Format, champs dans l'éditeur media, optimisation single via AJAX.

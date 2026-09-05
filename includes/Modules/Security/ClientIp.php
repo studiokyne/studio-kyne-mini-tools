@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\Security;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Résolution de l'IP cliente — source unique de vérité pour tout le module.
  *

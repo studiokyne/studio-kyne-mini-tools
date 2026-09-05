@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Modules\ImageOptimizer;
 
+defined( 'ABSPATH' ) || exit;
+
 /**
  * Traitement pur des fichiers image : optimisation, conversion de format,
  * détection des capacités serveur.

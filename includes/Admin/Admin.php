@@ -1,6 +1,8 @@
 <?php
 namespace StudioKyne\MiniTools\Admin;
 
+defined( 'ABSPATH' ) || exit;
+
 use StudioKyne\MiniTools\Core\Modules;
 use StudioKyne\MiniTools\Core\AbstractModule;
 use StudioKyne\MiniTools\Core\Settings;
@@ -9,6 +11,14 @@ use StudioKyne\MiniTools\Core\Settings;
  * Gère l'interface d'administration du plugin.
  */
 class Admin {
+
+	/**
+	 * Taille maximale acceptée pour un fichier de configuration importé (2 Mio).
+	 *
+	 * Le fichier est lu en entier puis décodé en JSON : deux copies en mémoire.
+	 * Un export complet pèse quelques dizaines de kilo-octets.
+	 */
+	const IMPORT_MAX_BYTES = 2097152;
 
 	/**
 	 * Slug de la page admin.
@@ -110,11 +120,16 @@ class Admin {
 			}
 
 			$label = ! empty( $module['menu_label'] ) ? $module['menu_label'] : $module['name'];
+
+			// Un module peut exiger plus que `manage_options` (voir
+			// AbstractModule::get_required_capability()). WordPress masque alors
+			// l'entrée de lui-même ; render_page() refait le test, l'URL restant
+			// devinable.
 			add_submenu_page(
 				$this->slug,
 				esc_html( $label ),
 				esc_html( $label ),
-				'manage_options',
+				$this->module_capability( $module_id ),
 				$this->slug . '&tab=module_' . $module_id,
 				[ $this, 'render_page' ]
 			);
@@ -283,9 +298,49 @@ class Admin {
 			wp_die( esc_html__( 'Vous n\'avez pas les permissions nécessaires.', 'studio-kyne-mini-tools' ) );
 		}
 
+		// Certains modules exigent davantage que `manage_options` (Fichiers,
+		// Base de données sous multisite : voir AbstractModule). L'onglet est
+		// déjà absent du menu, mais l'URL reste devinable — c'est ici que le
+		// refus compte.
+		$requise = $this->tab_capability();
+		if ( 'manage_options' !== $requise && ! current_user_can( $requise ) ) {
+			wp_die( esc_html__( 'Vous n\'avez pas les permissions nécessaires.', 'studio-kyne-mini-tools' ) );
+		}
+
 		$this->display_notices();
 
 		include SKMT_TEMPLATES_DIR . 'admin/layout.php';
+	}
+
+	/**
+	 * Capacité exigée par l'onglet demandé.
+	 *
+	 * Le menu et les écrans de l'extension tournent sous `manage_options` ;
+	 * seuls les modules qui le déclarent en demandent davantage.
+	 */
+	private function tab_capability(): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : '';
+
+		if ( 0 !== strpos( $tab, 'module_' ) ) {
+			return 'manage_options';
+		}
+
+		return $this->module_capability( substr( $tab, strlen( 'module_' ) ) );
+	}
+
+	/**
+	 * Capacité déclarée par un module, ou `manage_options` par défaut.
+	 */
+	private function module_capability( string $module_id ): string {
+		$definition = $this->modules->get_all()[ $module_id ] ?? null;
+		$class      = $definition['class'] ?? '';
+
+		if ( ! $class || ! class_exists( $class ) || ! is_subclass_of( $class, AbstractModule::class ) ) {
+			return 'manage_options';
+		}
+
+		return (string) $class::get_required_capability();
 	}
 
 	/**
@@ -313,6 +368,7 @@ class Admin {
 			'settings_imported'   => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
 			'import_error_file'   => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
 			'import_error_invalid' => __( 'Le fichier JSON est invalide ou incompatible.', 'studio-kyne-mini-tools' ),
+			'import_error_size'   => __( 'Le fichier dépasse la taille maximale autorisée (2 Mo).', 'studio-kyne-mini-tools' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -444,6 +500,36 @@ class Admin {
 	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
 	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
 	 */
+	/**
+	 * Construit un en-tête Content-Disposition sûr pour un nom de fichier.
+	 *
+	 * Le nom était injecté tel quel entre guillemets. Or sous Linux un nom de
+	 * fichier peut contenir un guillemet, et même un retour à la ligne : le
+	 * premier referme la valeur, le second termine l'en-tête et permet d'en
+	 * ajouter d'autres — une injection d'en-tête de réponse en bonne et due
+	 * forme, déclenchée par un simple téléversement.
+	 *
+	 * On rend donc deux paramètres, comme le veut la RFC 6266 :
+	 *  - `filename=` en ASCII assaini, pour les clients anciens ;
+	 *  - `filename*=UTF-8''…` percent-encodé, qui porte le nom réel (accents
+	 *    compris) et n'a pas de guillemets à refermer.
+	 *
+	 * @param string $filename Nom de fichier brut, tel qu'il est sur le disque.
+	 */
+	public static function content_disposition( string $filename ): string {
+		// Retire tout séparateur de chemin, puis tout caractère de contrôle
+		// (dont CR et LF) et les guillemets.
+		$brut = basename( $filename );
+		$brut = (string) preg_replace( '/[\x00-\x1F\x7F]/u', '', $brut );
+
+		$ascii = (string) preg_replace( '/[^A-Za-z0-9._-]/', '_', $brut );
+		if ( '' === trim( $ascii, '_.' ) ) {
+			$ascii = 'download';
+		}
+
+		return 'attachment; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode( $brut );
+	}
+
 	public static function add_persistent_notice( string $id, string $message, string $type = 'info', int $user_id = 0 ): void {
 		$user_id = $user_id ?: get_current_user_id();
 		if ( ! $user_id ) {
@@ -744,7 +830,7 @@ class Admin {
 
 		$filename = 'skmt-settings-' . gmdate( 'Y-m-d' ) . '.json';
 		header( 'Content-Type: application/json; charset=utf-8' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		header( 'Content-Disposition: ' . self::content_disposition( $filename ) );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
 		echo wp_json_encode( $data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE );
 		exit;
@@ -768,6 +854,34 @@ class Admin {
 				'page'             => $this->slug,
 				'tab'              => 'settings',
 				'skmt_notice'      => 'import_error_file',
+				'skmt_notice_type' => 'error',
+			], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		// `tmp_name` vient de $_FILES, donc du client. is_uploaded_file() est la
+		// seule chose qui atteste que ce chemin désigne bien un fichier déposé
+		// par CETTE requête, et non un chemin arbitraire du serveur glissé dans
+		// la variable. C'est la garde standard avant toute lecture d'un upload.
+		if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
+			wp_safe_redirect( add_query_arg( [
+				'page'             => $this->slug,
+				'tab'              => 'settings',
+				'skmt_notice'      => 'import_error_file',
+				'skmt_notice_type' => 'error',
+			], admin_url( 'admin.php' ) ) );
+			exit;
+		}
+
+		// Plafond de taille : le fichier est lu en entier puis décodé en JSON,
+		// deux opérations qui tiennent en mémoire. Un export complet pèse
+		// quelques dizaines de kilo-octets ; 2 Mo laissent une marge confortable
+		// sans exposer la mémoire de PHP à un fichier de plusieurs centaines.
+		if ( filesize( $file['tmp_name'] ) > self::IMPORT_MAX_BYTES ) {
+			wp_safe_redirect( add_query_arg( [
+				'page'             => $this->slug,
+				'tab'              => 'settings',
+				'skmt_notice'      => 'import_error_size',
 				'skmt_notice_type' => 'error',
 			], admin_url( 'admin.php' ) ) );
 			exit;

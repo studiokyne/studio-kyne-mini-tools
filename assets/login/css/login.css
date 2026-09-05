@@ -411,6 +411,7 @@ body.login.skmt-login-split .forgetmenot input[type="checkbox"] {
 body.login.skmt-login-split #backtoblog {
   clear: both !important;
   margin-top: 24px !important;
+  margin-bottom: 0 !important;
   font-size: 13px !important;
   color: var(--skmt-n500) !important;
   padding: 0 !important;
@@ -429,6 +430,33 @@ body.login.skmt-login-split #backtoblog a:hover {
 body.login.skmt-login-split #loginform a {
   color: var(--skmt-l-link) !important;
   text-decoration: none !important;
+}
+
+/* Lien "Politique de confidentialité" (affiché par WP quand une page est
+   definie dans Reglages > Confidentialite) — aligne sur #backtoblog. */
+body.login.skmt-login-split .privacy-policy-page-link {
+  clear: both !important;
+  margin: 24px 0 0 0 !important;
+  padding: 0 !important;
+  text-align: left !important;
+  font-size: 13px !important;
+  color: var(--skmt-n500) !important;
+}
+
+/* Les deux liens de pied de formulaire cohabitent : resserrer le second. */
+body.login.skmt-login-split #backtoblog + .privacy-policy-page-link {
+  margin-top: 8px !important;
+}
+
+body.login.skmt-login-split .privacy-policy-page-link a {
+  color: var(--skmt-l-link) !important;
+  text-decoration: none !important;
+  font-size: 13px !important;
+}
+
+body.login.skmt-login-split .privacy-policy-page-link a:hover {
+  opacity: 0.75 !important;
+  text-decoration: underline !important;
 }
 
 /* ================================================================
