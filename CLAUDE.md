@@ -19,6 +19,29 @@ Never bump the version manually — the CI workflows handle it.
 
 `Core/Updater.php` caches the GitHub response for 12h **and caches failures for 15 min**. Without that negative cache, an unreachable GitHub or an exhausted anonymous quota (60 req/h) fires a fresh 10-second HTTP call on every update check, i.e. on nearly every admin page load. The manual "check for updates" button deletes both transients first, so it always bypasses it.
 
+## Outillage de développement
+
+Composer sert **uniquement** au développement : aucune dépendance d'exécution, `vendor/` est ignoré par Git et exclu des ZIP de release (comme `composer.*`, `phpcs.*`, `phpstan*`, `tools/`, `CLAUDE.md`, `docs/`).
+
+```bash
+composer install          # PHPCS (WPCS + PHPCompatibilityWP), PHPStan (+ stubs WordPress)
+composer lint             # phpcs — composer lint:fix pour phpcbf
+composer analyse          # phpstan, niveau 5
+composer check            # les deux
+```
+
+Pas de PHP sur le poste Windows : passer par l'image Docker, avec `MSYS_NO_PATHCONV=1` pour que Git Bash ne convertisse pas les chemins :
+
+```bash
+MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/app" -w /app composer:2 check
+```
+
+Le workflow `lint.yml` rejoue `php -l`, PHPCS et PHPStan sur chaque PR vers `dev` et `main`.
+
+**Baselines.** `phpcs.baseline.xml` et `phpstan-baseline.neon` gèlent les constats antérieurs à l'outillage : le code nouveau est tenu au standard, l'ancien ne bloque pas la CI. Ne jamais régénérer une baseline pour faire passer un constat neuf — corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé. Quand une baseline se vide, la supprimer ; quand PHPStan passe sans baseline, monter le niveau.
+
+Exclusions assumées dans `phpcs.xml.dist` : docblocs (`Squiz.Commenting`), noms de fichiers PSR-4 (`WordPress.Files.FileName`), fins de ligne (Git les normalise). Les gabarits (`templates/`, `settings-template.php`) sont inclus depuis une méthode d'`Admin` : PHPStan ne les analyse pas et PHPCS n'y exige pas de préfixe sur les variables. `tools/phpstan-bootstrap.php` déclare les constantes absentes des stubs (`WPINC`).
+
 ## Architecture
 
 ### Boot sequence

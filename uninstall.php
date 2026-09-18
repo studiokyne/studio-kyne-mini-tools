@@ -50,11 +50,13 @@ foreach ( $module_classes as $id => $class ) {
 	// Suppression des post types custom
 	foreach ( $keys['post_type'] ?? [] as $post_type ) {
 		// Récupérer tous les posts du type custom
-		$posts = get_posts( [
-			'post_type'      => $post_type,
-			'numberposts'    => -1,
-			'posts_per_page' => -1,
-		] );
+		$posts = get_posts(
+			[
+				'post_type'      => $post_type,
+				'numberposts'    => -1,
+				'posts_per_page' => -1,
+			]
+		);
 
 		foreach ( $posts as $post ) {
 			wp_delete_post( $post->ID, true ); // true = hard delete
@@ -69,11 +71,13 @@ foreach ( $module_classes as $id => $class ) {
 			register_taxonomy( $taxonomy, 'attachment', [ 'public' => false ] );
 		}
 
-		$terms = get_terms( [
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'fields'     => 'ids',
-		] );
+		$terms = get_terms(
+			[
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			]
+		);
 
 		if ( ! is_wp_error( $terms ) ) {
 			foreach ( $terms as $term_id ) {

@@ -148,9 +148,9 @@ class Updater {
 		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $remote_version, $remote_match );
 		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $installed_version, $installed_match );
 
-		$remote_base    = $remote_match[1] ?? $remote_version;
-		$remote_suffix  = $remote_match[2] ?? '';
-		$installed_base = $installed_match[1] ?? $installed_version;
+		$remote_base      = $remote_match[1] ?? $remote_version;
+		$remote_suffix    = $remote_match[2] ?? '';
+		$installed_base   = $installed_match[1] ?? $installed_version;
 		$installed_suffix = $installed_match[2] ?? '';
 
 		// Comparer les versions de base
@@ -211,17 +211,17 @@ class Updater {
 		}
 
 		return (object) [
-			'name'          => 'Studio Kyne Mini Tools',
-			'slug'          => dirname( $plugin_file ),
-			'author'        => '<a href="https://studiokyne.com">Studio Kyne</a>',
-			'author_profile'=> 'https://studiokyne.com',
-			'homepage'      => $remote['url'],
-			'download_link' => $remote['download_url'],
-			'version'       => $remote['version'],
-			'requires'      => '6.0',
-			'requires_php'  => '7.4',
-			'last_updated'  => $remote['published_at'],
-			'sections'      => [
+			'name'           => 'Studio Kyne Mini Tools',
+			'slug'           => dirname( $plugin_file ),
+			'author'         => '<a href="https://studiokyne.com">Studio Kyne</a>',
+			'author_profile' => 'https://studiokyne.com',
+			'homepage'       => $remote['url'],
+			'download_link'  => $remote['download_url'],
+			'version'        => $remote['version'],
+			'requires'       => '6.0',
+			'requires_php'   => '7.4',
+			'last_updated'   => $remote['published_at'],
+			'sections'       => [
 				'description' => __( 'Suite d\'outils modulaires pour optimiser et améliorer votre site WordPress.', 'studio-kyne-mini-tools' ),
 			],
 		];
@@ -234,7 +234,7 @@ class Updater {
 	 */
 	private function get_remote_version() {
 		$cache_key = $this->transient_key . '_' . $this->channel;
-		$cached = get_transient( $cache_key );
+		$cached    = get_transient( $cache_key );
 
 		// Un échec récent est mémorisé comme tel : on ne réinterroge pas GitHub
 		// avant l'expiration du cache négatif.
@@ -248,13 +248,16 @@ class Updater {
 
 		$api_url = $this->get_api_url();
 
-		$response = wp_remote_get( $api_url, [
-			'timeout' => 10,
-			'headers' => [
-				'Accept' => 'application/vnd.github.v3+json',
-				'User-Agent' => 'StudioKyneMiniTools',
-			],
-		] );
+		$response = wp_remote_get(
+			$api_url,
+			[
+				'timeout' => 10,
+				'headers' => [
+					'Accept'     => 'application/vnd.github.v3+json',
+					'User-Agent' => 'StudioKyneMiniTools',
+				],
+			]
+		);
 
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 			return $this->remember_failure( $cache_key );
@@ -305,12 +308,15 @@ class Updater {
 			}
 
 			// Trier par version décroissante pour garantir la plus récente (indépendamment de l'ordre de l'API)
-			usort( $body, function ( $a, $b ) {
-				return version_compare(
-					ltrim( $b['tag_name'] ?? '', 'v' ),
-					ltrim( $a['tag_name'] ?? '', 'v' )
-				);
-			} );
+			usort(
+				$body,
+				function ( $a, $b ) {
+					return version_compare(
+						ltrim( $b['tag_name'] ?? '', 'v' ),
+						ltrim( $a['tag_name'] ?? '', 'v' )
+					);
+				}
+			);
 
 			foreach ( $body as $release ) {
 				if ( empty( $release['prerelease'] ) ) {

@@ -56,22 +56,29 @@ class Module extends AbstractModule {
 	];
 
 	public function init(): void {
-		add_action( 'wp_ajax_skmt_db_get_tables',    [ $this, 'ajax_get_tables' ] );
-		add_action( 'wp_ajax_skmt_db_get_rows',      [ $this, 'ajax_get_rows' ] );
+		add_action( 'wp_ajax_skmt_db_get_tables', [ $this, 'ajax_get_tables' ] );
+		add_action( 'wp_ajax_skmt_db_get_rows', [ $this, 'ajax_get_rows' ] );
 		add_action( 'wp_ajax_skmt_db_get_structure', [ $this, 'ajax_get_structure' ] );
-		add_action( 'wp_ajax_skmt_db_update_row',    [ $this, 'ajax_update_row' ] );
-		add_action( 'wp_ajax_skmt_db_delete_row',    [ $this, 'ajax_delete_row' ] );
-		add_action( 'wp_ajax_skmt_db_insert_row',    [ $this, 'ajax_insert_row' ] );
-		add_action( 'wp_ajax_skmt_db_truncate',      [ $this, 'ajax_truncate_table' ] );
-		add_action( 'wp_ajax_skmt_db_drop_table',    [ $this, 'ajax_drop_table' ] );
-		add_action( 'wp_ajax_skmt_db_export_sql',    [ $this, 'ajax_export_sql' ] );
-		add_action( 'wp_ajax_skmt_db_run_query',     [ $this, 'ajax_run_query' ] );
+		add_action( 'wp_ajax_skmt_db_update_row', [ $this, 'ajax_update_row' ] );
+		add_action( 'wp_ajax_skmt_db_delete_row', [ $this, 'ajax_delete_row' ] );
+		add_action( 'wp_ajax_skmt_db_insert_row', [ $this, 'ajax_insert_row' ] );
+		add_action( 'wp_ajax_skmt_db_truncate', [ $this, 'ajax_truncate_table' ] );
+		add_action( 'wp_ajax_skmt_db_drop_table', [ $this, 'ajax_drop_table' ] );
+		add_action( 'wp_ajax_skmt_db_export_sql', [ $this, 'ajax_export_sql' ] );
+		add_action( 'wp_ajax_skmt_db_run_query', [ $this, 'ajax_run_query' ] );
 	}
 
-	public function get_settings(): array { return []; }
-	public function save_settings( array $s ): bool { return false; }
-	public static function get_defaults(): array { return []; }
-	public static function get_uninstall_keys(): array { return [ 'options' => [], 'meta' => [] ]; }
+	public function get_settings(): array {
+		return []; }
+	public function save_settings( array $s ): bool {
+		return false; }
+	public static function get_defaults(): array {
+		return []; }
+	public static function get_uninstall_keys(): array {
+		return [
+			'options' => [],
+			'meta'    => [],
+		]; }
 
 	public function get_admin_css(): array {
 		return [ SKMT_ASSETS_URL . 'admin/css/modules/database.css' ];
@@ -84,37 +91,37 @@ class Module extends AbstractModule {
 	public function get_admin_js_data(): array {
 		return [
 			'i18n' => [
-				'confirmDelete'    => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
-				'confirmTruncate'  => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
-				'queryWarning'     => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
-				'confirmWrite'     => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
+				'confirmDelete'   => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
+				'confirmTruncate' => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
+				'queryWarning'    => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
+				'confirmWrite'    => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
 				// Actions génériques
-				'confirm'          => __( 'Confirmer', 'studio-kyne-mini-tools' ),
-				'cancel'           => __( 'Annuler', 'studio-kyne-mini-tools' ),
-				'delete'           => __( 'Supprimer', 'studio-kyne-mini-tools' ),
-				'execute'          => __( 'Exécuter', 'studio-kyne-mini-tools' ),
+				'confirm'         => __( 'Confirmer', 'studio-kyne-mini-tools' ),
+				'cancel'          => __( 'Annuler', 'studio-kyne-mini-tools' ),
+				'delete'          => __( 'Supprimer', 'studio-kyne-mini-tools' ),
+				'execute'         => __( 'Exécuter', 'studio-kyne-mini-tools' ),
 				// États / feedback
-				'loading'          => __( 'Chargement…', 'studio-kyne-mini-tools' ),
-				'executing'        => __( 'Exécution…', 'studio-kyne-mini-tools' ),
-				'inserting'        => __( 'Insertion…', 'studio-kyne-mini-tools' ),
-				'rowAdded'         => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
-				'rowUpdated'       => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
-				'rowDeleted'       => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
-				'tableTruncated'   => __( 'Table vidée', 'studio-kyne-mini-tools' ),
-				'tableDropped'     => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
-				'error'            => __( 'Erreur', 'studio-kyne-mini-tools' ),
-				'networkError'     => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
+				'loading'         => __( 'Chargement…', 'studio-kyne-mini-tools' ),
+				'executing'       => __( 'Exécution…', 'studio-kyne-mini-tools' ),
+				'inserting'       => __( 'Insertion…', 'studio-kyne-mini-tools' ),
+				'rowAdded'        => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
+				'rowUpdated'      => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
+				'rowDeleted'      => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
+				'tableTruncated'  => __( 'Table vidée', 'studio-kyne-mini-tools' ),
+				'tableDropped'    => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
+				'error'           => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				'networkError'    => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
 				// Libellés de tableau / recherche
-				'noTables'         => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
-				'noRows'           => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
-				'noColumn'         => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
-				'noHistory'        => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
-				'clearHistory'     => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
-				'searchInTable'    => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
-				'rowsLabel'        => __( 'lignes', 'studio-kyne-mini-tools' ),
-				'perPageLabel'     => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
-				'setNull'          => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
-				'queryTruncated'   => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
+				'noTables'        => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
+				'noRows'          => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
+				'noColumn'        => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
+				'noHistory'       => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
+				'clearHistory'    => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
+				'searchInTable'   => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
+				'rowsLabel'       => __( 'lignes', 'studio-kyne-mini-tools' ),
+				'perPageLabel'    => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
+				'setNull'         => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
+				'queryTruncated'  => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
 			],
 		];
 	}
@@ -188,7 +195,12 @@ class Module extends AbstractModule {
 			];
 		}
 
-		wp_send_json_success( [ 'tables' => $tables, 'prefix' => $prefix ] );
+		wp_send_json_success(
+			[
+				'tables' => $tables,
+				'prefix' => $prefix,
+			]
+		);
 	}
 
 	/* ================================================================
@@ -205,10 +217,12 @@ class Module extends AbstractModule {
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$exists = $wpdb->get_var( $wpdb->prepare(
-			'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s',
-			$table
-		) );
+		$exists = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s',
+				$table
+			)
+		);
 		return $exists ? $table : null;
 	}
 
@@ -291,7 +305,9 @@ class Module extends AbstractModule {
 		$col_names = array_column( $columns, 'Field' );
 		$primary   = '';
 		foreach ( $columns as $col ) {
-			if ( 'PRI' === $col['Key'] ) { $primary = $col['Field']; break; }
+			if ( 'PRI' === $col['Key'] ) {
+				$primary = $col['Field'];
+				break; }
 		}
 
 		// Recherche : WHERE sur toutes les colonnes de type texte (LIKE).
@@ -319,15 +335,17 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( 'SELECT * FROM `' . $table . '`' . $where . $order . ' LIMIT ' . $per_page . ' OFFSET ' . $offset, ARRAY_A );
 
-		wp_send_json_success( [
-			'columns'  => $col_names,
-			'primary'  => $primary,
-			'rows'     => $rows,
-			'total'    => $total,
-			'page'     => $page,
-			'per_page' => $per_page,
-			'pages'    => (int) ceil( $total / $per_page ),
-		] );
+		wp_send_json_success(
+			[
+				'columns'  => $col_names,
+				'primary'  => $primary,
+				'rows'     => $rows,
+				'total'    => $total,
+				'page'     => $page,
+				'per_page' => $per_page,
+				'pages'    => (int) ceil( $total / $per_page ),
+			]
+		);
 	}
 
 	public function ajax_get_structure(): void {
@@ -344,7 +362,12 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$indexes = $wpdb->get_results( 'SHOW INDEX FROM `' . $table . '`', ARRAY_A );
 
-		wp_send_json_success( [ 'columns' => $columns, 'indexes' => $indexes ] );
+		wp_send_json_success(
+			[
+				'columns' => $columns,
+				'indexes' => $indexes,
+			]
+		);
 	}
 
 	public function ajax_update_row(): void {
@@ -568,7 +591,7 @@ class Module extends AbstractModule {
 			' ',
 			$out
 		);
-		$out = ( null === $sans_commentaires ) ? $out : $sans_commentaires;
+		$out               = ( null === $sans_commentaires ) ? $out : $sans_commentaires;
 
 		$compacte = preg_replace( '/\s+/', ' ', $out );
 		$out      = ( null === $compacte ) ? $out : $compacte;
@@ -635,19 +658,21 @@ class Module extends AbstractModule {
 
 		// Garde-fou 2 : toute requête d'écriture exige une confirmation explicite côté client.
 		if ( ! $is_select && empty( $_POST['confirm'] ) ) {
-			wp_send_json_error( [
-				'message'      => __( 'Cette requête modifie la base. Confirmation requise.', 'studio-kyne-mini-tools' ),
-				'needs_confirm' => true,
-			] );
+			wp_send_json_error(
+				[
+					'message'       => __( 'Cette requête modifie la base. Confirmation requise.', 'studio-kyne-mini-tools' ),
+					'needs_confirm' => true,
+				]
+			);
 		}
 
 		$wpdb->flush();
 
 		if ( $is_select ) {
 			// Garde-fou 3 : borne mémoire — on plafonne les SELECT sans LIMIT explicite.
-			$capped = $sql;
+			$capped    = $sql;
 			$truncated = false;
-			$bare = rtrim( $sql, "; \t\n\r" );
+			$bare      = rtrim( $sql, "; \t\n\r" );
 			// Seuls SELECT et WITH peuvent ramener un volume non borné. SHOW,
 			// DESCRIBE et EXPLAIN rendent un jeu déjà fini — et n'acceptent pas
 			// de LIMIT : le plafond transformait « SHOW CREATE TABLE x » en
@@ -668,13 +693,15 @@ class Module extends AbstractModule {
 				wp_send_json_error( [ 'message' => $wpdb->last_error ] );
 			}
 			$count = count( (array) $results );
-			wp_send_json_success( [
-				'type'      => 'select',
-				'columns'   => ! empty( $results ) ? array_keys( $results[0] ) : [],
-				'rows'      => $results,
-				'total'     => $count,
-				'truncated' => $truncated && $count >= self::QUERY_ROW_CAP ? self::QUERY_ROW_CAP : 0,
-			] );
+			wp_send_json_success(
+				[
+					'type'      => 'select',
+					'columns'   => ! empty( $results ) ? array_keys( $results[0] ) : [],
+					'rows'      => $results,
+					'total'     => $count,
+					'truncated' => $truncated && $count >= self::QUERY_ROW_CAP ? self::QUERY_ROW_CAP : 0,
+				]
+			);
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
@@ -682,11 +709,13 @@ class Module extends AbstractModule {
 		if ( false === $result ) {
 			wp_send_json_error( [ 'message' => $this->friendly_db_error( $wpdb->last_error, __( 'Requête échouée.', 'studio-kyne-mini-tools' ) ) ] );
 		}
-		wp_send_json_success( [
-			'type'      => 'write',
-			'affected'  => $result,
-			'insert_id' => $wpdb->insert_id,
-		] );
+		wp_send_json_success(
+			[
+				'type'      => 'write',
+				'affected'  => $result,
+				'insert_id' => $wpdb->insert_id,
+			]
+		);
 	}
 
 	public function ajax_export_sql(): void {
@@ -713,8 +742,8 @@ class Module extends AbstractModule {
 		$is_num    = [];
 		$is_binary = [];
 		foreach ( $columns as $field => $col ) {
-			$type              = strtolower( $col['Type'] ?? '' );
-			$is_num[ $field ]  = (bool) preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|decimal|dec|numeric|float|double|real|bit|year)\b/', $type );
+			$type                = strtolower( $col['Type'] ?? '' );
+			$is_num[ $field ]    = (bool) preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|decimal|dec|numeric|float|double|real|bit|year)\b/', $type );
 			$is_binary[ $field ] = (bool) preg_match( '/(blob|binary)\b/', $type );
 		}
 		// Liste de colonnes échappées pour un INSERT explicite (réimportable même si l'ordre/nombre change).

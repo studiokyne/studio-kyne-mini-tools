@@ -81,7 +81,10 @@ class ClientIp {
 	public static function detected_headers(): array {
 		$found = [];
 
-		foreach ( [ 'HTTP_CF_CONNECTING_IP' => 'CF-Connecting-IP', 'HTTP_X_FORWARDED_FOR' => 'X-Forwarded-For' ] as $key => $label ) {
+		foreach ( [
+			'HTTP_CF_CONNECTING_IP' => 'CF-Connecting-IP',
+			'HTTP_X_FORWARDED_FOR'  => 'X-Forwarded-For',
+		] as $key => $label ) {
 			$value = self::server( $key );
 			if ( '' !== $value ) {
 				$found[ $label ] = $value;

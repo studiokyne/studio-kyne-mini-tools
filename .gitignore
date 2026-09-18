@@ -4,3 +4,7 @@
 .vscode/
 node_modules/
 dist/
+
+# Outillage Composer (dev uniquement, jamais distribué)
+vendor/
+.phpcs.cache

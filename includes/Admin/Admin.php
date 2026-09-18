@@ -70,11 +70,11 @@ class Admin {
 		// il doit rester vide même si un module (Marque blanche) le personnalise.
 		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ], PHP_INT_MAX );
 		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], PHP_INT_MAX );
-		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_start' ], 0 );
-		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_end' ],   PHP_INT_MAX );
-		add_action( 'admin_bar_menu',        [ $this, 'register_noindex_indicator' ], 998 );
-		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
-		add_action( 'admin_footer',          [ $this, 'render_notification_drawer' ] );
+		add_action( 'admin_notices', [ $this, 'capture_wp_notices_start' ], 0 );
+		add_action( 'admin_notices', [ $this, 'capture_wp_notices_end' ], PHP_INT_MAX );
+		add_action( 'admin_bar_menu', [ $this, 'register_noindex_indicator' ], 998 );
+		add_action( 'admin_bar_menu', [ $this, 'register_notification_center' ], 999 );
+		add_action( 'admin_footer', [ $this, 'render_notification_drawer' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_notification_assets' ] );
 		add_action( 'wp_ajax_skmt_dismiss_notice', [ $this, 'handle_dismiss_notice' ] );
 	}
@@ -187,12 +187,12 @@ class Admin {
 
 		// tokens.css d'abord : il ne contient que des custom properties, tous les
 		// autres feuilles en dependent.
-		wp_enqueue_style( 'skmt-tokens-css',     SKMT_ASSETS_URL . 'admin/css/tokens.css',     [],                    SKMT_VERSION );
-		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [ 'skmt-tokens-css' ], SKMT_VERSION );
-		wp_enqueue_style( 'skmt-layout-css',     SKMT_ASSETS_URL . 'admin/css/layout.css',     [ 'skmt-reset-css' ],  SKMT_VERSION );
-		wp_enqueue_style( 'skmt-sidebar-css',    SKMT_ASSETS_URL . 'admin/css/sidebar.css',    [ 'skmt-layout-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-tokens-css', SKMT_ASSETS_URL . 'admin/css/tokens.css', [], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-reset-css', SKMT_ASSETS_URL . 'admin/css/reset.css', [ 'skmt-tokens-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-layout-css', SKMT_ASSETS_URL . 'admin/css/layout.css', [ 'skmt-reset-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-sidebar-css', SKMT_ASSETS_URL . 'admin/css/sidebar.css', [ 'skmt-layout-css' ], SKMT_VERSION );
 		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-tokens-css' ], SKMT_VERSION );
-		wp_enqueue_style( 'skmt-buttons-css',    SKMT_ASSETS_URL . 'admin/css/buttons.css',    [ 'skmt-components-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-buttons-css', SKMT_ASSETS_URL . 'admin/css/buttons.css', [ 'skmt-components-css' ], SKMT_VERSION );
 
 		wp_enqueue_script( 'skmt-admin-js', SKMT_ASSETS_URL . 'admin/js/admin.js', [], SKMT_VERSION, true );
 
@@ -211,14 +211,18 @@ class Admin {
 	 * Localise les données globales pour un script admin (sans i18n spécifiques aux modules).
 	 */
 	private function localize_admin_script( string $handle ): void {
-		wp_localize_script( $handle, 'skmtAdmin', [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-			'i18n'    => [
-				'saveSuccess' => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
-				'saveError'   => __( 'Une erreur est survenue.', 'studio-kyne-mini-tools' ),
-			],
-		] );
+		wp_localize_script(
+			$handle,
+			'skmtAdmin',
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+				'i18n'    => [
+					'saveSuccess' => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
+					'saveError'   => __( 'Une erreur est survenue.', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
 	}
 
 	/**
@@ -226,7 +230,7 @@ class Admin {
 	 */
 	public function enqueue_global_notification_assets(): void {
 		wp_enqueue_style( 'skmt-notifications-css', SKMT_ASSETS_URL . 'admin/css/notifications.css', [], SKMT_VERSION );
-		wp_enqueue_script( 'skmt-notifications-js', SKMT_ASSETS_URL . 'admin/js/notifications.js',   [], SKMT_VERSION, true );
+		wp_enqueue_script( 'skmt-notifications-js', SKMT_ASSETS_URL . 'admin/js/notifications.js', [], SKMT_VERSION, true );
 	}
 
 	/**
@@ -360,16 +364,16 @@ class Admin {
 		$type = isset( $_GET['skmt_notice_type'] ) ? sanitize_key( $_GET['skmt_notice_type'] ) : 'success';
 
 		$messages = [
-			'settings_saved'     => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
-			'module_activated'   => __( 'Module activé.', 'studio-kyne-mini-tools' ),
-			'module_deactivated' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
-			'modules_updated'    => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
-			'updates_checked'    => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
-			'settings_reset'      => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
-			'settings_imported'   => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
-			'import_error_file'   => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
+			'settings_saved'       => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
+			'module_activated'     => __( 'Module activé.', 'studio-kyne-mini-tools' ),
+			'module_deactivated'   => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
+			'modules_updated'      => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
+			'updates_checked'      => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
+			'settings_reset'       => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
+			'settings_imported'    => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
+			'import_error_file'    => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
 			'import_error_invalid' => __( 'Le fichier JSON est invalide ou incompatible.', 'studio-kyne-mini-tools' ),
-			'import_error_size'   => __( 'Le fichier dépasse la taille maximale autorisée (2 Mo).', 'studio-kyne-mini-tools' ),
+			'import_error_size'    => __( 'Le fichier dépasse la taille maximale autorisée (2 Mo).', 'studio-kyne-mini-tools' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -418,7 +422,10 @@ class Admin {
 	 * @return array{notices: string, passthrough: string}
 	 */
 	private function split_captured_notices( string $html ): array {
-		$result = [ 'notices' => $html, 'passthrough' => '' ];
+		$result = [
+			'notices'     => $html,
+			'passthrough' => '',
+		];
 
 		if ( '' === trim( $html ) || ! class_exists( '\DOMDocument' ) ) {
 			return $result;
@@ -457,7 +464,10 @@ class Admin {
 			}
 		}
 
-		return [ 'notices' => $notices, 'passthrough' => $passthrough ];
+		return [
+			'notices'     => $notices,
+			'passthrough' => $passthrough,
+		];
 	}
 
 	/**
@@ -470,18 +480,20 @@ class Admin {
 
 		$bell = $this->render_icon( 'bell', 'sm', 'skmt-notif-bell-icon' );
 
-		$wp_admin_bar->add_node( [
-			'id'     => 'skmt-notif-center',
-			'parent' => 'top-secondary',
-			'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
-			'href'   => '#skmt-notif-drawer',
-			// WP_Admin_Bar échappe lui-même meta.title : un esc_attr__ ici
-			// double-encoderait (« > » rendu « &gt; »).
-			'meta'   => [
-				'class' => 'skmt-notif-trigger',
-				'title' => __( 'Notifications', 'studio-kyne-mini-tools' ),
-			],
-		] );
+		$wp_admin_bar->add_node(
+			[
+				'id'     => 'skmt-notif-center',
+				'parent' => 'top-secondary',
+				'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
+				'href'   => '#skmt-notif-drawer',
+				// WP_Admin_Bar échappe lui-même meta.title : un esc_attr__ ici
+				// double-encoderait (« > » rendu « &gt; »).
+				'meta'   => [
+					'class' => 'skmt-notif-trigger',
+					'title' => __( 'Notifications', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
 	}
 
 	/**
@@ -499,16 +511,18 @@ class Admin {
 
 		$icon = $this->render_icon( 'eye-off', 'sm', 'skmt-noindex-icon' );
 
-		$wp_admin_bar->add_node( [
-			'id'     => 'skmt-noindex',
-			'parent' => 'top-secondary',
-			'title'  => '<span class="skmt-noindex-wrap">' . $icon . '<span class="skmt-noindex-label">' . esc_html__( 'No-index', 'studio-kyne-mini-tools' ) . '</span></span>',
-			'href'   => admin_url( 'options-reading.php' ),
-			'meta'   => [
-				'class' => 'skmt-noindex-indicator',
-				'title' => __( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
-			],
-		] );
+		$wp_admin_bar->add_node(
+			[
+				'id'     => 'skmt-noindex',
+				'parent' => 'top-secondary',
+				'title'  => '<span class="skmt-noindex-wrap">' . $icon . '<span class="skmt-noindex-label">' . esc_html__( 'No-index', 'studio-kyne-mini-tools' ) . '</span></span>',
+				'href'   => admin_url( 'options-reading.php' ),
+				'meta'   => [
+					'class' => 'skmt-noindex-indicator',
+					'title' => __( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
 	}
 
 	/**
@@ -546,9 +560,9 @@ class Admin {
 	 */
 	public function render_notification_drawer(): void {
 
-		$close_icon    = $this->render_icon( 'x', 'sm' );
-		$notices_json  = wp_json_encode( $this->captured_wp_notices );
-		$toast_json    = wp_json_encode( $this->skmt_toast );
+		$close_icon   = $this->render_icon( 'x', 'sm' );
+		$notices_json = wp_json_encode( $this->captured_wp_notices );
+		$toast_json   = wp_json_encode( $this->skmt_toast );
 
 		$user_id         = get_current_user_id();
 		$raw_notices     = $user_id ? get_user_meta( $user_id, 'skmt_notices', true ) : [];
@@ -562,10 +576,12 @@ class Admin {
 			];
 		}
 		$persistent_json = wp_json_encode( $persistent_list );
-		$notif_data_json = wp_json_encode( [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-		] );
+		$notif_data_json = wp_json_encode(
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+			]
+		);
 		?>
 		<div id="skmt-notif-drawer" class="skmt-notif-drawer" role="dialog" aria-label="<?php esc_attr_e( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?>" aria-hidden="true">
 			<div class="skmt-notif-drawer__header">
@@ -713,12 +729,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => $tab,
-			'skmt_notice'      => 'settings_saved',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => $tab,
+					'skmt_notice'      => 'settings_saved',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -751,12 +772,17 @@ class Admin {
 			$notice = 'module_deactivated';
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'modules',
-			'skmt_notice'      => $notice,
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'modules',
+					'skmt_notice'      => $notice,
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -781,24 +807,29 @@ class Admin {
 
 		if ( 'activate' === $action ) {
 			$this->modules->activate( $module_id );
-			$notice      = __( 'Module activé.', 'studio-kyne-mini-tools' );
-			$new_state   = true;
+			$notice    = __( 'Module activé.', 'studio-kyne-mini-tools' );
+			$new_state = true;
 		} else {
 			$this->modules->deactivate( $module_id );
-			$notice      = __( 'Module désactivé.', 'studio-kyne-mini-tools' );
-			$new_state   = false;
+			$notice    = __( 'Module désactivé.', 'studio-kyne-mini-tools' );
+			$new_state = false;
 		}
 
-		$configure_url = add_query_arg( [
-			'page' => $this->slug,
-			'tab'  => 'module_' . $module_id,
-		], admin_url( 'admin.php' ) );
+		$configure_url = add_query_arg(
+			[
+				'page' => $this->slug,
+				'tab'  => 'module_' . $module_id,
+			],
+			admin_url( 'admin.php' )
+		);
 
-		wp_send_json_success( [
-			'notice'        => $notice,
-			'active'        => $new_state,
-			'configure_url' => esc_url( $configure_url ),
-		] );
+		wp_send_json_success(
+			[
+				'notice'        => $notice,
+				'active'        => $new_state,
+				'configure_url' => esc_url( $configure_url ),
+			]
+		);
 	}
 
 	/**
@@ -826,12 +857,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'modules',
-			'skmt_notice'      => 'modules_updated',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'modules',
+					'skmt_notice'      => 'modules_updated',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -852,12 +888,17 @@ class Admin {
 		delete_transient( 'skmt_github_update_dev' );
 		wp_update_plugins();
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'updates_checked',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'updates_checked',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -886,12 +927,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'settings_reset',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'settings_reset',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -950,12 +996,17 @@ class Admin {
 
 		$file = $_FILES['skmt_import_file'] ?? null;
 		if ( ! $file || empty( $file['tmp_name'] ) || $file['error'] !== UPLOAD_ERR_OK ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_file',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_file',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -964,12 +1015,17 @@ class Admin {
 		// par CETTE requête, et non un chemin arbitraire du serveur glissé dans
 		// la variable. C'est la garde standard avant toute lecture d'un upload.
 		if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_file',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_file',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -978,12 +1034,17 @@ class Admin {
 		// quelques dizaines de kilo-octets ; 2 Mo laissent une marge confortable
 		// sans exposer la mémoire de PHP à un fichier de plusieurs centaines.
 		if ( filesize( $file['tmp_name'] ) > self::IMPORT_MAX_BYTES ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_size',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_size',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -992,12 +1053,17 @@ class Admin {
 		$data = json_decode( $raw, true );
 
 		if ( ! is_array( $data ) || ! isset( $data['global'] ) ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_invalid',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_invalid',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -1023,12 +1089,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'settings_imported',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'settings_imported',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -1074,7 +1145,7 @@ class Admin {
 		];
 
 		if ( array_key_exists( 'update_channel', $global ) ) {
-			$channel = sanitize_key( (string) $global['update_channel'] );
+			$channel                           = sanitize_key( (string) $global['update_channel'] );
 			$clean['global']['update_channel'] = in_array( $channel, [ 'stable', 'dev' ], true ) ? $channel : 'stable';
 		}
 
@@ -1240,12 +1311,12 @@ class Admin {
 			'x'                => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 			'log-in'           => '<path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
 			'folder'           => '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
-		'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
-		'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
-		'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
-		'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
-		'eye-off'          => '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
-		'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
+			'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
+			'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
+			'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
+			'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+			'eye-off'          => '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+			'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
 		];
 	}
 

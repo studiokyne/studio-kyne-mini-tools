@@ -56,8 +56,8 @@ class Activator {
 				continue;
 			}
 
-			$defaults    = $class::get_defaults();
-			$option_key  = 'skmt_module_' . $id;
+			$defaults   = $class::get_defaults();
+			$option_key = 'skmt_module_' . $id;
 
 			if ( ! empty( $defaults ) && false === get_option( $option_key ) ) {
 				add_option( $option_key, $defaults );

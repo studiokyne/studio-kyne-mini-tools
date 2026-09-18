@@ -20,17 +20,17 @@ class Module extends AbstractModule {
 	public function init(): void {
 		$this->fm = new FileManager( ABSPATH );
 
-		add_action( 'wp_ajax_skmt_files_list',         [ $this, 'ajax_list' ] );
-		add_action( 'wp_ajax_skmt_files_delete',       [ $this, 'ajax_delete' ] );
-		add_action( 'wp_ajax_skmt_files_rename',       [ $this, 'ajax_rename' ] );
-		add_action( 'wp_ajax_skmt_files_move',         [ $this, 'ajax_move' ] );
-		add_action( 'wp_ajax_skmt_files_mkdir',        [ $this, 'ajax_mkdir' ] );
-		add_action( 'wp_ajax_skmt_files_zip',          [ $this, 'ajax_zip' ] );
-		add_action( 'wp_ajax_skmt_files_extract',      [ $this, 'ajax_extract' ] );
-		add_action( 'wp_ajax_skmt_files_get_content',  [ $this, 'ajax_get_content' ] );
+		add_action( 'wp_ajax_skmt_files_list', [ $this, 'ajax_list' ] );
+		add_action( 'wp_ajax_skmt_files_delete', [ $this, 'ajax_delete' ] );
+		add_action( 'wp_ajax_skmt_files_rename', [ $this, 'ajax_rename' ] );
+		add_action( 'wp_ajax_skmt_files_move', [ $this, 'ajax_move' ] );
+		add_action( 'wp_ajax_skmt_files_mkdir', [ $this, 'ajax_mkdir' ] );
+		add_action( 'wp_ajax_skmt_files_zip', [ $this, 'ajax_zip' ] );
+		add_action( 'wp_ajax_skmt_files_extract', [ $this, 'ajax_extract' ] );
+		add_action( 'wp_ajax_skmt_files_get_content', [ $this, 'ajax_get_content' ] );
 		add_action( 'wp_ajax_skmt_files_save_content', [ $this, 'ajax_save_content' ] );
-		add_action( 'wp_ajax_skmt_files_upload',       [ $this, 'ajax_upload' ] );
-		add_action( 'admin_post_skmt_files_download',  [ $this, 'handle_download' ] );
+		add_action( 'wp_ajax_skmt_files_upload', [ $this, 'ajax_upload' ] );
+		add_action( 'admin_post_skmt_files_download', [ $this, 'handle_download' ] );
 
 		// L'éditeur de code s'appuie sur CodeMirror, livré avec WordPress. Le
 		// core ne le charge pas de lui-même : il faut appeler wp_enqueue_code_editor()
@@ -53,9 +53,30 @@ class Module extends AbstractModule {
 	 * qui décide des modes CodeMirror préparés côté serveur.
 	 */
 	const EDITABLE_EXTENSIONS = [
-		'php', 'js', 'ts', 'css', 'html', 'htm', 'xml', 'svg',
-		'json', 'txt', 'md', 'sh', 'bash', 'sql', 'htaccess', 'env',
-		'yml', 'yaml', 'ini', 'conf', 'config', 'lock', 'log', 'htpasswd',
+		'php',
+		'js',
+		'ts',
+		'css',
+		'html',
+		'htm',
+		'xml',
+		'svg',
+		'json',
+		'txt',
+		'md',
+		'sh',
+		'bash',
+		'sql',
+		'htaccess',
+		'env',
+		'yml',
+		'yaml',
+		'ini',
+		'conf',
+		'config',
+		'lock',
+		'log',
+		'htpasswd',
 	];
 
 	/** Réglages CodeMirror par extension, remplis par enqueue_code_editor(). */
@@ -149,9 +170,12 @@ class Module extends AbstractModule {
 			|| ( $edition && defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT );
 
 		if ( $bloque ) {
-			wp_send_json_error( [
-				'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS dans wp-config.php).', 'studio-kyne-mini-tools' ),
-			], 403 );
+			wp_send_json_error(
+				[
+					'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS dans wp-config.php).', 'studio-kyne-mini-tools' ),
+				],
+				403
+			);
 		}
 	}
 
@@ -171,13 +195,21 @@ class Module extends AbstractModule {
 		try {
 			$items     = $this->fm->list_directory( $path );
 			$date_fmt  = get_option( 'date_format' ) . ' H:i';
-			$formatted = array_map( function ( $item ) use ( $date_fmt ) {
-				$item['size_fmt']     = ( $item['size'] !== null ) ? FileManager::format_size( (int) $item['size'] ) : '';
-				$item['modified_fmt'] = $item['modified'] ? date_i18n( $date_fmt, $item['modified'] ) : '';
-				return $item;
-			}, $items );
+			$formatted = array_map(
+				function ( $item ) use ( $date_fmt ) {
+					$item['size_fmt']     = ( $item['size'] !== null ) ? FileManager::format_size( (int) $item['size'] ) : '';
+					$item['modified_fmt'] = $item['modified'] ? date_i18n( $date_fmt, $item['modified'] ) : '';
+					return $item;
+				},
+				$items
+			);
 
-			wp_send_json_success( [ 'items' => $formatted, 'path' => $path ] );
+			wp_send_json_success(
+				[
+					'items' => $formatted,
+					'path'  => $path,
+				]
+			);
 		} catch ( \Exception $e ) {
 			wp_send_json_error( [ 'message' => $e->getMessage() ] );
 		}
@@ -263,11 +295,13 @@ class Module extends AbstractModule {
 			$abs          = $this->fm->create_zip( $paths, $dest );
 			$rel          = $this->fm->to_relative( $abs );
 			$download_url = $this->build_download_url( $rel );
-			wp_send_json_success( [
-				'message'      => __( 'Archive créée.', 'studio-kyne-mini-tools' ),
-				'path'         => $rel,
-				'download_url' => $download_url,
-			] );
+			wp_send_json_success(
+				[
+					'message'      => __( 'Archive créée.', 'studio-kyne-mini-tools' ),
+					'path'         => $rel,
+					'download_url' => $download_url,
+				]
+			);
 		} catch ( \Exception $e ) {
 			wp_send_json_error( [ 'message' => $e->getMessage() ] );
 		}
@@ -292,7 +326,12 @@ class Module extends AbstractModule {
 
 		try {
 			$content = $this->fm->get_content( $path );
-			wp_send_json_success( [ 'content' => $content, 'path' => $path ] );
+			wp_send_json_success(
+				[
+					'content' => $content,
+					'path'    => $path,
+				]
+			);
 		} catch ( \Exception $e ) {
 			wp_send_json_error( [ 'message' => $e->getMessage() ] );
 		}
@@ -356,14 +395,16 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => implode( ', ', $errors ) ] );
 		}
 
-		wp_send_json_success( [
-			'message' => sprintf(
-				/* translators: %d: number of files */
-				_n( '%d fichier uploadé.', '%d fichiers uploadés.', count( $uploaded ), 'studio-kyne-mini-tools' ),
-				count( $uploaded )
-			),
-			'paths'   => $uploaded,
-		] );
+		wp_send_json_success(
+			[
+				'message' => sprintf(
+					/* translators: %d: number of files */
+					_n( '%d fichier uploadé.', '%d fichiers uploadés.', count( $uploaded ), 'studio-kyne-mini-tools' ),
+					count( $uploaded )
+				),
+				'paths'   => $uploaded,
+			]
+		);
 	}
 
 	/* ================================================================
@@ -464,7 +505,7 @@ class Module extends AbstractModule {
 
 	public function get_admin_js_data(): array {
 		return [
-			'i18n' => [
+			'i18n'       => [
 				'confirmDelete' => __( 'Supprimer ce(s) élément(s) ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
 				'emptyFolder'   => __( 'Ce dossier est vide.', 'studio-kyne-mini-tools' ),
 				'loading'       => __( 'Chargement...', 'studio-kyne-mini-tools' ),

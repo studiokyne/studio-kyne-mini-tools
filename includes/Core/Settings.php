@@ -38,7 +38,7 @@ class Settings {
 		$settings = $this->get_all();
 
 		// Support des clés imbriquées (ex: "modules.image_optimizer")
-		$keys = explode( '.', $key );
+		$keys  = explode( '.', $key );
 		$value = $settings;
 
 		foreach ( $keys as $k ) {
@@ -74,7 +74,7 @@ class Settings {
 			$target = &$target[ $k ];
 		}
 
-		$target = $value;
+		$target         = $value;
 		$this->settings = $settings;
 
 		return update_option( $this->option_key, $settings );
@@ -86,8 +86,8 @@ class Settings {
 	 * @param array $data Tableau de settings.
 	 */
 	public function update( array $data ): bool {
-		$settings = $this->get_all();
-		$settings = $this->merge_recursive( $settings, $data );
+		$settings       = $this->get_all();
+		$settings       = $this->merge_recursive( $settings, $data );
 		$this->settings = $settings;
 
 		return update_option( $this->option_key, $settings );

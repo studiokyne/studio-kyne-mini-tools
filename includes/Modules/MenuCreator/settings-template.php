@@ -31,14 +31,14 @@ $svg = [
 <div class="skmt-mc-editor" id="skmt-mc-editor">
 
 	<!-- ============================================================
-		 COLONNE GAUCHE — liste des menus
-		 ============================================================ -->
+		COLONNE GAUCHE — liste des menus
+		============================================================ -->
 	<aside class="skmt-wl-ep__profiles-col">
 
 		<div class="skmt-wl-ep__profiles-header">
 			<span class="skmt-wl-ep__profiles-title"><?php esc_html_e( 'Menus', 'studio-kyne-mini-tools' ); ?></span>
 			<!-- Import / export de la totalité des menus : actions de gestion,
-				 donc en icône seule dans l'en-tête, hors du flux de navigation. -->
+				donc en icône seule dans l'en-tête, hors du flux de navigation. -->
 			<span class="skmt-mc-hdr-actions">
 				<button type="button" class="skmt-mc-hdr-btn" id="skmt-mc-import-btn"
 					data-skmt-tip="<?php esc_attr_e( 'Importer un ou plusieurs menus depuis un .json', 'studio-kyne-mini-tools' ); ?>"
@@ -66,7 +66,7 @@ $svg = [
 		</div>
 
 		<!-- La création suit immédiatement le dernier menu (et non le bas de la
-			 colonne) : le bouton occupe la place où le nouveau menu apparaîtra. -->
+			colonne) : le bouton occupe la place où le nouveau menu apparaîtra. -->
 		<div class="skmt-wl-ep__profiles-scroll">
 			<div class="skmt-wl-ep__profiles-list" id="skmt-wl-ep-profiles-list"></div>
 			<button type="button" class="skmt-mc-add-placeholder" id="skmt-mc-new-btn">
@@ -78,8 +78,8 @@ $svg = [
 	</aside>
 
 	<!-- ============================================================
-		 COLONNE CENTRALE — placeholder + arbre
-		 ============================================================ -->
+		COLONNE CENTRALE — placeholder + arbre
+		============================================================ -->
 	<div class="skmt-wl-ep__tree-col" id="skmt-mc-tree-col">
 
 		<div class="skmt-wl-ep__tree-actions" id="skmt-mc-tree-actions" style="display:none">
@@ -92,7 +92,7 @@ $svg = [
 		</div>
 
 		<!-- Bandeau des entrées orphelines : rempli par le JS quand le profil
-			 référence des slugs absents du menu WP courant. -->
+			référence des slugs absents du menu WP courant. -->
 		<div class="skmt-mc-stale-bar" id="skmt-mc-stale-bar" style="display:none"></div>
 
 		<div class="skmt-mc-placeholder" id="skmt-mc-placeholder">
@@ -106,8 +106,8 @@ $svg = [
 	</div>
 
 	<!-- ============================================================
-		 COLONNE DROITE — paramètres (direct switch, no tabs)
-		 ============================================================ -->
+		COLONNE DROITE — paramètres (direct switch, no tabs)
+		============================================================ -->
 	<div class="skmt-wl-ep__settings-col" id="skmt-wl-settings-col" style="display:none">
 
 		<!-- En-tête du panel (titre dynamique + bouton retour) -->
@@ -118,7 +118,7 @@ $svg = [
 			</button>
 			<span class="skmt-mc-panel-title" id="skmt-mc-panel-title"><?php esc_html_e( 'Paramètres du menu', 'studio-kyne-mini-tools' ); ?></span>
 			<!-- Export du menu ouvert : action de gestion du menu, donc dans son
-				 en-tête et masquée sur la vue d'un élément. -->
+				en-tête et masquée sur la vue d'un élément. -->
 			<button type="button" class="skmt-mc-hdr-btn skmt-mc-panel-header__action" id="skmt-mc-export-btn"
 				data-skmt-tip="<?php esc_attr_e( 'Exporter ce menu en .json', 'studio-kyne-mini-tools' ); ?>"
 				aria-label="<?php esc_attr_e( 'Exporter ce menu', 'studio-kyne-mini-tools' ); ?>">
@@ -148,7 +148,7 @@ $svg = [
 				</div>
 				<div class="skmt-mc-status-group">
 					<div class="skmt-wl-seg">
-						<button type="button" class="skmt-wl-seg__btn" data-value="draft"  id="skmt-wl-status-draft"><?php  esc_html_e( 'Brouillon', 'studio-kyne-mini-tools' ); ?></button>
+						<button type="button" class="skmt-wl-seg__btn" data-value="draft"  id="skmt-wl-status-draft"><?php esc_html_e( 'Brouillon', 'studio-kyne-mini-tools' ); ?></button>
 						<button type="button" class="skmt-wl-seg__btn" data-value="active" id="skmt-wl-status-active"><?php esc_html_e( 'Actif', 'studio-kyne-mini-tools' ); ?></button>
 					</div>
 				</div>

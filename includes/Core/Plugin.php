@@ -86,6 +86,6 @@ class Plugin {
 			'studio-kyne-mini-tools',
 			false,
 			dirname( plugin_basename( SKMT_PLUGIN_FILE ) ) . '/languages/'
-			);
+		);
 	}
 }

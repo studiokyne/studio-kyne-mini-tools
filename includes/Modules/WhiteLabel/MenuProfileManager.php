@@ -61,10 +61,12 @@ class MenuProfileManager {
 	}
 
 	public static function delete( string $id ): bool {
-		$profiles = array_values( array_filter(
-			self::get_all(),
-			fn( $p ) => ! isset( $p['id'] ) || $p['id'] !== $id
-		) );
+		$profiles = array_values(
+			array_filter(
+				self::get_all(),
+				fn( $p ) => ! isset( $p['id'] ) || $p['id'] !== $id
+			)
+		);
 
 		self::clear_all_cache();
 		return (bool) update_option( self::OPTION_KEY, $profiles );

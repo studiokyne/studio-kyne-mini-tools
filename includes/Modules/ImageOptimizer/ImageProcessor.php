@@ -567,11 +567,13 @@ class ImageProcessor {
 			$message = (string) $error;
 		}
 
-		error_log( sprintf(
-			'[SKMT Image Optimizer] %s a échoué pour %s : %s',
-			$context,
-			$file_path,
-			'' !== $message ? $message : 'erreur inconnue'
-		) );
+		error_log(
+			sprintf(
+				'[SKMT Image Optimizer] %s a échoué pour %s : %s',
+				$context,
+				$file_path,
+				'' !== $message ? $message : 'erreur inconnue'
+			)
+		);
 	}
 }

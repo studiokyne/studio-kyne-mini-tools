@@ -109,14 +109,18 @@ class MediaLibrary {
 			wp_enqueue_script( $handle, $script_url, [], SKMT_VERSION, true );
 
 			// Données globales + i18n spécifiques au module.
-			$js_data  = $this->module->get_admin_js_data();
-			$i18n     = $js_data['i18n'] ?? [];
+			$js_data = $this->module->get_admin_js_data();
+			$i18n    = $js_data['i18n'] ?? [];
 
-			wp_localize_script( $handle, 'skmtAdmin', [
-				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-				'i18n'    => $i18n,
-			] );
+			wp_localize_script(
+				$handle,
+				'skmtAdmin',
+				[
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+					'i18n'    => $i18n,
+				]
+			);
 		}
 	}
 
@@ -142,12 +146,12 @@ class MediaLibrary {
 		$is_animated  = $this->processor->is_animated( $file, $mime );
 		$is_optimized = $this->module->is_already_optimized( $post->ID );
 
-		$original_bytes      = (int) get_post_meta( $post->ID, '_skmt_original_bytes', true );
-		$optimized_bytes     = (int) get_post_meta( $post->ID, '_skmt_optimized_bytes', true );
-		$bytes_saved         = (int) get_post_meta( $post->ID, '_skmt_bytes_saved', true );
-		$main_original_bytes = (int) get_post_meta( $post->ID, '_skmt_main_original_bytes', true );
-		$main_optimized_bytes= (int) get_post_meta( $post->ID, '_skmt_main_optimized_bytes', true );
-		$main_bytes_saved    = (int) get_post_meta( $post->ID, '_skmt_main_bytes_saved', true );
+		$original_bytes       = (int) get_post_meta( $post->ID, '_skmt_original_bytes', true );
+		$optimized_bytes      = (int) get_post_meta( $post->ID, '_skmt_optimized_bytes', true );
+		$bytes_saved          = (int) get_post_meta( $post->ID, '_skmt_bytes_saved', true );
+		$main_original_bytes  = (int) get_post_meta( $post->ID, '_skmt_main_original_bytes', true );
+		$main_optimized_bytes = (int) get_post_meta( $post->ID, '_skmt_main_optimized_bytes', true );
+		$main_bytes_saved     = (int) get_post_meta( $post->ID, '_skmt_main_bytes_saved', true );
 
 		// Fallbacks pour les médias optimisés avant l'ajout du détail main.
 		if ( $is_optimized && 0 === $main_optimized_bytes ) {
@@ -257,13 +261,15 @@ class MediaLibrary {
 			$this->module->process_and_update_attachment( $attachment_id, true );
 		}
 
-		wp_send_json_success( [
-			'original_bytes'       => (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true ),
-			'optimized_bytes'      => (int) get_post_meta( $attachment_id, '_skmt_optimized_bytes', true ),
-			'bytes_saved'          => (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true ),
-			'main_original_bytes'  => (int) get_post_meta( $attachment_id, '_skmt_main_original_bytes', true ),
-			'main_optimized_bytes' => (int) get_post_meta( $attachment_id, '_skmt_main_optimized_bytes', true ),
-			'main_bytes_saved'     => (int) get_post_meta( $attachment_id, '_skmt_main_bytes_saved', true ),
-		] );
+		wp_send_json_success(
+			[
+				'original_bytes'       => (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true ),
+				'optimized_bytes'      => (int) get_post_meta( $attachment_id, '_skmt_optimized_bytes', true ),
+				'bytes_saved'          => (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true ),
+				'main_original_bytes'  => (int) get_post_meta( $attachment_id, '_skmt_main_original_bytes', true ),
+				'main_optimized_bytes' => (int) get_post_meta( $attachment_id, '_skmt_main_optimized_bytes', true ),
+				'main_bytes_saved'     => (int) get_post_meta( $attachment_id, '_skmt_main_bytes_saved', true ),
+			]
+		);
 	}
 }
