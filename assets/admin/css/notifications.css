@@ -461,31 +461,36 @@
   display: block !important;
 }
 
-/* Pastille rouge positionnée en haut à droite de l'icône */
+/* Pastille rouge en haut à droite de l'icône : compteur, plafonné à « 9+ » en JS */
 #wpadminbar .skmt-notif-badge {
   position: absolute !important;
-  top: 2px !important;
-  right: 2px !important;
+  top: 1px !important;
+  right: -2px !important;
   left: auto !important;
   bottom: auto !important;
-  width: 8px !important;
-  min-width: 8px !important;
-  height: 8px !important;
+  box-sizing: border-box !important;
+  width: auto !important;
+  min-width: 15px !important;
+  height: 15px !important;
   margin: 0 !important;
-  padding: 0 !important;
+  padding: 0 4px !important;
   background: #dc2626 !important;
-  border-radius: 50% !important;
+  border-radius: 999px !important;
   border: 1.5px solid #1d2327 !important;
   box-shadow: none !important;
   display: flex !important;
   align-items: center !important;
   justify-content: center !important;
-  font-size: 0 !important;
+  font-size: 9px !important;
+  font-weight: 600 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
   line-height: 1 !important;
+  letter-spacing: -0.02em !important;
   color: #ffffff !important;
   text-indent: 0 !important;
   float: none !important;
   overflow: visible !important;
+  white-space: nowrap !important;
   z-index: 1 !important;
 }
 
