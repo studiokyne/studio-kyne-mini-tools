@@ -151,12 +151,15 @@ class FileManager {
 		}
 		closedir( $handle );
 
-		usort( $items, function ( $a, $b ) {
-			if ( $a['type'] !== $b['type'] ) {
-				return $a['type'] === 'dir' ? -1 : 1;
+		usort(
+			$items,
+			function ( $a, $b ) {
+				if ( $a['type'] !== $b['type'] ) {
+					return $a['type'] === 'dir' ? -1 : 1;
+				}
+				return strcasecmp( $a['name'], $b['name'] );
 			}
-			return strcasecmp( $a['name'], $b['name'] );
-		} );
+		);
 
 		return $items;
 	}

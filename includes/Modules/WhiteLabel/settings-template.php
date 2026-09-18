@@ -28,8 +28,8 @@ $avatars = $module_settings['avatars'] ?? [];
 	<div class="skmt-module-form__scroll">
 
 	<!-- ============================================================
-		 BARRE D'ADMINISTRATION
-		 ============================================================ -->
+		BARRE D'ADMINISTRATION
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Barre d\'administration', 'studio-kyne-mini-tools' ); ?></h2>
@@ -191,8 +191,8 @@ $avatars = $module_settings['avatars'] ?? [];
 	</div>
 
 	<!-- ============================================================
-		 AVATARS
-		 ============================================================ -->
+		AVATARS
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Avatars', 'studio-kyne-mini-tools' ); ?></h2>
@@ -219,8 +219,8 @@ $avatars = $module_settings['avatars'] ?? [];
 	</div>
 
 	<!-- ============================================================
-		 PAGE DE PROFIL
-		 ============================================================ -->
+		PAGE DE PROFIL
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Page de profil', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Masquage visuel uniquement : chaque fonctionnalité reste active côté serveur. Ces cases épurent l'écran, elles ne retirent aucun droit.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></h2>
@@ -352,8 +352,8 @@ $avatars = $module_settings['avatars'] ?? [];
 	</div>
 
 	<!-- ============================================================
-		 PIED DE PAGE
-		 ============================================================ -->
+		PIED DE PAGE
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Pied de page', 'studio-kyne-mini-tools' ); ?></h2>

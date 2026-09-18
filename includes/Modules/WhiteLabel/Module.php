@@ -74,17 +74,17 @@ class Module extends AbstractModule {
 		// Avatars locaux : l'avatar téléversé prime, sinon on laisse WordPress
 		// retomber sur Gravatar (comportement par défaut).
 		if ( ! empty( $s['avatars']['local'] ) ) {
-			add_filter( 'get_avatar_data',          [ $this, 'apply_local_avatar' ], 10, 2 );
+			add_filter( 'get_avatar_data', [ $this, 'apply_local_avatar' ], 10, 2 );
 			// personal_options se déclenche en haut du formulaire de profil
 			// (dans « Options personnelles », avant la section « Nom »), sur
 			// profile.php ET user-edit.php.
-			add_action( 'personal_options',         [ $this, 'render_avatar_field' ] );
-			add_action( 'personal_options_update',  [ $this, 'save_avatar_field' ] );
+			add_action( 'personal_options', [ $this, 'render_avatar_field' ] );
+			add_action( 'personal_options_update', [ $this, 'save_avatar_field' ] );
 			add_action( 'edit_user_profile_update', [ $this, 'save_avatar_field' ] );
-			add_action( 'admin_enqueue_scripts',    [ $this, 'enqueue_avatar_media' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_avatar_media' ] );
 			// Masque l'« Illustration du profil » native (Gravatar) au profit
 			// de l'avatar local.
-			add_action( 'admin_head',               [ $this, 'hide_native_profile_picture' ] );
+			add_action( 'admin_head', [ $this, 'hide_native_profile_picture' ] );
 		}
 	}
 
@@ -146,10 +146,12 @@ class Module extends AbstractModule {
 			return;
 		}
 
-		$bar->add_node( [
-			'id'    => 'my-account',
-			'title' => substr( $node->title, strlen( $prefix ) ),
-		] );
+		$bar->add_node(
+			[
+				'id'    => 'my-account',
+				'title' => substr( $node->title, strlen( $prefix ) ),
+			]
+		);
 	}
 
 	public function hide_admin_bar_frontend( bool $show ): bool {
@@ -416,33 +418,33 @@ class Module extends AbstractModule {
 	public function save_settings( array $settings ): bool {
 		$data = [
 			'admin_bar' => [
-				'hide_wp_logo'          => (bool) ( $settings['admin_bar']['hide_wp_logo']          ?? false ),
-				'hide_site_menu'        => (bool) ( $settings['admin_bar']['hide_site_menu']        ?? false ),
-				'hide_command_palette'  => (bool) ( $settings['admin_bar']['hide_command_palette']  ?? false ),
-				'hide_updates_counter'  => (bool) ( $settings['admin_bar']['hide_updates_counter']  ?? false ),
+				'hide_wp_logo'          => (bool) ( $settings['admin_bar']['hide_wp_logo'] ?? false ),
+				'hide_site_menu'        => (bool) ( $settings['admin_bar']['hide_site_menu'] ?? false ),
+				'hide_command_palette'  => (bool) ( $settings['admin_bar']['hide_command_palette'] ?? false ),
+				'hide_updates_counter'  => (bool) ( $settings['admin_bar']['hide_updates_counter'] ?? false ),
 				'hide_comments_counter' => (bool) ( $settings['admin_bar']['hide_comments_counter'] ?? false ),
 				'hide_new_content_menu' => (bool) ( $settings['admin_bar']['hide_new_content_menu'] ?? false ),
-				'hide_help_button'      => (bool) ( $settings['admin_bar']['hide_help_button']      ?? false ),
-				'hide_screen_options'   => (bool) ( $settings['admin_bar']['hide_screen_options']   ?? false ),
-				'remove_howdy'          => (bool) ( $settings['admin_bar']['remove_howdy']          ?? false ),
-				'hide_frontend'         => (bool) ( $settings['admin_bar']['hide_frontend']         ?? false ),
+				'hide_help_button'      => (bool) ( $settings['admin_bar']['hide_help_button'] ?? false ),
+				'hide_screen_options'   => (bool) ( $settings['admin_bar']['hide_screen_options'] ?? false ),
+				'remove_howdy'          => (bool) ( $settings['admin_bar']['remove_howdy'] ?? false ),
+				'hide_frontend'         => (bool) ( $settings['admin_bar']['hide_frontend'] ?? false ),
 			],
-			'footer' => [
-				'left_text'       => wp_kses_post( $settings['footer']['left_text']   ?? '' ),
+			'footer'    => [
+				'left_text'       => wp_kses_post( $settings['footer']['left_text'] ?? '' ),
 				'hide_right_text' => ! empty( $settings['footer']['hide_right_text'] ),
-				'right_text'      => wp_kses_post( $settings['footer']['right_text']  ?? '' ),
+				'right_text'      => wp_kses_post( $settings['footer']['right_text'] ?? '' ),
 			],
-			'profile' => [
-				'hide_color_scheme'       => (bool) ( $settings['profile']['hide_color_scheme']       ?? false ),
+			'profile'   => [
+				'hide_color_scheme'       => (bool) ( $settings['profile']['hide_color_scheme'] ?? false ),
 				'hide_keyboard_shortcuts' => (bool) ( $settings['profile']['hide_keyboard_shortcuts'] ?? false ),
-				'hide_toolbar_toggle'     => (bool) ( $settings['profile']['hide_toolbar_toggle']     ?? false ),
-				'hide_app_passwords'      => (bool) ( $settings['profile']['hide_app_passwords']      ?? false ),
-				'hide_language'           => (bool) ( $settings['profile']['hide_language']           ?? false ),
-				'hide_bio'                => (bool) ( $settings['profile']['hide_bio']                 ?? false ),
-				'hide_sessions'           => (bool) ( $settings['profile']['hide_sessions']           ?? false ),
-				'hide_editor_options'     => (bool) ( $settings['profile']['hide_editor_options']     ?? false ),
+				'hide_toolbar_toggle'     => (bool) ( $settings['profile']['hide_toolbar_toggle'] ?? false ),
+				'hide_app_passwords'      => (bool) ( $settings['profile']['hide_app_passwords'] ?? false ),
+				'hide_language'           => (bool) ( $settings['profile']['hide_language'] ?? false ),
+				'hide_bio'                => (bool) ( $settings['profile']['hide_bio'] ?? false ),
+				'hide_sessions'           => (bool) ( $settings['profile']['hide_sessions'] ?? false ),
+				'hide_editor_options'     => (bool) ( $settings['profile']['hide_editor_options'] ?? false ),
 			],
-			'avatars' => [
+			'avatars'   => [
 				'local' => (bool) ( $settings['avatars']['local'] ?? false ),
 			],
 		];
@@ -464,12 +466,12 @@ class Module extends AbstractModule {
 				'remove_howdy'          => true,
 				'hide_frontend'         => true,
 			],
-			'footer' => [
+			'footer'    => [
 				'left_text'       => '',
 				'hide_right_text' => false,
 				'right_text'      => '',
 			],
-			'profile' => [
+			'profile'   => [
 				'hide_color_scheme'       => true,
 				'hide_keyboard_shortcuts' => true,
 				'hide_toolbar_toggle'     => true,
@@ -479,7 +481,7 @@ class Module extends AbstractModule {
 				'hide_sessions'           => false,
 				'hide_editor_options'     => false,
 			],
-			'avatars' => [
+			'avatars'   => [
 				'local' => true,
 			],
 		];
@@ -487,8 +489,8 @@ class Module extends AbstractModule {
 
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ 'skmt_module_white_label' ],
-			'meta'    => [],
+			'options'   => [ 'skmt_module_white_label' ],
+			'meta'      => [],
 			// L'avatar local est stocké sur l'UTILISATEUR, pas sur un post :
 			// déclaré en 'meta', il n'était jamais supprimé.
 			'user_meta' => [ self::AVATAR_META ],

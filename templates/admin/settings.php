@@ -51,8 +51,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-page__scroll">
 
 	<!-- ================================================================
-	     MISES À JOUR
-	     ================================================================ -->
+		MISES À JOUR
+		================================================================ -->
 	<form id="skmt-save-settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 		<input type="hidden" name="action" value="skmt_save_settings">
@@ -119,8 +119,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-divider"></div>
 
 	<!-- ================================================================
-	     CONFIGURATION — export / import / reset
-	     ================================================================ -->
+		CONFIGURATION — export / import / reset
+		================================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php echo esc_html__( 'Configuration', 'studio-kyne-mini-tools' ); ?></h2>
@@ -157,8 +157,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 							<?php wp_nonce_field( 'skmt_import_settings', 'skmt_import_nonce' ); ?>
 							<input type="hidden" name="action" value="skmt_import_settings">
 							<input type="file" name="skmt_import_file" id="skmt_import_file" accept=".json"
-								   style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
-								   onchange="document.getElementById('skmt-import-form').submit()">
+									style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
+									onchange="document.getElementById('skmt-import-form').submit()">
 							<label for="skmt_import_file" class="skmt-btn skmt-btn--secondary skmt-btn--sm" style="width:100%;cursor:pointer;">
 								<?php echo esc_html__( 'Importer', 'studio-kyne-mini-tools' ); ?>
 							</label>
@@ -195,8 +195,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-divider"></div>
 
 	<!-- ================================================================
-	     INFORMATIONS SERVEUR — tableau collapsible
-	     ================================================================ -->
+		INFORMATIONS SERVEUR — tableau collapsible
+		================================================================ -->
 	<details class="skmt-section skmt-section--collapsible">
 		<summary class="skmt-section__header skmt-section__header--summary">
 			<div>

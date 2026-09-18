@@ -52,7 +52,7 @@ class UrlRewriter {
 
 		global $wpdb;
 
-		$updated = 0;
+		$updated  = 0;
 		$updated += $this->rewrite_table( $wpdb->posts, 'ID', [ 'post_content', 'post_excerpt' ], $stems, $pairs );
 		$updated += $this->rewrite_table( $wpdb->postmeta, 'meta_id', [ 'meta_value' ], $stems, $pairs );
 		$updated += $this->rewrite_table( $wpdb->options, 'option_id', [ 'option_value' ], $stems, $pairs );
@@ -128,10 +128,13 @@ class UrlRewriter {
 		$cols_sql = '`' . implode( '`, `', $columns ) . '`';
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT `{$id_col}`, {$cols_sql} FROM `{$table}` WHERE " . implode( ' OR ', $where ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$args
-		), ARRAY_A );
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT `{$id_col}`, {$cols_sql} FROM `{$table}` WHERE " . implode( ' OR ', $where ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$args
+			),
+			ARRAY_A
+		);
 
 		$updated = 0;
 		foreach ( (array) $rows as $row ) {
@@ -151,16 +154,18 @@ class UrlRewriter {
 				// Le fichier a déjà changé de nom : une ligne non réécrite est un
 				// lien cassé. On ne peut pas revenir en arrière ici, mais on le
 				// dit, avec de quoi corriger à la main.
-				error_log( sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
-					'[SKMT Image Optimizer] réécriture d\'URL échouée dans %s (%s=%s) : %s',
-					$table,
-					$id_col,
-					(string) $row[ $id_col ],
-					$wpdb->last_error
-				) );
+				error_log(
+					sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+						'[SKMT Image Optimizer] réécriture d\'URL échouée dans %s (%s=%s) : %s',
+						$table,
+						$id_col,
+						(string) $row[ $id_col ],
+						$wpdb->last_error
+					)
+				);
 				continue;
 			}
-			$updated++;
+			++$updated;
 		}
 
 		return $updated;

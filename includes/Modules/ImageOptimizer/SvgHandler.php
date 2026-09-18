@@ -19,15 +19,60 @@ class SvgHandler {
 
 	/** Éléments SVG autorisés (liste blanche). */
 	private const ALLOWED_TAGS = [
-		'a', 'circle', 'clippath', 'defs', 'desc', 'ellipse', 'feblend',
-		'fecolormatrix', 'fecomponenttransfer', 'fecomposite', 'feconvolvematrix',
-		'fediffuselighting', 'fedisplacementmap', 'fedistantlight', 'feflood',
-		'fefunca', 'fefuncb', 'fefuncg', 'fefuncr', 'fegaussianblur', 'feimage',
-		'femerge', 'femergenode', 'femorphology', 'feoffset', 'fepointlight',
-		'fespecularlighting', 'fespotlight', 'fetile', 'feturbulence', 'filter',
-		'g', 'image', 'line', 'lineargradient', 'marker', 'mask', 'metadata',
-		'path', 'pattern', 'polygon', 'polyline', 'radialgradient', 'rect', 'stop',
-		'style', 'svg', 'switch', 'symbol', 'text', 'textpath', 'title', 'tspan', 'use',
+		'a',
+		'circle',
+		'clippath',
+		'defs',
+		'desc',
+		'ellipse',
+		'feblend',
+		'fecolormatrix',
+		'fecomponenttransfer',
+		'fecomposite',
+		'feconvolvematrix',
+		'fediffuselighting',
+		'fedisplacementmap',
+		'fedistantlight',
+		'feflood',
+		'fefunca',
+		'fefuncb',
+		'fefuncg',
+		'fefuncr',
+		'fegaussianblur',
+		'feimage',
+		'femerge',
+		'femergenode',
+		'femorphology',
+		'feoffset',
+		'fepointlight',
+		'fespecularlighting',
+		'fespotlight',
+		'fetile',
+		'feturbulence',
+		'filter',
+		'g',
+		'image',
+		'line',
+		'lineargradient',
+		'marker',
+		'mask',
+		'metadata',
+		'path',
+		'pattern',
+		'polygon',
+		'polyline',
+		'radialgradient',
+		'rect',
+		'stop',
+		'style',
+		'svg',
+		'switch',
+		'symbol',
+		'text',
+		'textpath',
+		'title',
+		'tspan',
+		'use',
 	];
 
 	/** Réglages du module (svg_upload, svg_roles). */
@@ -164,7 +209,7 @@ class SvgHandler {
 			$entity_previous = libxml_disable_entity_loader( true );
 		}
 
-		$dom = new \DOMDocument();
+		$dom                     = new \DOMDocument();
 		$dom->preserveWhiteSpace = false;
 
 		// NB : on n'ajoute jamais LIBXML_NOENT — l'expansion d'entités est un vecteur d'attaque.
@@ -291,7 +336,7 @@ class SvgHandler {
 				},
 				$css
 			);
-			$css = ( null === $decode ) ? $css : $decode;
+			$css    = ( null === $decode ) ? $css : $decode;
 		}
 
 		// At-rules qui chargent une ressource externe.

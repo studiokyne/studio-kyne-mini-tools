@@ -98,18 +98,20 @@ class Module extends AbstractModule {
 	 * ================================================================ */
 
 	public function get_settings(): array {
-		return $this->get_module_settings( [
-			'optimize_on_upload' => true,
-			'format_mode'        => 'auto',
-			'quality'            => 75,
-			'max_width'          => 2560,
-			'max_height'         => 2560,
-			'strip_exif'         => true,
-			'generate_alt'       => true,
-			'keep_original'      => false,
-			'svg_upload'         => true,
-			'svg_roles'          => [ 'administrator' ],
-		] );
+		return $this->get_module_settings(
+			[
+				'optimize_on_upload' => true,
+				'format_mode'        => 'auto',
+				'quality'            => 75,
+				'max_width'          => 2560,
+				'max_height'         => 2560,
+				'strip_exif'         => true,
+				'generate_alt'       => true,
+				'keep_original'      => false,
+				'svg_upload'         => true,
+				'svg_roles'          => [ 'administrator' ],
+			]
+		);
 	}
 
 	public function save_settings( array $settings ): bool {
@@ -163,7 +165,7 @@ class Module extends AbstractModule {
 	public function get_admin_js_data(): array {
 		return [
 			'bulkState' => $this->bulk->get_state(),
-			'i18n' => [
+			'i18n'      => [
 				'bulkScanning'  => __( 'Analyse…', 'studio-kyne-mini-tools' ),
 				'bulkRunning'   => __( 'Optimisation en cours…', 'studio-kyne-mini-tools' ),
 				'bulkProcessed' => __( 'Traité :', 'studio-kyne-mini-tools' ),
@@ -218,7 +220,7 @@ class Module extends AbstractModule {
 				'skmt_module_image_optimizer' . self::STATS_SUFFIX,
 				'skmt_module_image_optimizer' . self::BULK_STATE_SUFFIX,
 			],
-			'meta' => [
+			'meta'    => [
 				'_skmt_optimized',
 				'_skmt_original_bytes',
 				'_skmt_optimized_bytes',
@@ -338,7 +340,7 @@ class Module extends AbstractModule {
 				$total_after += $after;
 
 				if ( $converted && $converted !== $size_file ) {
-					$size_updates[ $size ] = [
+					$size_updates[ $size ]                      = [
 						'file' => $converted,
 						'mime' => $this->processor->get_mime_type( $converted ),
 					];
@@ -348,7 +350,7 @@ class Module extends AbstractModule {
 		}
 
 		// --- Fichier original ---
-		$original_file     = $base_path . $metadata['file'];
+		$original_file      = $base_path . $metadata['file'];
 		$original_converted = false;
 		$original_new_file  = '';
 
@@ -405,9 +407,12 @@ class Module extends AbstractModule {
 			$final_path = $original_converted ? $original_new_file : $original_file;
 			$this->mark_attachment_optimized(
 				$attachment_id,
-				$total_before, $total_after,
-				$final_path, $final_mime,
-				$main_before, $main_after
+				$total_before,
+				$total_after,
+				$final_path,
+				$final_mime,
+				$main_before,
+				$main_after
 			);
 		}
 
@@ -470,13 +475,16 @@ class Module extends AbstractModule {
 	}
 
 	private function update_stats( int $bytes_saved, int $original_bytes ): void {
-		$stats = wp_parse_args( get_option( $this->get_stats_key(), [] ), [
-			'optimized'      => 0,
-			'bytes_saved'    => 0,
-			'original_bytes' => 0,
-		] );
+		$stats = wp_parse_args(
+			get_option( $this->get_stats_key(), [] ),
+			[
+				'optimized'      => 0,
+				'bytes_saved'    => 0,
+				'original_bytes' => 0,
+			]
+		);
 
-		$stats['optimized']++;
+		++$stats['optimized'];
 		$stats['bytes_saved']    += max( $bytes_saved, 0 );
 		$stats['original_bytes'] += max( $original_bytes, 0 );
 
@@ -489,11 +497,14 @@ class Module extends AbstractModule {
 			'bytes_saved'    => 0,
 			'original_bytes' => 0,
 		];
-		$stats = wp_parse_args( get_option( $this->get_stats_key(), [] ), $defaults );
+		$stats    = wp_parse_args( get_option( $this->get_stats_key(), [] ), $defaults );
 
-		return array_merge( $stats, [
-			'capabilities' => $this->processor->get_capabilities(),
-		] );
+		return array_merge(
+			$stats,
+			[
+				'capabilities' => $this->processor->get_capabilities(),
+			]
+		);
 	}
 
 	/**
@@ -544,10 +555,12 @@ class Module extends AbstractModule {
 
 		$mime = $this->processor->get_mime_type( $new_file );
 		if ( $mime ) {
-			wp_update_post( [
-				'ID'             => $attachment_id,
-				'post_mime_type' => $mime,
-			] );
+			wp_update_post(
+				[
+					'ID'             => $attachment_id,
+					'post_mime_type' => $mime,
+				]
+			);
 		}
 
 		// Le guid porte l'URL d'origine du fichier ; certains outils le lisent
@@ -564,8 +577,8 @@ class Module extends AbstractModule {
 
 	private function update_metadata_after_conversion( array $metadata, string $old_file, string $new_file, array $size_updates ): array {
 		if ( $old_file && $new_file && ! empty( $metadata['file'] ) ) {
-			$old_info = pathinfo( $old_file );
-			$new_info = pathinfo( $new_file );
+			$old_info         = pathinfo( $old_file );
+			$new_info         = pathinfo( $new_file );
 			$metadata['file'] = str_replace( $old_info['basename'], $new_info['basename'], $metadata['file'] );
 		}
 
@@ -575,7 +588,7 @@ class Module extends AbstractModule {
 					continue;
 				}
 				$metadata['sizes'][ $size ]['file']      = basename( $update['file'] );
-				$metadata['sizes'][ $size ]['mime-type']  = $update['mime'] ?? $metadata['sizes'][ $size ]['mime-type'];
+				$metadata['sizes'][ $size ]['mime-type'] = $update['mime'] ?? $metadata['sizes'][ $size ]['mime-type'];
 			}
 		}
 

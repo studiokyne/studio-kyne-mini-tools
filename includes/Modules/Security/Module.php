@@ -36,13 +36,13 @@ class Module extends AbstractModule {
 	public function init(): void {
 		$this->settings = $this->get_module_settings( self::get_defaults() );
 
-		$auth = $this->settings['authentication'];
+		$auth                = $this->settings['authentication'];
 		$this->rate_limiter  = new RateLimiter(
 			$auth['rate_limit_whitelist'] ?? [],
-			$auth['rate_limit_attempts']  ?? 5,
-			$auth['rate_limit_window']    ?? 900,
-			$auth['rate_limit_lockout']   ?? 1800,
-			$auth['ip_source']            ?? ClientIp::SOURCE_REMOTE_ADDR
+			$auth['rate_limit_attempts'] ?? 5,
+			$auth['rate_limit_window'] ?? 900,
+			$auth['rate_limit_lockout'] ?? 1800,
+			$auth['ip_source'] ?? ClientIp::SOURCE_REMOTE_ADDR
 		);
 		$this->hardening     = new HardeningService(
 			$this->settings['hardening']['disable_xmlrpc'] ?? false,
@@ -75,11 +75,11 @@ class Module extends AbstractModule {
 		}
 
 		if ( ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) && ! self::login_url_disabled() ) {
-			add_action( 'wp_loaded',          [ $this->login_handler, 'wp_loaded' ], 10 );
-			add_filter( 'login_url',          [ $this->login_handler, 'filter_login_url' ], 10, 3 );
-			add_filter( 'site_url',           [ $this->login_handler, 'filter_site_url' ], 10 );
-			add_filter( 'network_site_url',   [ $this->login_handler, 'filter_site_url' ], 10 );
-			add_filter( 'wp_redirect',        [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_action( 'wp_loaded', [ $this->login_handler, 'wp_loaded' ], 10 );
+			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ], 10, 3 );
+			add_filter( 'site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'network_site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'wp_redirect', [ $this->login_handler, 'filter_site_url' ], 10 );
 		}
 
 		// === HARDENING HOOKS ===

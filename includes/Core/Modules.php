@@ -144,14 +144,17 @@ class Modules {
 	 * Normalise une définition de module.
 	 */
 	private function normalize_definition( array $args ): array {
-		$normalized = wp_parse_args( $args, [
-			'name'        => '',
-			'description' => '',
-			'menu_label'  => '',
-			'menu_desc'   => '',
-			'class'       => '',
-			'icon'        => 'package',
-		] );
+		$normalized = wp_parse_args(
+			$args,
+			[
+				'name'        => '',
+				'description' => '',
+				'menu_label'  => '',
+				'menu_desc'   => '',
+				'class'       => '',
+				'icon'        => 'package',
+			]
+		);
 
 		$normalized['name']        = is_string( $normalized['name'] ) ? $normalized['name'] : '';
 		$normalized['description'] = is_string( $normalized['description'] ) ? $normalized['description'] : '';
@@ -167,14 +170,17 @@ class Modules {
 	 * Enregistre un module.
 	 */
 	public function register( string $id, array $args ): void {
-		$this->registered[ $id ] = wp_parse_args( $args, [
-			'name'        => '',
-			'description' => '',
-			'menu_label'  => '',
-			'menu_desc'   => '',
-			'class'       => '',
-			'icon'        => 'package',
-		] );
+		$this->registered[ $id ] = wp_parse_args(
+			$args,
+			[
+				'name'        => '',
+				'description' => '',
+				'menu_label'  => '',
+				'menu_desc'   => '',
+				'class'       => '',
+				'icon'        => 'package',
+			]
+		);
 	}
 
 	/**

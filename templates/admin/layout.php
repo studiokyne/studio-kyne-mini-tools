@@ -10,7 +10,7 @@ $tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
 <div class="skmt-admin-wrap">
 	<div class="skmt-admin-container">
 		<!-- Sidebar -->
-		<?php include SKMT_TEMPLATES_DIR . 'components/sidebar.php'; ?>
+		<?php require SKMT_TEMPLATES_DIR . 'components/sidebar.php'; ?>
 
 		<!-- Contenu principal -->
 		<main class="skmt-admin-main">

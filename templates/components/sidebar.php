@@ -40,7 +40,7 @@ $core_items = [
 			<?php foreach ( $core_items as $item ) : ?>
 				<li class="skmt-sidebar__item">
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=' . $item['id'] ) ); ?>"
-					   class="skmt-sidebar__link <?php echo $item['id'] === $tab ? 'is-active' : ''; ?>">
+						class="skmt-sidebar__link <?php echo $item['id'] === $tab ? 'is-active' : ''; ?>">
 						<div class="skmt-sidebar__icon-wrapper">
 							<?php echo $this->render_icon( $item['icon'], 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
@@ -65,7 +65,7 @@ $core_items = [
 						?>
 						<li class="skmt-sidebar__item">
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=module_' . $module_id ) ); ?>"
-							   class="skmt-sidebar__link <?php echo 'module_' . $module_id === $tab ? 'is-active' : ''; ?>">
+								class="skmt-sidebar__link <?php echo 'module_' . $module_id === $tab ? 'is-active' : ''; ?>">
 								<div class="skmt-sidebar__icon-wrapper">
 									<?php echo $this->render_icon( $icon, 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								</div>

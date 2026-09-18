@@ -6,9 +6,15 @@
 defined( 'ABSPATH' ) || exit;
 
 $modules      = $this->modules->get_all();
-$active_count = count( array_filter( $modules, function( $id ) {
-	return $this->modules->is_active( $id );
-}, ARRAY_FILTER_USE_KEY ) );
+$active_count = count(
+	array_filter(
+		$modules,
+		function ( $id ) {
+			return $this->modules->is_active( $id );
+		},
+		ARRAY_FILTER_USE_KEY
+	)
+);
 ?>
 <div class="skmt-page">
 	<div class="skmt-page__header">

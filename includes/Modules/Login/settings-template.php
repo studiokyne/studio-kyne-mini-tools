@@ -14,9 +14,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-$layout   = $module_settings['layout']   ?? [];
+$layout   = $module_settings['layout'] ?? [];
 $branding = $module_settings['branding'] ?? [];
-$form     = $module_settings['form']     ?? [];
+$form     = $module_settings['form'] ?? [];
 
 // Images courantes
 $panel_img_id  = absint( $layout['panel_image_id'] ?? 0 );
@@ -34,8 +34,8 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 	<div class="skmt-module-form__scroll">
 
 	<!-- ============================================================
-		 LAYOUT — PANNEAU IMAGE
-		 ============================================================ -->
+		LAYOUT — PANNEAU IMAGE
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Layout', 'studio-kyne-mini-tools' ); ?></h2>
@@ -97,8 +97,8 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 	<div class="skmt-divider"></div>
 
 	<!-- ============================================================
-		 BRANDING — LOGO
-		 ============================================================ -->
+		BRANDING — LOGO
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Branding', 'studio-kyne-mini-tools' ); ?></h2>
@@ -163,8 +163,8 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 	<div class="skmt-divider"></div>
 
 	<!-- ============================================================
-		 COULEURS
-		 ============================================================ -->
+		COULEURS
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Couleurs', 'studio-kyne-mini-tools' ); ?></h2>
@@ -235,8 +235,8 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 	<div class="skmt-divider"></div>
 
 	<!-- ============================================================
-		 OPTIONS DIVERSES
-		 ============================================================ -->
+		OPTIONS DIVERSES
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Options', 'studio-kyne-mini-tools' ); ?></h2>

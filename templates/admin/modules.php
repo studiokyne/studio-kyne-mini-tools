@@ -21,20 +21,21 @@ $modules = $this->modules->get_all();
 			<input type="hidden" name="action" value="skmt_update_modules">
 
 			<div class="skmt-module-grid skmt-page__body">
-				<?php foreach ( $modules as $module_id => $module ) :
+				<?php
+				foreach ( $modules as $module_id => $module ) :
 					$is_active = $this->modules->is_active( $module_id );
 					$icon      = ! empty( $module['icon'] ) ? $module['icon'] : 'package';
-				?>
+					?>
 					<div class="skmt-module-card <?php echo $is_active ? 'skmt-module-card--active' : ''; ?>">
 						<div class="skmt-module-card__header">
 							<?php echo $this->render_icon( $icon, 'md' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 							<h3 class="skmt-module-card__title"><?php echo esc_html( $module['name'] ); ?></h3>
 							<label class="skmt-toggle">
 								<input type="checkbox"
-									   name="skmt_modules[]"
-									   value="<?php echo esc_attr( $module_id ); ?>"
-									   data-module-id="<?php echo esc_attr( $module_id ); ?>"
-									   <?php checked( $is_active, true ); ?>>
+										name="skmt_modules[]"
+										value="<?php echo esc_attr( $module_id ); ?>"
+										data-module-id="<?php echo esc_attr( $module_id ); ?>"
+										<?php checked( $is_active, true ); ?>>
 								<span class="skmt-toggle__slider"></span>
 							</label>
 						</div>
