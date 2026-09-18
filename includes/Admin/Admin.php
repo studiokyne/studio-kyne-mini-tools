@@ -701,7 +701,9 @@ class Admin {
 			$instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;
 
 			// Même règle que render_page() : un module peut exiger davantage que
-			// manage_options (multisite). L'enregistrement doit la respecter aussi.
+			// manage_options (multisite). Ce test s'AJOUTE au manage_options
+			// vérifié plus haut, il ne le remplace pas — la capacité déclarée
+			// par un module est toujours plus stricte, jamais une alternative.
 			if ( ! current_user_can( $this->module_capability( $module_id ) ) ) {
 				wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 			}

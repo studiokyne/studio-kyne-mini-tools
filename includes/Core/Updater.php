@@ -118,7 +118,8 @@ class Updater {
 			'package'      => $remote['download_url'],
 			'icons'        => [],
 			'banners'      => [],
-			'tested'       => get_bloginfo( 'version' ),
+			// Pas de champ `tested` : le renseigner avec la version courante du
+			// site déclarait le plugin testé sur n'importe quelle version.
 			'requires'     => '6.0',
 			'requires_php' => '7.4',
 		];

@@ -323,11 +323,30 @@ class FileManager {
 				$zip->close();
 				throw new \RuntimeException( 'Archive refusée : entrée hors racine (' . $name . ').' );
 			}
+			// Un lien symbolique au nom anodin peut pointer hors de la racine ;
+			// une entrée suivante écrirait alors À TRAVERS le lien. On refuse
+			// tout lien plutôt que d'en suivre la cible.
+			if ( $this->zip_entry_is_symlink( $zip, $i ) ) {
+				$zip->close();
+				throw new \RuntimeException( 'Archive refusée : lien symbolique (' . $name . ').' );
+			}
 		}
 
 		$zip->extractTo( $dest );
 		$zip->close();
 		return true;
+	}
+
+	/**
+	 * L'entrée est-elle un lien symbolique (attributs externes Unix, mode S_IFLNK) ?
+	 */
+	private function zip_entry_is_symlink( \ZipArchive $zip, int $index ): bool {
+		$opsys = 0;
+		$attr  = 0;
+		if ( ! $zip->getExternalAttributesIndex( $index, $opsys, $attr ) ) {
+			return false;
+		}
+		return \ZipArchive::OPSYS_UNIX === $opsys && 0xA000 === ( ( $attr >> 16 ) & 0xF000 );
 	}
 
 	/**
