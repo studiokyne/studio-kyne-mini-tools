@@ -24,4 +24,4 @@ Convertir renomme le fichier (`photo.jpg` → `photo.webp`) et supprime l'origin
 
 ## Production
 
-Voir la mémoire de session pour les encodeurs disponibles en production (Dokploy, image php8.5-alpine) : WebP fonctionne, le délégué AVIF manque.
+Les encodeurs disponibles se vérifient avec `ImageProcessor::get_capabilities()` : la détection sonde un **vrai encodage** (Imagick et GD), car `imagewebp()`/`imageavif()` existent en PHP 8.1+ même sans la bibliothèque sous-jacente et `gd_info()` peut mentir. Le résultat est mis en transient sous une clé dérivée des versions de PHP, GD et Imagick ; après un changement d'image serveur, il se rafraîchit donc seul. Sur l'hébergement actuel (image `php8.5-alpine`), WebP fonctionne mais le délégué AVIF est absent : préférer WebP dans les réglages par défaut.
