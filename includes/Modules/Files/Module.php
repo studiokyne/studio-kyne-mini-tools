@@ -176,7 +176,7 @@ class Module extends AbstractModule {
 		if ( $bloque ) {
 			wp_send_json_error(
 				[
-					'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS dans wp-config.php).', 'studio-kyne-mini-tools' ),
+					'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT, DISALLOW_FILE_MODS ou filtre file_mod_allowed).', 'studio-kyne-mini-tools' ),
 				],
 				403
 			);
