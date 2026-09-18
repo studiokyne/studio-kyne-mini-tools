@@ -37,7 +37,7 @@ jobs:
         run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
 
       - name: PHPCS
-        run: vendor/bin/phpcs --report=checkstyle | cs2pr
+        run: vendor/bin/phpcs -q --report=checkstyle | cs2pr
 
       - name: PHPStan
         run: vendor/bin/phpstan analyse --memory-limit=2G --no-progress --error-format=github
