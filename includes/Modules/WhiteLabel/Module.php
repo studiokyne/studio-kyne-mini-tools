@@ -232,6 +232,10 @@ class Module extends AbstractModule {
 	/**
 	 * Remplace l'avatar par l'image locale de l'utilisateur si elle existe.
 	 * Sinon on ne touche à rien : WordPress retombe sur Gravatar.
+	 *
+	 * @param array<string, mixed> $args
+	 * @param mixed $id_or_email
+	 * @return array<string, mixed>
 	 */
 	public function apply_local_avatar( array $args, $id_or_email ): array {
 		// Respecte une demande explicite de l'avatar par défaut.
@@ -410,11 +414,17 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		$this->settings = $this->get_module_settings( static::get_defaults() );
 		return $this->settings;
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		$data = [
 			'admin_bar' => [
@@ -452,6 +462,9 @@ class Module extends AbstractModule {
 		return $this->save_module_settings( $data );
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [
 			'admin_bar' => [
@@ -509,6 +522,9 @@ class Module extends AbstractModule {
 		return [];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [];
 	}

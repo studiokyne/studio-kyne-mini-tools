@@ -11,18 +11,28 @@ defined( 'ABSPATH' ) || exit;
  */
 class ImageProcessor {
 
+	/**
+	 * @var array<string, mixed>
+	 */
 	private array $settings;
 
 	/**
 	 * Cache des capacités serveur (Imagick/GD, AVIF/WebP).
+	 *
+	 * @var array<string, bool|string>|null
 	 */
 	private ?array $capabilities = null;
 
 	/**
 	 * Fichiers déjà optimisés sur cette requête (déduplication).
+	 *
+	 * @var array<string, true>
 	 */
 	private array $optimized_paths = [];
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function __construct( array $settings ) {
 		$this->settings = $settings;
 	}
@@ -41,6 +51,8 @@ class ImageProcessor {
 	 * (téléversement, lot du bulk, écran de réglages) coûtait quatre encodages
 	 * par appel. Le résultat vit en transient, sous une clé liée aux versions
 	 * de PHP, GD et Imagick : un changement de build invalide le cache seul.
+	 *
+	 * @return array<string, bool|string>
 	 */
 	public function get_capabilities(): array {
 		if ( null !== $this->capabilities ) {

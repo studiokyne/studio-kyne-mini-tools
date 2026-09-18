@@ -31,6 +31,8 @@ class Module extends AbstractModule {
 
 	/**
 	 * Réglages actifs du module (cache mémoire).
+	 *
+	 * @var array<string, mixed>
 	 */
 	private array $settings = [];
 
@@ -97,6 +99,9 @@ class Module extends AbstractModule {
 	 * RÉGLAGES
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return $this->get_module_settings(
 			[
@@ -114,6 +119,9 @@ class Module extends AbstractModule {
 		);
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		$sanitized = [
 			'optimize_on_upload' => isset( $settings['optimize_on_upload'] ),
@@ -137,6 +145,9 @@ class Module extends AbstractModule {
 
 	/**
 	 * Ne conserve que des slugs de rôles WordPress réellement existants.
+	 *
+	 * @param mixed $roles
+	 * @return string[]
 	 */
 	private function sanitize_roles( $roles ): array {
 		if ( ! is_array( $roles ) ) {
@@ -162,6 +173,9 @@ class Module extends AbstractModule {
 		];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [
 			'bulkState' => $this->bulk->get_state(),
@@ -246,6 +260,9 @@ class Module extends AbstractModule {
 	 * pré-optimiser le fichier dans wp_handle_upload — sinon la mesure « avant »
 	 * porte sur un fichier déjà compressé et le gain affiché est nul (l'image est
 	 * quand même marquée « optimisée »).
+	 *
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, mixed>
 	 */
 	public function optimize_attachment_sizes( array $metadata, int $attachment_id ): array {
 		if ( ! $this->settings['optimize_on_upload'] ) {
@@ -282,6 +299,8 @@ class Module extends AbstractModule {
 	 * Traite toutes les tailles d'un attachment (optimisation + conversion).
 	 *
 	 * @param bool $force Ignore le flag "déjà optimisé".
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, mixed>
 	 */
 	public function process_attachment_metadata( array $metadata, int $attachment_id, bool $force ): array {
 		$mime_type = $this->processor->get_mime_type( '', $attachment_id );
@@ -491,6 +510,9 @@ class Module extends AbstractModule {
 		update_option( $this->get_stats_key(), $stats, false );
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_stats(): array {
 		$defaults = [
 			'optimized'      => 0,
@@ -509,6 +531,8 @@ class Module extends AbstractModule {
 
 	/**
 	 * Estimation des gains pour le bulk (utilisée par le template de réglages).
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_bulk_preview(): array {
 		return $this->bulk->get_preview();
@@ -575,6 +599,11 @@ class Module extends AbstractModule {
 		}
 	}
 
+	/**
+	 * @param array<string, mixed> $metadata
+	 * @param array<string, array<string, string>> $size_updates
+	 * @return array<string, mixed>
+	 */
 	private function update_metadata_after_conversion( array $metadata, string $old_file, string $new_file, array $size_updates ): array {
 		if ( $old_file && $new_file && ! empty( $metadata['file'] ) ) {
 			$old_info         = pathinfo( $old_file );
@@ -595,6 +624,10 @@ class Module extends AbstractModule {
 		return $metadata;
 	}
 
+	/**
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, mixed>
+	 */
 	private function refresh_metadata_filesizes( array $metadata, string $base_path ): array {
 		if ( ! empty( $metadata['file'] ) ) {
 			$original_path = $base_path . $metadata['file'];
@@ -647,6 +680,9 @@ class Module extends AbstractModule {
 	 * COMPATIBILITÉ : capacités serveur (utilisées dans le template réglages)
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, bool|string>
+	 */
 	public function get_capabilities(): array {
 		return $this->processor->get_capabilities();
 	}

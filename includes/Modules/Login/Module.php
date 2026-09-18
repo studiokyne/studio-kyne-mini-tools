@@ -246,12 +246,17 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return $this->get_module_settings( static::get_defaults() );
 	}
 
 	/**
 	 * Valide et sauvegarde les settings.
+	 *
+	 * @param array<string, mixed> $settings
 	 */
 	public function save_settings( array $settings ): bool {
 		$current = $this->get_module_settings( static::get_defaults() );
@@ -286,6 +291,8 @@ class Module extends AbstractModule {
 
 	/**
 	 * Valeurs par défaut des settings.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public static function get_defaults(): array {
 		return [

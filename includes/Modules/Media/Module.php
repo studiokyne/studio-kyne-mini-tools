@@ -150,6 +150,9 @@ class Module extends AbstractModule {
 	/**
 	 * Traduit skmt_folder en tax_query pour la médiathèque AJAX (vue grille et
 	 * toutes les modales wp.media).
+	 *
+	 * @param array<string, mixed> $query
+	 * @return array<string, mixed>
 	 */
 	public function filter_media_query( array $query ): array {
 		$raw = $_REQUEST['query'][ self::QUERY_VAR ] ?? null; // phpcs:ignore WordPress.Security.NonceVerification
@@ -216,6 +219,7 @@ class Module extends AbstractModule {
 	 * Retourne null quand aucun filtrage ne doit s'appliquer.
 	 *
 	 * @param mixed $raw '' / null = tous, UNASSIGNED = non classés, sinon term_id.
+	 * @return array<int, array<string, mixed>>|null
 	 */
 	private function build_tax_query( $raw ): ?array {
 		if ( null === $raw || '' === $raw ) {
@@ -434,8 +438,9 @@ class Module extends AbstractModule {
 	 * plutôt que d'ouvrir un endpoint, ce qui garde le panneau de détails
 	 * synchrone avec la grille sans requête supplémentaire.
 	 *
-	 * @param array    $response Données préparées par le core.
+	 * @param array<string, mixed> $response Données préparées par le core.
 	 * @param \WP_Post $attachment Pièce jointe concernée.
+	 * @return array<string, mixed>
 	 */
 	public function expose_attachment_folders( array $response, $attachment ): array {
 		$terms = get_the_terms( $attachment, self::TAXONOMY );
@@ -463,6 +468,8 @@ class Module extends AbstractModule {
 	 * Arborescence + compteurs. Le compteur affiché inclut les descendants, ce
 	 * qu'on attend d'un dossier ; il est calculé par remontée en PHP plutôt que
 	 * par une requête par terme.
+	 *
+	 * @return array<string, mixed>
 	 */
 	private function get_folder_payload(): array {
 		$terms = get_terms(
@@ -515,11 +522,11 @@ class Module extends AbstractModule {
 	 * MAX_PAIRS on retombe sur l'addition : approximative en multi-dossiers,
 	 * mais on refuse de charger un volume de relations non borné en mémoire.
 	 *
-	 * @param array $terms  Termes de la taxonomie.
-	 * @param array $parent term_id => parent_id.
-	 * @return array term_id => nombre de médias distincts.
+	 * @param \WP_Term[] $terms  Termes de la taxonomie.
+	 * @param array<int, int> $parent_map term_id => parent_id.
+	 * @return array<int, int> term_id => nombre de médias distincts.
 	 */
-	private function rollup_counts( array $terms, array $parent ): array {
+	private function rollup_counts( array $terms, array $parent_map ): array {
 		global $wpdb;
 
 		$direct = [];
@@ -537,7 +544,7 @@ class Module extends AbstractModule {
 		);
 
 		if ( $pair_count > self::MAX_PAIRS ) {
-			return $this->rollup_counts_additive( $direct, $parent );
+			return $this->rollup_counts_additive( $direct, $parent_map );
 		}
 
 		$rows = $wpdb->get_results(
@@ -563,30 +570,36 @@ class Module extends AbstractModule {
 		}
 
 		foreach ( $sets as $term_id => $objects ) {
-			$ancestor = $parent[ $term_id ] ?? 0;
+			$ancestor = $parent_map[ $term_id ] ?? 0;
 			$guard    = 0;
 			while ( $ancestor > 0 && isset( $totals[ $ancestor ] ) && $guard++ < 100 ) {
 				$totals[ $ancestor ] += $objects; // union : conserve les clés existantes
-				$ancestor             = $parent[ $ancestor ] ?? 0;
+				$ancestor             = $parent_map[ $ancestor ] ?? 0;
 			}
 		}
 
 		return array_map( 'count', $totals );
 	}
 
-	/** Repli sur de simples additions quand le volume de relations est trop gros. */
-	private function rollup_counts_additive( array $direct, array $parent ): array {
+	/**
+	 * Repli sur de simples additions quand le volume de relations est trop gros.
+	 *
+	 * @param array<int, int> $direct
+	 * @param array<int, int> $parent_map
+	 * @return array<int, int>
+	 */
+	private function rollup_counts_additive( array $direct, array $parent_map ): array {
 		$total = $direct;
 
 		foreach ( $direct as $term_id => $count ) {
 			if ( ! $count ) {
 				continue;
 			}
-			$ancestor = $parent[ $term_id ] ?? 0;
+			$ancestor = $parent_map[ $term_id ] ?? 0;
 			$guard    = 0;
 			while ( $ancestor > 0 && isset( $total[ $ancestor ] ) && $guard++ < 100 ) {
 				$total[ $ancestor ] += $count;
-				$ancestor            = $parent[ $ancestor ] ?? 0;
+				$ancestor            = $parent_map[ $ancestor ] ?? 0;
 			}
 		}
 
@@ -856,14 +869,23 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return [];
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		return false;
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [];
 	}

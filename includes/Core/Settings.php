@@ -15,11 +15,15 @@ class Settings {
 
 	/**
 	 * Cache des settings.
+	 *
+	 * @var array<string, mixed>|null
 	 */
 	private ?array $settings = null;
 
 	/**
 	 * Récupère tous les settings.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_all(): array {
 		if ( null === $this->settings ) {
@@ -33,6 +37,7 @@ class Settings {
 	 *
 	 * @param string $key     Clé du setting (peut être imbriquée avec des points).
 	 * @param mixed  $default Valeur par défaut.
+	 * @return mixed
 	 */
 	public function get( string $key, $default = null ) {
 		$settings = $this->get_all();
@@ -83,7 +88,7 @@ class Settings {
 	/**
 	 * Met à jour plusieurs settings en une fois.
 	 *
-	 * @param array $data Tableau de settings.
+	 * @param array<string, mixed> $data Tableau de settings.
 	 */
 	public function update( array $data ): bool {
 		$settings       = $this->get_all();
@@ -95,6 +100,10 @@ class Settings {
 
 	/**
 	 * Fusionne deux tableaux récursivement en remplaçant les valeurs.
+	 *
+	 * @param array<string, mixed> $base
+	 * @param array<string, mixed> $updates
+	 * @return array<string, mixed>
 	 */
 	private function merge_recursive( array $base, array $updates ): array {
 		foreach ( $updates as $key => $value ) {

@@ -95,6 +95,10 @@ class Module extends AbstractModule {
 		return (bool) $enabled;
 	}
 
+	/**
+	 * @param string[] $menu_order
+	 * @return string[]
+	 */
 	public function apply_menu_order( array $menu_order ): array {
 		$profile = MenuProfileManager::get_active_for_user( get_current_user_id() );
 		if ( ! $profile || empty( $profile['items'] ) ) {
@@ -1162,6 +1166,10 @@ class Module extends AbstractModule {
 	 * HELPERS
 	 * ================================================================ */
 
+	/**
+	 * @param array<string, mixed> $profile
+	 * @return array<string, mixed>
+	 */
 	private function sanitize_profile( array $profile ): array {
 		return [
 			'id'            => ! empty( $profile['id'] ) ? sanitize_text_field( $profile['id'] ) : wp_generate_uuid4(),
@@ -1177,6 +1185,10 @@ class Module extends AbstractModule {
 		];
 	}
 
+	/**
+	 * @param array<int, array<string, mixed>> $items
+	 * @return array<int, array<string, mixed>>
+	 */
 	private function sanitize_menu_items( array $items, int $depth = 0 ): array {
 		// Garde-fou anti-payload : borne le nombre d'entrées persistées par
 		// niveau, pour éviter qu'un profil pathologique ne gonfle l'option.
@@ -1236,14 +1248,23 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return [];
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		return true;
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [];
 	}
@@ -1276,6 +1297,9 @@ class Module extends AbstractModule {
 		return [ 'skmt-sortable-js' ];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		$tab  = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$data = [

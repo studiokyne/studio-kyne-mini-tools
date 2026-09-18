@@ -111,6 +111,8 @@ class FileManager {
 
 	/**
 	 * Liste le contenu d'un répertoire. Retourne les dossiers en premier.
+	 *
+	 * @return array<int, array<string, mixed>>
 	 */
 	public function list_directory( string $rel ): array {
 		$abs = $this->resolve( $rel );
@@ -265,6 +267,8 @@ class FileManager {
 
 	/**
 	 * Crée une archive ZIP. Retourne le chemin absolu du zip créé.
+	 *
+	 * @param string[] $rel_paths Chemins relatifs à archiver.
 	 */
 	public function create_zip( array $rel_paths, string $dest_rel ): string {
 		if ( ! class_exists( 'ZipArchive' ) ) {
@@ -371,6 +375,9 @@ class FileManager {
 		return true;
 	}
 
+	/**
+	 * @param array<string, mixed> $file Entrée de $_FILES.
+	 */
 	public function upload( string $dir_rel, array $file ): string {
 		$dir  = $this->resolve( $dir_rel );
 		$name = sanitize_file_name( $file['name'] );

@@ -75,9 +75,16 @@ class SvgHandler {
 		'use',
 	];
 
-	/** Réglages du module (svg_upload, svg_roles). */
+	/**
+	 * Réglages du module (svg_upload, svg_roles).
+	 *
+	 * @var array<string, mixed>
+	 */
 	private array $settings;
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function __construct( array $settings ) {
 		$this->settings = $settings;
 	}
@@ -118,6 +125,9 @@ class SvgHandler {
 
 	/**
 	 * Ajoute le MIME SVG à la liste autorisée pour les rôles habilités.
+	 *
+	 * @param array<string, string> $mimes
+	 * @return array<string, string>
 	 */
 	public function allow_mime( $mimes ) {
 		if ( $this->current_user_can_upload() ) {
@@ -128,6 +138,12 @@ class SvgHandler {
 
 	/**
 	 * Corrige la détection type/extension de WordPress pour les .svg.
+	 *
+	 * @param array<string, mixed> $data
+	 * @param string $file
+	 * @param string $filename
+	 * @param array<string, string>|null $mimes
+	 * @return array<string, mixed>
 	 */
 	public function fix_filetype( $data, $file, $filename, $mimes ) {
 		if ( ! empty( $data['ext'] ) && ! empty( $data['type'] ) ) {
@@ -149,6 +165,9 @@ class SvgHandler {
 	/**
 	 * Filtre wp_handle_upload_prefilter : assainit le SVG avant qu'il ne soit
 	 * déplacé dans la médiathèque. Rejette le fichier si l'assainissement échoue.
+	 *
+	 * @param array<string, mixed> $file
+	 * @return array<string, mixed>
 	 */
 	public function sanitize_on_upload( $file ) {
 		$type = $file['type'] ?? '';

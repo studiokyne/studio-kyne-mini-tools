@@ -70,7 +70,7 @@ class Updater {
 	 * Vide les caches de mise à jour après l'installation d'une nouvelle version.
 	 *
 	 * @param object $upgrader Instance de l'upgrader (non utilisée).
-	 * @param array  $options  Contexte de l'opération.
+	 * @param array<string, mixed>  $options  Contexte de l'opération.
 	 */
 	public function purge_cache_after_update( $upgrader, array $options ): void {
 		if ( ( $options['action'] ?? '' ) !== 'update' || ( $options['type'] ?? '' ) !== 'plugin' ) {
@@ -93,6 +93,7 @@ class Updater {
 	 * Vérifie les mises à jour disponibles.
 	 *
 	 * @param object $transient Données du transient.
+	 * @return object
 	 */
 	public function check_update( $transient ) {
 		if ( empty( $transient->checked ) ) {
@@ -189,9 +190,10 @@ class Updater {
 	/**
 	 * Fournit les informations du plugin pour l'écran de détails.
 	 *
-	 * @param false|object|array $result Valeur par défaut.
+	 * @param false|object|array<string, mixed> $result Valeur par défaut.
 	 * @param string             $action Action demandée.
 	 * @param object             $args   Arguments.
+	 * @return false|object|array<string, mixed>
 	 */
 	public function plugin_info( $result, string $action, object $args ) {
 		if ( 'plugin_information' !== $action ) {
@@ -230,7 +232,7 @@ class Updater {
 	/**
 	 * Récupère la dernière version depuis GitHub.
 	 *
-	 * @return array|false Données de la release ou false en cas d'erreur.
+	 * @return array<string, mixed>|false Données de la release ou false en cas d'erreur.
 	 */
 	private function get_remote_version() {
 		$cache_key = $this->transient_key . '_' . $this->channel;
@@ -300,6 +302,9 @@ class Updater {
 
 	/**
 	 * Normalise les donnees de release selon le canal.
+	 *
+	 * @param mixed $body Corps JSON décodé de l'API GitHub.
+	 * @return array<string, mixed>|false
 	 */
 	private function normalize_release_data( $body ) {
 		if ( 'dev' === $this->channel ) {
@@ -338,6 +343,9 @@ class Updater {
 
 	/**
 	 * Convertit une release GitHub en payload updater.
+	 *
+	 * @param array<string, mixed> $release
+	 * @return array<string, mixed>
 	 */
 	private function format_release_payload( array $release ): array {
 		$download_url = $this->find_asset_download_url( $release );
@@ -352,6 +360,8 @@ class Updater {
 
 	/**
 	 * Recupere l'asset zip si disponible.
+	 *
+	 * @param array<string, mixed> $release
 	 */
 	private function find_asset_download_url( array $release ): string {
 		if ( empty( $release['assets'] ) || ! is_array( $release['assets'] ) ) {
