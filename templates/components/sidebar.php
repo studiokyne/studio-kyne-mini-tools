@@ -32,13 +32,7 @@ $core_items = [
 <aside class="skmt-sidebar">
 	<div class="skmt-sidebar__header">
 		<h2 class="skmt-sidebar__title"><?php echo esc_html__( 'Navigation', 'studio-kyne-mini-tools' ); ?></h2>
-		<div class="skmt-sidebar__actions">
-			<!-- 
-         2 buttons
-         - 1 pour importer la configuration depuis un fichier JSON
-         - 1 pour exporter la configuration actuelle dans un fichier JSON
-         -->
-		</div>
+		<div class="skmt-sidebar__actions"></div>
 	</div>
 
 	<nav class="skmt-sidebar__nav">

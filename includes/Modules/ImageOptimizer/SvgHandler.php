@@ -352,8 +352,9 @@ class SvgHandler {
 				continue;
 			}
 
-			// style : bloque url(javascript:…), expression(), et @import.
-			if ( 'style' === $name && preg_match( '/(javascript:|expression\(|@import|url\(\s*["\']?\s*data:text\/html)/i', $decoded ) ) {
+			// style : même liste que sanitize_css() pour l'élément <style> —
+			// on n'entretient pas deux définitions du « sûr ».
+			if ( 'style' === $name && preg_match( '/(javascript:|expression\(|@import|-moz-binding|behavior\s*:|url\(\s*["\']?\s*data:text\/html)/i', $decoded ) ) {
 				$el->removeAttributeNode( $attr );
 			}
 		}

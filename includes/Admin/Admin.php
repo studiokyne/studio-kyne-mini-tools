@@ -475,9 +475,11 @@ class Admin {
 			'parent' => 'top-secondary',
 			'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
 			'href'   => '#skmt-notif-drawer',
+			// WP_Admin_Bar échappe lui-même meta.title : un esc_attr__ ici
+			// double-encoderait (« > » rendu « &gt; »).
 			'meta'   => [
 				'class' => 'skmt-notif-trigger',
-				'title' => esc_attr__( 'Notifications', 'studio-kyne-mini-tools' ),
+				'title' => __( 'Notifications', 'studio-kyne-mini-tools' ),
 			],
 		] );
 	}
@@ -504,7 +506,7 @@ class Admin {
 			'href'   => admin_url( 'options-reading.php' ),
 			'meta'   => [
 				'class' => 'skmt-noindex-indicator',
-				'title' => esc_attr__( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
+				'title' => __( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
 			],
 		] );
 	}
@@ -586,11 +588,6 @@ class Admin {
 	}
 
 	/**
-	 * Ajoute une notice persistante (survit aux rechargements).
-	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
-	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
-	 */
-	/**
 	 * Construit un en-tête Content-Disposition sûr pour un nom de fichier.
 	 *
 	 * Le nom était injecté tel quel entre guillemets. Or sous Linux un nom de
@@ -620,6 +617,11 @@ class Admin {
 		return 'attachment; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode( $brut );
 	}
 
+	/**
+	 * Ajoute une notice persistante (survit aux rechargements).
+	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
+	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
+	 */
 	public static function add_persistent_notice( string $id, string $message, string $type = 'info', int $user_id = 0 ): void {
 		$user_id = $user_id ?: get_current_user_id();
 		if ( ! $user_id ) {
@@ -697,6 +699,12 @@ class Admin {
 		if ( strpos( $tab, 'module_' ) === 0 ) {
 			$module_id = substr( $tab, 7 );
 			$instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;
+
+			// Même règle que render_page() : un module peut exiger davantage que
+			// manage_options (multisite). L'enregistrement doit la respecter aussi.
+			if ( ! current_user_can( $this->module_capability( $module_id ) ) ) {
+				wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+			}
 
 			if ( $instance && isset( $_POST['skmt_module_settings'] ) && is_array( $_POST['skmt_module_settings'] ) ) {
 				$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) );
@@ -1068,10 +1076,6 @@ class Admin {
 			$clean['global']['update_channel'] = in_array( $channel, [ 'stable', 'dev' ], true ) ? $channel : 'stable';
 		}
 
-		if ( array_key_exists( 'auto_updates', $global ) ) {
-			$clean['global']['auto_updates'] = ! empty( $global['auto_updates'] );
-		}
-
 		// Seuls les modules réellement enregistrés peuvent voir leur état changer.
 		foreach ( array_keys( $this->modules->get_all() ) as $module_id ) {
 			if ( array_key_exists( $module_id, $modules ) ) {
@@ -1249,15 +1253,6 @@ class Admin {
 
 	private function get_current_tab(): string {
 		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
-	}
-
-	/**
-	 * Vérifie si la page courante est une page du plugin (via $_GET['page']).
-	 * Utilisable tôt dans le cycle de vie WP, avant que get_current_screen() soit disponible.
-	 */
-	private function is_skmt_page(): bool {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return isset( $_GET['page'] ) && sanitize_key( $_GET['page'] ) === $this->slug;
 	}
 
 	private function is_plugin_screen(): bool {

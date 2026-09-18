@@ -119,7 +119,7 @@ class Updater {
 			'icons'        => [],
 			'banners'      => [],
 			'tested'       => get_bloginfo( 'version' ),
-			'requires'     => '5.8',
+			'requires'     => '6.0',
 			'requires_php' => '7.4',
 		];
 
@@ -199,7 +199,7 @@ class Updater {
 
 		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
 
-		if ( dirname( $plugin_file ) !== $args->slug ) {
+		if ( dirname( $plugin_file ) !== ( $args->slug ?? '' ) ) {
 			return $result;
 		}
 
@@ -217,7 +217,7 @@ class Updater {
 			'homepage'      => $remote['url'],
 			'download_link' => $remote['download_url'],
 			'version'       => $remote['version'],
-			'requires'      => '5.8',
+			'requires'      => '6.0',
 			'requires_php'  => '7.4',
 			'last_updated'  => $remote['published_at'],
 			'sections'      => [

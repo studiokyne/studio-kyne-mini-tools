@@ -1233,7 +1233,7 @@ class Module extends AbstractModule {
 
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ MenuProfileManager::OPTION_KEY ],
+			'options' => [ MenuProfileManager::OPTION_KEY, MenuProfileManager::CACHE_GEN_OPTION ],
 			'meta'    => [],
 		];
 	}

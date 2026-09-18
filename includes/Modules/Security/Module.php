@@ -13,6 +13,18 @@ use StudioKyne\MiniTools\Core\AbstractModule;
  */
 class Module extends AbstractModule {
 
+	/**
+	 * Premiers segments interdits pour l'URL de connexion personnalisée.
+	 *
+	 * `admin` et `login` sont redirigés par le cœur vers wp-admin / wp-login
+	 * (wp_redirect_admin_locations) ; `index` et `xmlrpc` sont des fichiers ;
+	 * `feed`, `embed`, `comments` sont des bases de réécriture. Tout segment en
+	 * `wp-` est refusé d'un bloc (wp-admin, wp-login, wp-content, wp-json…).
+	 * Un slug réservé enferme l'administrateur hors du site, sans autre issue
+	 * que la constante SKMT_DISABLE_LOGIN_URL.
+	 */
+	private const RESERVED_LOGIN_SEGMENTS = [ 'admin', 'login', 'index', 'index-php', 'xmlrpc', 'xmlrpc-php', 'feed', 'embed', 'comments' ];
+
 	private RateLimiter $rate_limiter;
 	private HardeningService $hardening;
 	private LoginUrlHandler $login_handler;
@@ -158,15 +170,6 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Hook wp_scheduled_delete — nettoie les entrées de rate limit expirées.
-	 *
-	 * @return void
-	 */
-	public function cleanup_rate_limits(): void {
-		$this->rate_limiter->cleanup_expired();
-	}
-
-	/**
 	 * Porte de sortie : desactive l'URL de connexion personnalisee.
 	 *
 	 * A poser dans wp-config.php quand le slug a ete oublie ou mal saisi —
@@ -248,12 +251,11 @@ class Module extends AbstractModule {
 		$current['authentication']['enable_custom_login_url'] = ! empty( $settings['enable_custom_login_url'] );
 
 		if ( isset( $settings['custom_login_url'] ) ) {
-			$url = sanitize_text_field( wp_unslash( $settings['custom_login_url'] ) );
-			if ( ! empty( $url ) ) {
-				if ( $url[0] !== '/' ) {
-					$url = '/' . $url;
-				}
-				$current['authentication']['custom_login_url'] = $url;
+			// Un slug refusé laisse la valeur précédente en place : mieux vaut
+			// un réglage inchangé qu'une connexion impossible à router.
+			$slug = self::sanitize_login_slug( (string) wp_unslash( $settings['custom_login_url'] ) );
+			if ( null !== $slug ) {
+				$current['authentication']['custom_login_url'] = '/' . $slug;
 			}
 		}
 
@@ -278,6 +280,29 @@ class Module extends AbstractModule {
 		$current['hardening']['hide_wp_version']   = ! empty( $settings['hide_wp_version'] );
 
 		return $this->save_module_settings( $current );
+	}
+
+	/**
+	 * Normalise un slug de connexion saisi par l'utilisateur, ou null s'il est
+	 * inutilisable.
+	 *
+	 * Chaque segment passe par sanitize_title() : seuls `[a-z0-9-]` et le
+	 * séparateur `/` survivent, donc rien qui ne puisse être comparé au chemin
+	 * d'une requête. Le premier segment ne doit pas être réservé (voir
+	 * RESERVED_LOGIN_SEGMENTS).
+	 */
+	public static function sanitize_login_slug( string $raw ): ?string {
+		$segments = array_values( array_filter( array_map( 'sanitize_title', explode( '/', trim( $raw ) ) ) ) );
+		if ( ! $segments ) {
+			return null;
+		}
+
+		$first = $segments[0];
+		if ( 0 === strpos( $first, 'wp-' ) || in_array( $first, self::RESERVED_LOGIN_SEGMENTS, true ) ) {
+			return null;
+		}
+
+		return implode( '/', $segments );
 	}
 
 	/**
@@ -314,20 +339,6 @@ class Module extends AbstractModule {
 			],
 		];
 	}
-
-	/**
-	 * Hook d'activation du module.
-	 *
-	 * @return void
-	 */
-	public function on_activate(): void {}
-
-	/**
-	 * Hook de désactivation du module.
-	 *
-	 * @return void
-	 */
-	public function on_deactivate(): void {}
 
 	/**
 	 * Retourne les defaults du module.

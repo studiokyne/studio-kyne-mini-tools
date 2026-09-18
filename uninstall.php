@@ -3,7 +3,7 @@
  * Nettoyage des données lors de la désinstallation.
  *
  * Chaque module déclare les clés à supprimer via ::get_uninstall_keys().
- * Pour ajouter un module : déclarer sa classe dans $module_classes ci-dessous.
+ * La liste des modules vit dans Activator::MODULE_CLASSES.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -14,22 +14,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/Autoloader.php';
 \StudioKyne\MiniTools\Core\Autoloader::register();
 
-/**
- * Classes des modules intégrés.
- * À mettre à jour lorsqu'un nouveau module est ajouté.
- *
- * @var array<string, class-string>
- */
-$module_classes = [
-	'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
-	'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
-	'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
-	'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
-	'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
-	'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
-	'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
-	'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
-];
+$module_classes = \StudioKyne\MiniTools\Core\Activator::MODULE_CLASSES;
 
 // Suppression de l'option globale.
 delete_option( 'skmt_settings' );

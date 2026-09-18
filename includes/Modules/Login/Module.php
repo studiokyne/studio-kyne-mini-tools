@@ -16,13 +16,6 @@ class Module extends AbstractModule {
 	private array $settings = [];
 
 	/**
-	 * Constructeur.
-	 */
-	public function __construct( string $id ) {
-		parent::__construct( $id );
-	}
-
-	/**
 	 * Initialise les hooks WordPress.
 	 */
 	public function init(): void {
