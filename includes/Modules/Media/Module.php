@@ -45,6 +45,23 @@ class Module extends AbstractModule {
 	/** Couleurs prédéfinies autorisées ('' = aucune / défaut). */
 	const FOLDER_COLORS = [ '', '#ef4444', '#f59e0b', '#22c55e', '#0ea5e9', '#8b5cf6', '#64748b' ];
 
+	/**
+	 * Libellés lisibles des couleurs, pour le survol des pastilles : un code
+	 * hexadécimal ne dit rien à l'utilisateur.
+	 *
+	 * @return array<string,string> hex => libellé
+	 */
+	private static function folder_color_labels(): array {
+		return [
+			'#ef4444' => __( 'Rouge', 'studio-kyne-mini-tools' ),
+			'#f59e0b' => __( 'Orange', 'studio-kyne-mini-tools' ),
+			'#22c55e' => __( 'Vert', 'studio-kyne-mini-tools' ),
+			'#0ea5e9' => __( 'Bleu', 'studio-kyne-mini-tools' ),
+			'#8b5cf6' => __( 'Violet', 'studio-kyne-mini-tools' ),
+			'#64748b' => __( 'Gris', 'studio-kyne-mini-tools' ),
+		];
+	}
+
 	public function init(): void {
 		// init() est appelé pendant le hook `init` (via init_active_modules).
 		// On enregistre donc la taxonomie immédiatement : un add_action('init')
@@ -296,7 +313,8 @@ class Module extends AbstractModule {
 		wp_localize_script( 'skmt-media-js', 'skmtMedia', [
 			'ajaxUrl'    => admin_url( 'admin-ajax.php' ),
 			'nonce'      => wp_create_nonce( 'skmt_admin_nonce' ),
-			'colors'     => self::FOLDER_COLORS,
+			'colors'      => self::FOLDER_COLORS,
+			'colorLabels' => self::folder_color_labels(),
 			'queryVar'   => self::QUERY_VAR,
 			'unassigned' => self::UNASSIGNED,
 			// L'interface doit refléter la garde serveur : sans ce drapeau, un
