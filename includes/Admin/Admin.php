@@ -72,6 +72,7 @@ class Admin {
 		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], PHP_INT_MAX );
 		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_start' ], 0 );
 		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_end' ],   PHP_INT_MAX );
+		add_action( 'admin_bar_menu',        [ $this, 'register_noindex_indicator' ], 998 );
 		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
 		add_action( 'admin_footer',          [ $this, 'render_notification_drawer' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_notification_assets' ] );
@@ -415,6 +416,33 @@ class Admin {
 			'meta'   => [
 				'class' => 'skmt-notif-trigger',
 				'title' => esc_attr__( 'Notifications', 'studio-kyne-mini-tools' ),
+			],
+		] );
+	}
+
+	/**
+	 * Signale dans la barre d'admin que le site demande aux moteurs de ne pas
+	 * l'indexer (Réglages > Lecture). Un simple repère, pas une alerte : il doit
+	 * se lire d'un coup d'œil à la connexion sans réclamer d'action.
+	 */
+	public function register_noindex_indicator( \WP_Admin_Bar $wp_admin_bar ): void {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( '0' !== (string) get_option( 'blog_public', '1' ) ) {
+			return;
+		}
+
+		$icon = $this->render_icon( 'eye-off', 'sm', 'skmt-noindex-icon' );
+
+		$wp_admin_bar->add_node( [
+			'id'     => 'skmt-noindex',
+			'parent' => 'top-secondary',
+			'title'  => '<span class="skmt-noindex-wrap">' . $icon . '<span class="skmt-noindex-label">' . esc_html__( 'No-index', 'studio-kyne-mini-tools' ) . '</span></span>',
+			'href'   => admin_url( 'options-reading.php' ),
+			'meta'   => [
+				'class' => 'skmt-noindex-indicator',
+				'title' => esc_attr__( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
 			],
 		] );
 	}
@@ -1148,6 +1176,7 @@ class Admin {
 		'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
 		'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
 		'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+		'eye-off'          => '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
 		'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
 		];
 	}
