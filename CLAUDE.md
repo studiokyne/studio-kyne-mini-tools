@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-**Studio Kyne Mini Tools** is a modular WordPress plugin (PHP 7.4+, WP 5.8+). No build step, no Composer, no npm — pure PHP with a custom PSR-4 autoloader. There are no automated tests. Third-party JS is vendored as-is under `assets/admin/js/vendor/` (e.g. `sortable.min.js`), never bundled.
+**Studio Kyne Mini Tools** is a modular WordPress plugin (PHP 7.4+, WP 6.0+). No build step, no Composer, no npm — pure PHP with a custom PSR-4 autoloader. There are no automated tests. Third-party JS is vendored as-is under `assets/admin/js/vendor/` (e.g. `sortable.min.js`), never bundled.
 
 ## Releases
 
