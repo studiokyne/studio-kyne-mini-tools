@@ -29,6 +29,7 @@
   var QUERY_VAR = cfg.queryVar || "skmt_folder";
   var UNASSIGNED = cfg.unassigned || "__none__";
   var COLORS = cfg.colors || [];
+  var COLOR_LABELS = cfg.colorLabels || {};
 
   /**
    * L'utilisateur peut-il modifier l'ARBORESCENCE (créer, renommer, supprimer,
@@ -300,10 +301,11 @@
     var swatches = COLORS.map(function (c) {
       var isNone = c === "";
       var isSel = (folder.color || "") === c;
+      var label = isNone ? t("defaultColor", "Par défaut") : (COLOR_LABELS[c] || c);
       return '<button type="button" class="skmt-media-swatch' + (isNone ? " is-none" : "") + (isSel ? " is-selected" : "") +
         '" data-color="' + escHtml(c) + '" ' + (c ? 'style="background:' + escHtml(c) + '" ' : "") +
-        'title="' + escHtml(isNone ? t("defaultColor", "Par défaut") : c) + '" ' +
-        'data-skmt-tip="' + escHtml(isNone ? t("defaultColor", "Par défaut") : c) + '"></button>';
+        'title="' + escHtml(label) + '" ' +
+        'data-skmt-tip="' + escHtml(label) + '" aria-label="' + escHtml(label) + '"></button>';
     }).join("");
 
     var dd = document.createElement("div");
