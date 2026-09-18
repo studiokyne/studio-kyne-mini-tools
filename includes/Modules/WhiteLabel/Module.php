@@ -280,7 +280,7 @@ class Module extends AbstractModule {
 			if ( ! empty( $id_or_email->user_id ) ) {
 				return (int) $id_or_email->user_id;
 			}
-			$email = $id_or_email->comment_author_email ?? '';
+			$email = (string) $id_or_email->comment_author_email;
 			$user  = $email ? get_user_by( 'email', $email ) : false;
 			return $user ? (int) $user->ID : 0;
 		}

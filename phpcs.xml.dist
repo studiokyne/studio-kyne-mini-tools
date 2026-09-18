@@ -29,6 +29,8 @@
 		<exclude name="Universal.Arrays.DisallowShortArraySyntax"/>
 		<!-- Git normalise les fins de ligne (autocrlf) : le poste Windows verrait 45 faux positifs. -->
 		<exclude name="Generic.Files.LineEndings"/>
+		<!-- Les propriétés lues sont celles d'objets WordPress et DOM (WP_Post, DOMNode…) : leur casse n'est pas la nôtre. -->
+		<exclude name="WordPress.NamingConventions.ValidVariableName.UsedPropertyNotSnakeCase"/>
 	</rule>
 
 	<!-- Les gabarits sont inclus depuis une méthode d'Admin : leurs variables ne sont pas globales. -->

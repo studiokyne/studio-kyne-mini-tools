@@ -40,7 +40,7 @@ Chaque module est une classe qui étend `AbstractModule` (qui implémente `Modul
 - `get_settings(): array` — réglages courants
 - `save_settings(array $settings): bool` — assainir et persister ; le cœur n'applique aucun assainissement
 - `static get_defaults(): array` — tableau imbriqué de défauts, fusionné récursivement par `get_module_settings()`
-- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**) et `user_meta` pour le nettoyage à la désinstallation. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée.
+- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**), `user_meta`, `post_type` et `taxonomy` pour le nettoyage à la désinstallation ; chaque clé est optionnelle. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée.
 
 Surcharges optionnelles : `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `to_form_payload()`, `get_export_extras()` / `import_extras()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 
@@ -160,6 +160,6 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/app" -w /app composer:2 check
 
 Le workflow `lint.yml` rejoue `php -l`, PHPCS et PHPStan sur chaque PR vers `dev` et `main`.
 
-**Baselines.** `phpcs.baseline.xml` et `phpstan-baseline.neon` gèlent les constats antérieurs à l'outillage : le code nouveau est tenu au standard, l'ancien ne bloque pas la CI. Ne jamais régénérer une baseline pour faire passer un constat neuf — corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé. Quand une baseline se vide, la supprimer ; quand PHPStan passe sans baseline, monter le niveau (suivi : issue #50).
+**Baselines.** `phpcs.baseline.xml` gèle les constats PHPCS antérieurs à l'outillage : le code nouveau est tenu au standard, l'ancien ne bloque pas la CI. PHPStan tourne au niveau 5 **sans baseline** depuis la PR #52 ; le passage au niveau 6 (docblocs de tableaux, environ 160 constats) est suivi dans l'issue #50. Ne jamais régénérer une baseline pour faire passer un constat neuf — corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé. La baseline PHPCS s'appaire sur le contenu des lignes et leur voisinage : toucher une ligne voisine d'un constat gelé le fait ressortir, et il faut alors le corriger ou l'annoter (jamais le regeler). Quand la baseline se vide, la supprimer.
 
 Exclusions assumées dans `phpcs.xml.dist` : docblocs (`Squiz.Commenting`), noms de fichiers PSR-4 (`WordPress.Files.FileName`), fins de ligne (Git les normalise). Les gabarits (`templates/`, `settings-template.php`) sont inclus depuis une méthode d'`Admin` : PHPStan ne les analyse pas et PHPCS n'y exige pas de préfixe sur les variables. `tools/phpstan-bootstrap.php` déclare les constantes absentes des stubs (`WPINC`).

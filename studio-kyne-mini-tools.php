@@ -34,7 +34,13 @@ require_once SKMT_INCLUDES_DIR . 'Core/Autoloader.php';
 StudioKyne\MiniTools\Core\Autoloader::register();
 
 // Bootstrap
-add_action( 'plugins_loaded', [ 'StudioKyne\MiniTools\Core\Plugin', 'instance' ], 10 );
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		StudioKyne\MiniTools\Core\Plugin::instance();
+	},
+	10
+);
 
 // Activation hook
 register_activation_hook( __FILE__, [ 'StudioKyne\MiniTools\Core\Activator', 'activate' ] );

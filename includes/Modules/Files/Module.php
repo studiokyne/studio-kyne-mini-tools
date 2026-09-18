@@ -163,16 +163,20 @@ class Module extends AbstractModule {
 	 * La lecture (listing, aperçu, téléchargement) reste ouverte dans les deux
 	 * cas : aucune des deux constantes ne parle de lecture.
 	 *
+	 * DISALLOW_FILE_MODS se lit via wp_is_file_mod_allowed(), qui applique le
+	 * filtre `file_mod_allowed` : un hébergeur qui verrouille les fichiers par
+	 * ce filtre plutôt que par la constante est ainsi respecté lui aussi.
+	 *
 	 * @param bool $edition true si l'appel écrit un CONTENU (édition/upload).
 	 */
 	private function check_file_mods( bool $edition = false ): void {
-		$bloque = ( defined( 'DISALLOW_FILE_MODS' ) && DISALLOW_FILE_MODS )
+		$bloque = ! wp_is_file_mod_allowed( 'skmt_files' )
 			|| ( $edition && defined( 'DISALLOW_FILE_EDIT' ) && DISALLOW_FILE_EDIT );
 
 		if ( $bloque ) {
 			wp_send_json_error(
 				[
-					'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT / DISALLOW_FILE_MODS dans wp-config.php).', 'studio-kyne-mini-tools' ),
+					'message' => __( 'La modification de fichiers est désactivée sur ce site (DISALLOW_FILE_EDIT, DISALLOW_FILE_MODS ou filtre file_mod_allowed).', 'studio-kyne-mini-tools' ),
 				],
 				403
 			);

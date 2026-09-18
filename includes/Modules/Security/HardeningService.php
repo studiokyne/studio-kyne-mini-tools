@@ -10,20 +10,6 @@ defined( 'ABSPATH' ) || exit;
  */
 class HardeningService {
 
-	private bool $disable_xmlrpc    = false;
-	private bool $prevent_user_enum = false;
-	private bool $hide_wp_version   = false;
-
-	public function __construct(
-		bool $disable_xmlrpc = false,
-		bool $prevent_user_enum = false,
-		bool $hide_wp_version = false
-	) {
-		$this->disable_xmlrpc    = $disable_xmlrpc;
-		$this->prevent_user_enum = $prevent_user_enum;
-		$this->hide_wp_version   = $hide_wp_version;
-	}
-
 	// === XML-RPC ===
 
 	/**
