@@ -169,6 +169,19 @@
     }, function (data) {
       dataState.columns = data.columns;
       dataState.primary = data.primary;
+      // Sans recherche, `total` est le compte exact : il remplace l'estimation
+      // affichée pour les grosses tables (liste et en-tête).
+      if (!dataState.search) {
+        var tbl = db.tables.find(function (t) { return t.name === db.currentTable; });
+        if (tbl && (tbl.approx || tbl.rows !== data.total)) {
+          tbl.rows = data.total;
+          tbl.approx = false;
+          document.getElementById('skmt-db-table-meta').textContent =
+            data.total.toLocaleString() + ' lignes · ' + formatSize(tbl.size);
+          var item = document.querySelector('.skmt-db__table-item[data-table="' + db.currentTable + '"] .skmt-db__table-item-rows');
+          if (item) item.textContent = data.total.toLocaleString();
+        }
+      }
       renderDataTable(content, data);
     });
   }
