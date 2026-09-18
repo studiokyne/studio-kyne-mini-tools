@@ -66,14 +66,17 @@ foreach ( $module_classes as $id => $class ) {
 	// Suppression des taxonomies custom (tous les termes).
 	// Le plugin n'étant pas booté ici, la taxonomie n'est pas enregistrée : on
 	// l'enregistre à la volée pour que get_terms()/wp_delete_term() fonctionnent.
-	foreach ( $keys['taxonomy'] ?? [] as $taxonomy ) {
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			register_taxonomy( $taxonomy, 'attachment', [ 'public' => false ] );
+	foreach ( $keys['taxonomy'] ?? [] as $tax_name ) {
+		if ( '' === $tax_name ) {
+			continue;
+		}
+		if ( ! taxonomy_exists( $tax_name ) ) {
+			register_taxonomy( $tax_name, 'attachment', [ 'public' => false ] );
 		}
 
 		$terms = get_terms(
 			[
-				'taxonomy'   => $taxonomy,
+				'taxonomy'   => $tax_name,
 				'hide_empty' => false,
 				'fields'     => 'ids',
 			]
@@ -81,7 +84,7 @@ foreach ( $module_classes as $id => $class ) {
 
 		if ( ! is_wp_error( $terms ) ) {
 			foreach ( $terms as $term_id ) {
-				wp_delete_term( $term_id, $taxonomy );
+				wp_delete_term( $term_id, $tax_name );
 			}
 		}
 	}

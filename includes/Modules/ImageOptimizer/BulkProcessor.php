@@ -310,7 +310,11 @@ class BulkProcessor {
 			)
 		);
 
-		return array_map( 'intval', $query->posts );
+		// fields => ids : WP_Query renvoie des entiers, mais son type déclaré reste int|WP_Post.
+		return array_map(
+			static fn( $post ): int => $post instanceof \WP_Post ? (int) $post->ID : (int) $post,
+			(array) $query->posts
+		);
 	}
 
 	/**

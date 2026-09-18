@@ -92,8 +92,9 @@ class Updater {
 	/**
 	 * Vérifie les mises à jour disponibles.
 	 *
-	 * @param object $transient Données du transient.
-	 * @return object
+	 * @param \stdClass $transient Données du transient.
+	 *
+	 * @return \stdClass
 	 */
 	public function check_update( $transient ) {
 		if ( empty( $transient->checked ) ) {

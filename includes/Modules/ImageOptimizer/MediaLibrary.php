@@ -178,7 +178,7 @@ class MediaLibrary {
 			if ( ! empty( $stats['original_bytes'] ) ) {
 				$avg_ratio = (float) $stats['bytes_saved'] / max( 1.0, (float) $stats['original_bytes'] );
 			}
-			$estimated = (int) floor( filesize( $file ) * $avg_ratio );
+			$estimated = (int) floor( (int) filesize( $file ) * $avg_ratio );
 		}
 
 		// Bouton / statut d'action.
@@ -192,26 +192,26 @@ class MediaLibrary {
 			$action_html = '<span class="skmt-optimized-status">' . esc_html__( 'Déjà optimisée', 'studio-kyne-mini-tools' ) . '</span>';
 		}
 
-		$current_size    = filesize( $file );
+		$current_size    = (int) filesize( $file );
 		$potential_style = $is_optimized ? 'style="display:none;"' : '';
 		$result_style    = $is_optimized ? '' : 'style="display:none;"';
 
 		$details = '<div class="skmt-gain-potential" ' . $potential_style . '>'
 			. '<p>'
 			. esc_html__( 'Gain potentiel :', 'studio-kyne-mini-tools' )
-			. ' <strong class="skmt-bytes-estimated">' . esc_html( size_format( $estimated, 2 ) ) . '</strong>'
+			. ' <strong class="skmt-bytes-estimated">' . esc_html( (string) size_format( $estimated, 2 ) ) . '</strong>'
 			. '</p>'
-			. '<p>' . esc_html__( 'Taille actuelle :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-current">' . esc_html( size_format( $current_size, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille actuelle :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-current">' . esc_html( (string) size_format( $current_size, 2 ) ) . '</strong></p>'
 			. '</div>'
 			. '<div class="skmt-gain-result" ' . $result_style . '>'
 			. '<p style="margin-bottom:4px;"><strong>' . esc_html__( 'Fichier principal', 'studio-kyne-mini-tools' ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-saved">' . esc_html( size_format( $main_bytes_saved, 2 ) ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-original">' . esc_html( size_format( $main_original_bytes, 2 ) ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-final">' . esc_html( size_format( $main_optimized_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-saved">' . esc_html( (string) size_format( $main_bytes_saved, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-original">' . esc_html( (string) size_format( $main_original_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-main-bytes-final">' . esc_html( (string) size_format( $main_optimized_bytes, 2 ) ) . '</strong></p>'
 			. '<p style="margin:10px 0 4px;"><strong>' . esc_html__( 'Total (principal + miniatures)', 'studio-kyne-mini-tools' ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-saved">' . esc_html( size_format( $bytes_saved, 2 ) ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-original">' . esc_html( size_format( $original_bytes, 2 ) ) . '</strong></p>'
-			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-final">' . esc_html( size_format( $optimized_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Gain obtenu :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-saved">' . esc_html( (string) size_format( $bytes_saved, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille avant :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-original">' . esc_html( (string) size_format( $original_bytes, 2 ) ) . '</strong></p>'
+			. '<p>' . esc_html__( 'Taille après :', 'studio-kyne-mini-tools' ) . ' <strong class="skmt-bytes-final">' . esc_html( (string) size_format( $optimized_bytes, 2 ) ) . '</strong></p>'
 			. '</div>';
 
 		$form_fields['skmt_image_optimizer'] = [

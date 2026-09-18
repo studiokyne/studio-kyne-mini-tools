@@ -272,7 +272,7 @@ class Admin {
 			}
 
 			$handle = 'skmt-module-' . $module_id . '-js-' . $index;
-			$deps   = array_merge( [ 'skmt-admin-js' ], $instance->get_admin_js_deps() );
+			$deps   = array_values( array_filter( array_merge( [ 'skmt-admin-js' ], $instance->get_admin_js_deps() ) ) );
 			wp_enqueue_script( $handle, $script_url, $deps, SKMT_VERSION, true );
 
 			// Injection des données JS spécifiques au module dans skmtAdmin
@@ -1052,7 +1052,7 @@ class Admin {
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$raw  = file_get_contents( $file['tmp_name'] );
-		$data = json_decode( $raw, true );
+		$data = json_decode( (string) $raw, true );
 
 		if ( ! is_array( $data ) || ! isset( $data['global'] ) ) {
 			wp_safe_redirect(
