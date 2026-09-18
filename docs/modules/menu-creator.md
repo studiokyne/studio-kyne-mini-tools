@@ -1,0 +1,45 @@
+# Module MenuCreator
+
+`includes/Modules/MenuCreator/Module.php` + `assets/admin/js/modules/menu-creator.js`. Applique les profils de `WhiteLabel\MenuProfileManager` (voir [white-label.md](white-label.md)) au vrai menu de wp-admin. Les endpoints AJAX portent des noms `skmt_wl_*` bien qu'ils vivent dans ce module.
+
+## Application au menu
+
+`custom_menu_order` (activé par utilisateur via `maybe_enable_custom_order`, pas aveuglément) + filtre `menu_order` pour l'ordre, action `admin_menu` pour visibilité/renommage/séparateurs/liens personnalisés (y compris le réordonnancement des sous-menus), `admin_head` pour l'injection des surcharges CSS d'icônes par item (SVG base64 ou URL), les attributs `target` des liens personnalisés, et un correctif global d'opacité des icônes de menu (enregistré sans condition). Les hooks qui transforment le menu ne s'enregistrent dans `init()` que si au moins un profil est `status === 'active'`. `apply_menu_visibility()` prend un instantané du menu WP intact dans `self::$pristine_menu`/`$pristine_submenu` **avant** de muter les globales, pour que l'éditeur reçoive le vrai menu WP (pas nos séparateurs/liens déjà injectés).
+
+## Blocage d'accès
+
+Masquer un item ne fait que le retirer de la barre latérale : l'URL reste ouvrable. La case « Bloquer l'accès direct » (`block_access`, uniquement sur un item déjà masqué — `sanitize_menu_items()` force `false` sur un item visible) ajoute le refus côté serveur via `enforce_blocked_pages()` sur `admin_init` @1. `request_matches_slug()` reconstruit la requête attendue depuis le slug de menu (`slug_to_request()` gère les trois formes : `upload.php`, `edit.php?post_type=page`, et le slug de page d'extension servi par admin.php, y compris `wc-admin&path=/analytics/overview`) : les paramètres du slug doivent tous correspondre, et un slug sans `post_type`/`taxonomy`/`page` ne doit pas matcher une requête qui en porte un — sinon bloquer `edit.php` bloquerait aussi `edit.php?post_type=page`. Jamais actif sur `admin-ajax.php`/`admin-post.php`/`async-upload.php` (un refus y casserait des requêtes légitimes), et `index.php` renvoie un `wp_die` 403 au lieu de la redirection (qui pointe vers lui — boucle). Le message passe par un **toast** (`render_denied_toast()` sur `admin_footer`), pas par une `admin_notice` : celle-ci serait captée par le centre de notifications du plugin et n'apparaîtrait que sous la cloche, alors que l'utilisateur vient d'être redirigé et doit comprendre tout de suite. Le paramètre `skmt_denied` est retiré de l'URL en JS pour qu'un rechargement ne rejoue pas le message. **Ce n'est pas un système de permissions** : REST, WP-CLI et les capacités WP ne sont pas concernés.
+
+## Export
+
+Les profils vivent sous `skmt_wl_menu_profiles`, hors de `skmt_module_menu_creator` : ils sortent de l'export global par le point d'extension `AbstractModule::get_export_extras()` / `import_extras()` (bloc `extras` du JSON, à côté de `modules`). Ces deux méthodes sont génériques — tout module rangeant son état dans une option à lui doit les surcharger. L'import fusionne par id (`MenuProfileManager::save()` écrase l'entrée de même id, ajoute sinon) : un fichier partiel ne supprime aucun menu. L'éditeur a en plus son propre export/import : deux boutons en icône seule dans l'en-tête de la colonne Menus — importer (upload) et « tout exporter » (download, tous les menus lus depuis `mcProfiles` — l'état en base, pas l'éditeur, pour ne pas embarquer des modifications non enregistrées) et « Exporter » dans le pied du panneau (le menu ouvert, état à l'écran compris). `ajax_import_profile` avale les trois formes (`{profiles:[…]}`, `{profile:…}`, profil nu), repasse chaque menu par `sanitize_profile()` et les crée en brouillon.
+
+## Restriction par rôle des liens personnalisés
+
+Un item WP est déjà filtré par sa propre capacité ; un lien personnalisé n'est rattaché à rien, d'où le champ `roles` (vide = tout le monde). Le filtrage se fait en **n'ajoutant pas** l'entrée dans `apply_menu_visibility()` (`current_user_has_role()`) : la capacité d'`add_menu_page()` ne peut pas exprimer « ces rôles-là », WordPress ne raisonnant qu'en capacités.
+
+## Historique et raccourcis
+
+Toute mutation de l'éditeur se termine par `setDirty(true)` : c'est donc `setDirty()` qui empile l'instantané (`pushHistory()`), plutôt qu'un appel par poignée — l'arbre, les champs et le picker en oublieraient un. L'instantané reprend `collectProfile()`, parce que les champs du panneau vivent dans le DOM et pas dans `ed.profile`, mais garde les items avec leurs propriétés d'exécution (`_uid`, `_wpLabel`), sans quoi le retour en arrière casserait la sélection. Deux instantanés à moins de 400 ms fusionnent, sinon chaque caractère tapé coûterait un Ctrl+Z. `applyHistory()` pose `hist.lock` pour que le `setDirty()` du re-rendu ne réempile pas, et revenir à l'index 0 remet le menu en état « enregistré ». Côté clavier : Ctrl/Cmd+S est toujours intercepté, Ctrl+Z / Ctrl+Y sont **laissés au champ** quand le focus est dans une saisie (l'annulation de texte native y est attendue).
+
+## Entrées obsolètes
+
+`mergeWpMenu()` **conserve** les items dont le slug n'existe plus dans le menu WP courant et les marque `_stale` (badge Lucide `triangle-alert` dans l'arbre + bandeau `#skmt-mc-stale-bar` au-dessus, avec une action « Nettoyer »). Les purger en silence — ce que faisait la version précédente — effaçait le paramétrage d'une extension simplement désactivée le temps d'une mise à jour. Un slug inconnu est inoffensif côté application : `remove_menu_page()` ne fait rien et `apply_menu_order()` passe par un `array_diff`.
+
+## Libellés
+
+`clean_menu_label()` retire les `<span>` **avec leur contenu** avant `wp_strip_all_tags()` : WP et les extensions collent leurs compteurs dans le titre lui-même (`Commentaires <span class="awaiting-mod">0</span>`), et un simple strip laissait des libellés du type « Commentaires 00 commentaire en modération » dans l'éditeur.
+
+## Picker d'icônes
+
+Bibliothèque de ~150 SVG Lucide **repris tels quels de lucide-static v1.34.0** et groupés par catégorie dans `get_icon_library()` (`get_lucide_icons()` aplatit pour le JS, `get_icon_categories()` alimente les en-têtes) — voir la règle « jamais de SVG dessiné à la main » : pour en ajouter, récupérer le fichier officiel, pas approximer. Trois onglets : Bibliothèque (recherche + catégories), Médiathèque, Code SVG. Ce dernier passe par `ajax_sanitize_svg`, qui réutilise `ImageOptimizer\SvgHandler::sanitize()` — même risque, même liste blanche, on n'écrit pas un second nettoyeur. La recherche interroge `get_icon_aliases()` (slug → mots-clés FR/EN, servi comme `iconAliases`) et pas seulement le slug : ceux de Lucide sont anglais et rarement devinables depuis une interface française (`funnel` pour un filtre, `banknote` pour un billet, `boxes` pour un stock). Côté JS, `foldAccents()` replie les accents des deux côtés de la comparaison — inutile de doubler les entrées — et chaque mot saisi doit être trouvé, dans n'importe quel ordre. Une icône sans alias reste cherchable par son nom.
+
+## Icônes — deux pièges structurels
+
+`inject_menu_icon_overrides()` cible le `<li>` par son attribut `id` (index 5 de `$menu`, reproduit par `menu_dom_id()`), **jamais** par une recherche de sous-chaîne dans le `href` : WooCommerce enregistre « Marketing » sous le slug `woocommerce-marketing` puis réécrit l'URL du menu en `admin.php?page=wc-admin&path=/marketing` — le href ne contient plus le slug, et l'icône n'était jamais appliquée (même chose pour le top-level `woocommerce` → `page=wc-admin`). Le href reste un repli pour les entrées sans hookname.
+
+Second piège : une icône de menu SVG est monochrome et peinte pour la barre latérale **sombre** (fill `#f3f1f1` chez WooCommerce/Bricks, `stroke="currentColor"` dans un fichier Lucide uploadé). Rendue en `<img>`, `currentColor` n'hérite de rien et retombe au **noir** ; rendue dans l'éditeur (fond clair), le fill blanc est invisible. Les SVG **monochromes** (`svg_is_monochrome()` : `currentColor`, aucune couleur déclarée, ou une seule — même test dupliqué en JS) sont donc rendus en **masque CSS** (`.skmt-mc-icon` côté menu réel, `.skmt-wl-icon-mask` côté éditeur) : la source ne donne que la forme, la couleur vient de la feuille de style. Les autres médias (PNG, SVG multicolore — le logo du plugin lui-même, carré blanc + glyphe noir, qu'un masque aplatirait en carré plein) restent en `<img>` pour garder leurs couleurs. `resolve_icon_render()` tranche en lisant le fichier local via `read_local_svg()` ; côté éditeur, un SVG servi par URL est récupéré en `fetch` same-origin, mis en cache et l'arbre redessiné une fois.
+
+## Données de l'éditeur
+
+L'éditeur reçoit ses données par `get_admin_js_data()` (clés `mcProfiles`, `wpMenu`, `wpSubmenu`, `wpRoles`, `wpRecentUsers`, `iconLibrary`, `iconCategories`, `iconAliases`) — il n'y a **pas** d'endpoint `ajax_get_wp_menu`. Le glisser-déposer utilise SortableJS embarqué (`assets/admin/js/vendor/sortable.min.js`, handle `skmt-sortable-js` via `get_admin_js_deps()`).
