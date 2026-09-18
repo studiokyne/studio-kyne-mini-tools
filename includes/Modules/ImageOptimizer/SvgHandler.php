@@ -313,9 +313,11 @@ class SvgHandler {
 			$css
 		);
 
-		// Filet : si un schéma exécutable subsiste malgré tout, on ne cherche
-		// pas à réparer la feuille — on la jette.
-		if ( preg_match( '/(javascript|vbscript|data\s*:\s*text\/html)\s*:/i', $css ) ) {
+		// Filet : si un schéma exécutable ou un vecteur historique subsiste
+		// malgré tout (ex. « expression(…) » sans propriété devant, que le
+		// motif de déclaration ne couvre pas), on ne cherche pas à réparer la
+		// feuille — on la jette.
+		if ( preg_match( '/(javascript|vbscript|data\s*:\s*text\/html)\s*:|expression\s*\(|-moz-binding|behavior\s*:/i', $css ) ) {
 			return '';
 		}
 
@@ -352,9 +354,17 @@ class SvgHandler {
 				continue;
 			}
 
-			// style : bloque url(javascript:…), expression(), et @import.
-			if ( 'style' === $name && preg_match( '/(javascript:|expression\(|@import|url\(\s*["\']?\s*data:text\/html)/i', $decoded ) ) {
-				$el->removeAttributeNode( $attr );
+			// style : le MÊME nettoyeur que l'élément <style> (commentaires et
+			// échappements normalisés, url() sur liste blanche, expression()
+			// et -moz-binding retirés) — on n'entretient pas deux définitions
+			// du « sûr ». Un style vidé par le nettoyage est retiré.
+			if ( 'style' === $name ) {
+				$propre = trim( $this->sanitize_css( (string) $value ) );
+				if ( '' === $propre ) {
+					$el->removeAttributeNode( $attr );
+				} else {
+					$attr->nodeValue = $propre;
+				}
 			}
 		}
 	}

@@ -313,8 +313,58 @@ class FileManager {
 			throw new \RuntimeException( 'Impossible d\'ouvrir l\'archive.' );
 		}
 
+		// ZipArchive::extractTo() ne neutralise pas les entrées « ../x » ni les
+		// chemins absolus (hors open_basedir) : une archive forgée écrirait
+		// hors de la racine que ce gestionnaire promet de ne jamais quitter.
+		// On refuse l'archive entière plutôt que d'en extraire une partie.
+		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
+			$name = (string) $zip->getNameIndex( $i );
+			if ( ! $this->is_safe_zip_entry( $name ) ) {
+				$zip->close();
+				throw new \RuntimeException( 'Archive refusée : entrée hors racine (' . $name . ').' );
+			}
+			// Un lien symbolique au nom anodin peut pointer hors de la racine ;
+			// une entrée suivante écrirait alors À TRAVERS le lien. On refuse
+			// tout lien plutôt que d'en suivre la cible.
+			if ( $this->zip_entry_is_symlink( $zip, $i ) ) {
+				$zip->close();
+				throw new \RuntimeException( 'Archive refusée : lien symbolique (' . $name . ').' );
+			}
+		}
+
 		$zip->extractTo( $dest );
 		$zip->close();
+		return true;
+	}
+
+	/**
+	 * L'entrée est-elle un lien symbolique (attributs externes Unix, mode S_IFLNK) ?
+	 */
+	private function zip_entry_is_symlink( \ZipArchive $zip, int $index ): bool {
+		$opsys = 0;
+		$attr  = 0;
+		if ( ! $zip->getExternalAttributesIndex( $index, $opsys, $attr ) ) {
+			return false;
+		}
+		return \ZipArchive::OPSYS_UNIX === $opsys && 0xA000 === ( ( $attr >> 16 ) & 0xF000 );
+	}
+
+	/**
+	 * Une entrée d'archive reste-t-elle sous le dossier d'extraction ?
+	 */
+	private function is_safe_zip_entry( string $name ): bool {
+		if ( '' === $name || false !== strpos( $name, "\0" ) ) {
+			return false;
+		}
+		// Chemin absolu (POSIX, Windows) ou UNC.
+		if ( '/' === $name[0] || '\\' === $name[0] || preg_match( '#^[a-zA-Z]:#', $name ) ) {
+			return false;
+		}
+		foreach ( preg_split( '#[/\\\\]#', $name ) as $segment ) {
+			if ( '..' === $segment ) {
+				return false;
+			}
+		}
 		return true;
 	}
 

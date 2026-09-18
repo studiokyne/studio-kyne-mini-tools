@@ -11,7 +11,7 @@
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: studio-kyne-mini-tools
  * Domain Path: /languages
- * Requires at least: 5.8
+ * Requires at least: 6.0
  * Requires PHP: 7.4
  */
 
@@ -37,13 +37,7 @@ StudioKyne\MiniTools\Core\Autoloader::register();
 add_action( 'plugins_loaded', [ 'StudioKyne\MiniTools\Core\Plugin', 'instance' ], 10 );
 
 // Activation hook
-register_activation_hook( __FILE__, function () {
-	require_once SKMT_INCLUDES_DIR . 'Core/Activator.php';
-	StudioKyne\MiniTools\Core\Activator::activate();
-} );
+register_activation_hook( __FILE__, [ 'StudioKyne\MiniTools\Core\Activator', 'activate' ] );
 
 // Deactivation hook
-register_deactivation_hook( __FILE__, function () {
-	require_once SKMT_INCLUDES_DIR . 'Core/Deactivator.php';
-	StudioKyne\MiniTools\Core\Deactivator::deactivate();
-} );
+register_deactivation_hook( __FILE__, [ 'StudioKyne\MiniTools\Core\Deactivator', 'deactivate' ] );

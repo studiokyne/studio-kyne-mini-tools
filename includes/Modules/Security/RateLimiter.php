@@ -130,14 +130,4 @@ class RateLimiter {
 		$this->record_attempt( $ip, true );
 	}
 
-	public function get_attempt_state( string $ip ): array {
-		return $this->get_attempt_data( $ip );
-	}
-
-	/**
-	 * Les transients expirent automatiquement — méthode conservée pour compatibilité.
-	 */
-	public function cleanup_expired(): int {
-		return 0;
-	}
 }

@@ -11,6 +11,18 @@ defined( 'ABSPATH' ) || exit;
  */
 class LoginUrlHandler {
 
+	/**
+	 * Actions de wp-login.php qui ne présentent aucun formulaire de connexion
+	 * et doivent rester servies à leur adresse d'origine.
+	 *
+	 * `postpass` : le formulaire des contenus protégés par mot de passe poste
+	 * sur `wp-login.php?action=postpass`, et filter_site_url() laisse cette
+	 * URL intacte à dessein. La bloquer avec le reste rendait 404 à tout
+	 * visiteur qui déverrouille un article protégé.
+	 * `confirmaction` : confirmation des demandes de données personnelles.
+	 */
+	private const PASSTHROUGH_ACTIONS = [ 'postpass', 'confirmaction' ];
+
 	private string $custom_login_url;
 
 	/**
@@ -80,6 +92,11 @@ class LoginUrlHandler {
 		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 		$request     = wp_parse_url( rawurldecode( $request_uri ) );
 		$path        = $request['path'] ?? '';
+		$action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+
+		if ( in_array( $action, self::PASSTHROUGH_ACTIONS, true ) ) {
+			return;
+		}
 
 		// Bloquer l'accès direct à wp-login.php : remplacer l'URI par une URL
 		// inexistante et laisser WordPress générer un vrai 404 via son template.
@@ -106,8 +123,6 @@ class LoginUrlHandler {
 		if ( empty( $path ) || ! $this->is_custom_login_uri( $path ) ) {
 			return;
 		}
-
-		$action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
 
 		if ( is_user_logged_in() && 'logout' !== $action ) {
 			$user        = wp_get_current_user();

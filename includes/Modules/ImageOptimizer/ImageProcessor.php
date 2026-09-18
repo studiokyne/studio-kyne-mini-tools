@@ -31,12 +31,27 @@ class ImageProcessor {
 	 * CAPACITÉS SERVEUR
 	 * ================================================================ */
 
+	/** Durée de vie du cache des capacités (24 h). */
+	private const CAPABILITIES_TTL = DAY_IN_SECONDS;
+
 	/**
 	 * Détecte et met en cache les capacités image du serveur.
+	 *
+	 * Les sondes sont de vrais encodages : les refaire à chaque requête
+	 * (téléversement, lot du bulk, écran de réglages) coûtait quatre encodages
+	 * par appel. Le résultat vit en transient, sous une clé liée aux versions
+	 * de PHP, GD et Imagick : un changement de build invalide le cache seul.
 	 */
 	public function get_capabilities(): array {
 		if ( null !== $this->capabilities ) {
 			return $this->capabilities;
+		}
+
+		$cache_key = 'skmt_image_caps_' . md5( PHP_VERSION . '|' . (string) phpversion( 'gd' ) . '|' . (string) phpversion( 'imagick' ) );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) && isset( $cached['editor'] ) ) {
+			$this->capabilities = $cached;
+			return $cached;
 		}
 
 		$has_imagick = extension_loaded( 'imagick' );
@@ -78,6 +93,8 @@ class ImageProcessor {
 			'gd_webp'      => $gd_webp,
 			'editor'       => $has_imagick ? 'imagick' : ( $has_gd ? 'gd' : 'none' ),
 		];
+
+		set_transient( $cache_key, $this->capabilities, self::CAPABILITIES_TTL );
 
 		return $this->capabilities;
 	}
@@ -423,11 +440,22 @@ class ImageProcessor {
 		return ! in_array( $mime_type, $excluded, true );
 	}
 
+	/** Formats qui peuvent contenir plusieurs images. */
+	private const ANIMATABLE_MIMES = [ 'image/gif', 'image/webp', 'image/png', 'image/apng', 'image/avif' ];
+
 	/**
 	 * Détecte si une image est animée (GIF animé, WebP animé, APNG…).
+	 *
+	 * Le test court-circuite par MIME : un JPEG ne peut pas être animé, et le
+	 * charger dans Imagick pour compter ses frames — une fois par taille —
+	 * lisait chaque fichier en entier pour rien.
 	 */
 	public function is_animated( string $file_path, string $mime_type ): bool {
 		if ( empty( $file_path ) || ! file_exists( $file_path ) ) {
+			return false;
+		}
+
+		if ( '' !== $mime_type && ! in_array( $mime_type, self::ANIMATABLE_MIMES, true ) ) {
 			return false;
 		}
 

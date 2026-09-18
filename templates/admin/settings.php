@@ -10,32 +10,14 @@ global $wpdb;
 $global         = $this->settings->get( 'global', [] );
 $update_channel = $global['update_channel'] ?? 'stable';
 
-// Image processing capabilities (résultat mis en cache 24h pour éviter un appel Imagick coûteux)
-$has_imagick = extension_loaded( 'imagick' );
-$has_gd      = extension_loaded( 'gd' );
-
-$image_caps = get_transient( 'skmt_image_caps' );
-if ( false === $image_caps ) {
-	$can_avif = false;
-	$can_webp = false;
-
-	if ( $has_imagick ) {
-		$formats  = \Imagick::queryFormats();
-		$can_avif = in_array( 'AVIF', $formats, true );
-		$can_webp = in_array( 'WEBP', $formats, true );
-	}
-	if ( $has_gd ) {
-		$gd_info  = gd_info();
-		$can_avif = $can_avif || ( $gd_info['AVIF Support'] ?? false );
-		$can_webp = $can_webp || ( $gd_info['WebP Support'] ?? false );
-	}
-	$image_caps = [ 'avif' => $can_avif, 'webp' => $can_webp ];
-	set_transient( 'skmt_image_caps', $image_caps, DAY_IN_SECONDS );
-}
-
-$can_avif = $image_caps['avif'];
-$can_webp = $image_caps['webp'];
-$editor   = $has_imagick ? 'Imagick' : ( $has_gd ? 'GD' : __( 'Aucun', 'studio-kyne-mini-tools' ) );
+// Capacités image : la même détection que le module Image Optimizer (vrai
+// encodage d'essai, mis en cache), et non queryFormats()/gd_info() qui
+// annoncent parfois un format sans délégué d'encodage réel.
+$image_caps = ( new \StudioKyne\MiniTools\Modules\ImageOptimizer\ImageProcessor( [] ) )->get_capabilities();
+$can_avif   = ! empty( $image_caps['avif'] );
+$can_webp   = ! empty( $image_caps['webp'] );
+$has_editor = 'none' !== $image_caps['editor'];
+$editor     = $has_editor ? ucfirst( $image_caps['editor'] ) : __( 'Aucun', 'studio-kyne-mini-tools' );
 
 // Server info
 $php_version     = PHP_VERSION;
@@ -266,7 +248,7 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 					</tr>
 					<tr>
 						<td class="skmt-server-table__label"><?php echo esc_html__( 'Éditeur image', 'studio-kyne-mini-tools' ); ?></td>
-						<td><span class="skmt-badge <?php echo 'Aucun' !== $editor ? 'skmt-badge--success' : 'skmt-badge--danger'; ?>"><?php echo esc_html( $editor ); ?></span></td>
+						<td><span class="skmt-badge <?php echo $has_editor ? 'skmt-badge--success' : 'skmt-badge--danger'; ?>"><?php echo esc_html( $editor ); ?></span></td>
 					</tr>
 					<tr>
 						<td class="skmt-server-table__label"><?php echo esc_html__( 'AVIF', 'studio-kyne-mini-tools' ); ?></td>

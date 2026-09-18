@@ -33,6 +33,18 @@ class Module extends AbstractModule {
 		'INTO DUMPFILE',
 		'LOAD DATA',
 		'LOAD_FILE',
+		// Instructions qui touchent le SERVEUR MySQL, pas ce site : variables
+		// globales (general_log_file écrit où on veut), chargement de code
+		// (UDF via SONAME, plugins), arrêt de connexions.
+		'SET GLOBAL',
+		'SET PERSIST',
+		'INSTALL PLUGIN',
+		'INSTALL COMPONENT',
+		'SONAME',
+		'KILL',
+		'ALTER DATABASE',
+		'ALTER SCHEMA',
+		'CREATE FUNCTION',
 	];
 
 	public function init(): void {
@@ -162,7 +174,7 @@ class Module extends AbstractModule {
 	}
 
 	/* ================================================================
-	 * AJAX — À IMPLÉMENTER (prompts 1-07 / 1-08)
+	 * VALIDATION DES IDENTIFIANTS
 	 * ================================================================ */
 
 	/**

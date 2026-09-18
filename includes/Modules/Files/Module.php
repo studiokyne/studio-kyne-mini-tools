@@ -488,7 +488,7 @@ class Module extends AbstractModule {
 	}
 
 	public function save_settings( array $settings ): bool {
-		return $this->save_module_settings( $this->get_module_settings( self::get_defaults() ) );
+		return true; // Aucun réglage : rien à écrire.
 	}
 
 	public static function get_defaults(): array {

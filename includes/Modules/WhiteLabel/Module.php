@@ -21,10 +21,6 @@ class Module extends AbstractModule {
 	 */
 	private array $settings = [];
 
-	public function __construct( string $id ) {
-		parent::__construct( $id );
-	}
-
 	public function init(): void {
 		$s  = $this->get_settings();
 		$ab = $s['admin_bar'];
@@ -54,7 +50,9 @@ class Module extends AbstractModule {
 			add_action( 'admin_head', [ $this, 'hide_screen_options_css' ] );
 		}
 		if ( ! empty( $ab['remove_howdy'] ) ) {
-			add_filter( 'gettext', [ $this, 'remove_howdy' ], 10, 2 );
+			// 9999 : le cœur n'ajoute « Mon compte » qu'à la priorité 9991
+			// (wp_admin_bar_my_account_item), bien après ses autres nœuds.
+			add_action( 'admin_bar_menu', [ $this, 'remove_howdy' ], 9999 );
 		}
 		if ( ! empty( $ab['hide_frontend'] ) ) {
 			add_filter( 'show_admin_bar', [ $this, 'hide_admin_bar_frontend' ] );
@@ -127,12 +125,31 @@ class Module extends AbstractModule {
 		echo '<style>#screen-options-link-wrap{display:none!important}</style>';
 	}
 
-	public function remove_howdy( string $translation, string $text ): string {
-		// $text est toujours la chaîne anglaise source, quelle que soit la locale installée.
-		if ( 'Howdy, %s' === $text ) {
-			return '%s';
+	/**
+	 * Retire la salutation du nœud « Mon compte ».
+	 *
+	 * Le cœur construit ce titre comme sprintf( __( 'Howdy, %s' ), <span
+	 * class="display-name">…</span> ) suivi de l'avatar : on retranche le
+	 * préfixe traduit tel qu'il est réellement rendu. Un filtre gettext
+	 * faisait la même chose, mais en s'exécutant pour CHAQUE chaîne traduite
+	 * de chaque page d'admin.
+	 */
+	public function remove_howdy( \WP_Admin_Bar $bar ): void {
+		$node = $bar->get_node( 'my-account' );
+		if ( ! $node || empty( $node->title ) ) {
+			return;
 		}
-		return $translation;
+
+		/* translators: %s: user's display name. */
+		$prefix = sprintf( __( 'Howdy, %s' ), '' ); // phpcs:ignore WordPress.WP.I18n.MissingArgDomain -- chaîne du cœur, à retrouver dans sa traduction.
+		if ( '' === $prefix || 0 !== strpos( $node->title, $prefix ) ) {
+			return;
+		}
+
+		$bar->add_node( [
+			'id'    => 'my-account',
+			'title' => substr( $node->title, strlen( $prefix ) ),
+		] );
 	}
 
 	public function hide_admin_bar_frontend( bool $show ): bool {
