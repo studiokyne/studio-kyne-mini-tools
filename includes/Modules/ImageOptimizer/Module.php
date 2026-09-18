@@ -234,7 +234,9 @@ class Module extends AbstractModule {
 			return $metadata;
 		}
 
-		return $this->process_attachment_metadata( $metadata, $attachment_id, false );
+		// Un média qui vient d'être téléversé n'est encore référencé nulle
+		// part : inutile de balayer contenus et métas.
+		return $this->process_attachment_metadata( $metadata, $attachment_id, false, false );
 	}
 
 	/* ================================================================
@@ -249,7 +251,7 @@ class Module extends AbstractModule {
 		$metadata = wp_get_attachment_metadata( $attachment_id );
 
 		if ( $metadata ) {
-			$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, $force );
+			$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, $force, true );
 			wp_update_attachment_metadata( $attachment_id, $metadata );
 		}
 
@@ -259,9 +261,12 @@ class Module extends AbstractModule {
 	/**
 	 * Traite toutes les tailles d'un attachment (optimisation + conversion).
 	 *
-	 * @param bool $force Ignore le flag "déjà optimisé".
+	 * @param bool $force        Ignore le flag "déjà optimisé".
+	 * @param bool $rewrite_urls Réécrit les URLs déjà insérées (contenus, métas,
+	 *                           options) quand un fichier change de nom. Faux
+	 *                           pour un téléversement : rien ne le référence.
 	 */
-	public function process_attachment_metadata( array $metadata, int $attachment_id, bool $force ): array {
+	public function process_attachment_metadata( array $metadata, int $attachment_id, bool $force, bool $rewrite_urls = true ): array {
 		$mime_type = $this->processor->get_mime_type( '', $attachment_id );
 
 		if ( empty( $mime_type ) || ! $this->processor->is_supported_mime( $mime_type ) ) {
@@ -286,12 +291,14 @@ class Module extends AbstractModule {
 		$base_path  = trailingslashit( $upload_dir['basedir'] );
 		$subdir     = dirname( $metadata['file'] );
 		$sizes_path = trailingslashit( $base_path . $subdir );
+		$rel_dir    = ( '.' === $subdir || '' === $subdir ) ? '' : trailingslashit( str_replace( '\\', '/', $subdir ) );
 
 		$total_before = 0;
 		$total_after  = 0;
 		$main_before  = 0;
 		$main_after   = 0;
 		$size_updates = [];
+		$url_pairs    = []; // ancien chemin relatif uploads => nouveau (voir UrlRewriter)
 
 		// --- Miniatures ---
 		if ( ! empty( $metadata['sizes'] ) ) {
@@ -320,6 +327,7 @@ class Module extends AbstractModule {
 						'file' => $converted,
 						'mime' => $this->processor->get_mime_type( $converted ),
 					];
+					$url_pairs[ $rel_dir . $size_data['file'] ] = $rel_dir . basename( $converted );
 				}
 			}
 		}
@@ -346,7 +354,15 @@ class Module extends AbstractModule {
 				$original_converted = true;
 				$original_new_file  = $converted;
 				$this->update_attachment_database_refs( $attachment_id, $original_file, $converted );
+				$url_pairs[ str_replace( '\\', '/', $metadata['file'] ) ] = $rel_dir . basename( $converted );
 			}
+		}
+
+		// Un fichier renommé est un lien cassé partout où son URL a déjà été
+		// insérée : on réécrit avant de toucher aux métadonnées, pour que le
+		// média et ses références changent dans le même traitement.
+		if ( $rewrite_urls && $url_pairs ) {
+			( new UrlRewriter() )->rewrite( $url_pairs );
 		}
 
 		// --- Mise à jour des métadonnées WP ---
@@ -492,6 +508,17 @@ class Module extends AbstractModule {
 				'ID'             => $attachment_id,
 				'post_mime_type' => $mime,
 			] );
+		}
+
+		// Le guid porte l'URL d'origine du fichier ; certains outils le lisent
+		// comme URL. wp_update_post() ne le réécrit pas sur une mise à jour :
+		// on passe par $wpdb, puis on purge le cache de l'objet.
+		global $wpdb;
+		$guid = (string) get_post_field( 'guid', $attachment_id );
+		if ( '' !== $guid && false !== strpos( $guid, basename( $old_file ) ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->update( $wpdb->posts, [ 'guid' => str_replace( basename( $old_file ), basename( $new_file ), $guid ) ], [ 'ID' => $attachment_id ] );
+			clean_post_cache( $attachment_id );
 		}
 	}
 
