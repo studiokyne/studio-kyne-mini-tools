@@ -96,7 +96,7 @@
     // toute confusion lors de l'écriture d'une requête SQL. Le préfixe reste indiqué
     // dans le libellé de groupe « WordPress (wp_) ».
     var label = t.name;
-    var rows  = t.rows.toLocaleString();
+    var rows  = (t.approx ? '≈ ' : '') + t.rows.toLocaleString();
     return '<div class="skmt-db__table-item" data-table="' + escHtml(t.name) + '" data-skmt-tip="' + escHtml(t.name) + '" data-skmt-tip-placement="right">' +
            '<span class="skmt-db__table-item-name">' + escHtml(label) + '</span>' +
            '<span class="skmt-db__table-item-rows">' + rows + '</span>' +
@@ -122,7 +122,7 @@
     if (t) {
       document.getElementById('skmt-db-table-name').textContent = t.name;
       document.getElementById('skmt-db-table-meta').textContent =
-        t.rows.toLocaleString() + ' lignes · ' + formatSize(t.size);
+        (t.approx ? '≈ ' : '') + t.rows.toLocaleString() + ' lignes · ' + formatSize(t.size);
     }
     // Activer l'onglet Données par défaut (implémenté au prompt 1-07)
     switchTab('data');

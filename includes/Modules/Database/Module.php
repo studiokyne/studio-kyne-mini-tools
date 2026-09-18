@@ -14,6 +14,14 @@ class Module extends AbstractModule {
 	/** Nb de lignes maximum renvoyées par une requête SELECT libre sans LIMIT explicite. */
 	const QUERY_ROW_CAP = 1000;
 
+	/**
+	 * Au-delà de cette estimation, on ne compte plus exactement dans la liste
+	 * des tables : un COUNT(*) sur un postmeta ou un journal de plusieurs
+	 * millions de lignes bloquait l'ouverture de l'onglet plusieurs secondes.
+	 * Le compte exact arrive de toute façon quand la table est ouverte.
+	 */
+	const EXACT_COUNT_THRESHOLD = 100000;
+
 	/** Mots-clés interdits dans l'éditeur SQL libre (opérations hors périmètre / destructrices au niveau serveur). */
 	const FORBIDDEN_KEYWORDS = [
 		'DROP DATABASE',
@@ -138,18 +146,28 @@ class Module extends AbstractModule {
 
 		$tables = [];
 		foreach ( (array) $tables_raw as $t ) {
-			$name  = $t['Name'];
-			$is_wp = str_starts_with( $name, $prefix );
+			$name     = $t['Name'];
+			$is_wp    = str_starts_with( $name, $prefix );
+			$estimate = (int) $t['Rows'];
+			$approx   = false;
 
 			// `SHOW TABLE STATUS`.Rows est une estimation pour InnoDB (souvent 0 ou
-			// très approximative). On récupère un compte exact via COUNT(*). Le nom
-			// provient de SHOW TABLE STATUS, donc sûr à échapper en backticks.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-			$count = $wpdb->get_var( 'SELECT COUNT(*) FROM `' . str_replace( '`', '``', $name ) . '`' );
+			// très approximative). On la corrige par un COUNT(*) tant qu'elle reste
+			// raisonnable ; au-delà du seuil on garde l'estimation et on le dit.
+			// Le nom provient de SHOW TABLE STATUS, donc sûr à échapper en backticks.
+			if ( $estimate <= self::EXACT_COUNT_THRESHOLD ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+				$count = $wpdb->get_var( 'SELECT COUNT(*) FROM `' . str_replace( '`', '``', $name ) . '`' );
+				$rows  = null === $count ? $estimate : (int) $count;
+			} else {
+				$rows   = $estimate;
+				$approx = true;
+			}
 
 			$tables[] = [
 				'name'         => $name,
-				'rows'         => null === $count ? (int) $t['Rows'] : (int) $count,
+				'rows'         => $rows,
+				'approx'       => $approx,
 				'size'         => ( (int) $t['Data_length'] + (int) $t['Index_length'] ),
 				'engine'       => $t['Engine'],
 				'is_wp_prefix' => $is_wp,
