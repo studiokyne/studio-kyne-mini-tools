@@ -316,7 +316,7 @@ class ImageProcessor {
 			return $file_path;
 		}
 
-		$output_path = $info['dirname'] . '/' . $info['filename'] . '.' . $target_format;
+		$output_path = ( $info['dirname'] ?? '.' ) . '/' . $info['filename'] . '.' . $target_format;
 		$before      = filesize( $file_path );
 
 		$cap = $this->get_capabilities();

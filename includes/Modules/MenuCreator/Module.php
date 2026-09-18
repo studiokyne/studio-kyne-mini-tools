@@ -430,9 +430,17 @@ class Module extends AbstractModule {
 			$file = 'admin.php';
 		}
 
+		// parse_str() peut produire des tableaux (clé[]=…) : on ne garde que les scalaires.
+		$flat = [];
+		foreach ( $args as $key => $value ) {
+			if ( is_scalar( $value ) ) {
+				$flat[ (string) $key ] = (string) $value;
+			}
+		}
+
 		return [
 			'file' => $file,
-			'args' => array_map( 'strval', $args ),
+			'args' => $flat,
 		];
 	}
 

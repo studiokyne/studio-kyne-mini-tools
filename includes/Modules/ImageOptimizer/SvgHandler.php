@@ -212,7 +212,7 @@ class SvgHandler {
 	 */
 	public function sanitize( string $svg ): ?string {
 		// Retire une éventuelle BOM et les instructions de traitement PHP.
-		$svg = preg_replace( '/<\?php.*?\?>/is', '', $svg );
+		$svg = (string) preg_replace( '/<\?php.*?\?>/is', '', $svg );
 
 		// Bloque les définitions de type de document (attaques XXE / entités externes).
 		if ( preg_match( '/<!DOCTYPE/i', $svg ) && preg_match( '/<!ENTITY/i', $svg ) ) {
@@ -327,7 +327,7 @@ class SvgHandler {
 			$el->removeChild( $el->firstChild );
 		}
 
-		if ( '' !== trim( $propre ) ) {
+		if ( '' !== trim( $propre ) && null !== $el->ownerDocument ) {
 			$el->appendChild( $el->ownerDocument->createTextNode( $propre ) );
 		}
 	}
@@ -351,7 +351,7 @@ class SvgHandler {
 			$decode = preg_replace_callback(
 				'/\\\\([0-9a-fA-F]{1,6})[ \t\n]?/',
 				static function ( array $m ) {
-					$cp = hexdec( $m[1] );
+					$cp = (int) hexdec( $m[1] );
 					return ( $cp > 0 && $cp < 0x110000 ) ? (string) mb_chr( $cp, 'UTF-8' ) : '';
 				},
 				$css
@@ -413,7 +413,7 @@ class SvgHandler {
 
 			// Attributs pouvant embarquer du script.
 			$decoded = html_entity_decode( (string) $value, ENT_QUOTES );
-			$decoded = preg_replace( '/\s+/', '', $decoded );
+			$decoded = (string) preg_replace( '/\s+/', '', $decoded );
 			if ( preg_match( '/(javascript|data:text\/html|vbscript):/i', $decoded ) ) {
 				$el->removeAttributeNode( $attr );
 				continue;

@@ -27,7 +27,8 @@ class Settings {
 	 */
 	public function get_all(): array {
 		if ( null === $this->settings ) {
-			$this->settings = get_option( $this->option_key, [] );
+			$stored         = get_option( $this->option_key, [] );
+			$this->settings = is_array( $stored ) ? $stored : [];
 		}
 		return $this->settings;
 	}

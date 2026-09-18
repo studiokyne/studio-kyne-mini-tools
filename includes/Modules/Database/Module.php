@@ -796,7 +796,7 @@ class Module extends AbstractModule {
 					} elseif ( ! empty( $is_num[ $field ] ) && is_numeric( $v ) ) {
 						$values[] = $v; // numérique → non quoté.
 					} else {
-						$values[] = "'" . esc_sql( $v ) . "'";
+						$values[] = "'" . esc_sql( (string) $v ) . "'";
 					}
 				}
 				echo 'INSERT INTO `' . $table . '` (' . $col_list . ') VALUES (' . implode( ', ', $values ) . ");\n";

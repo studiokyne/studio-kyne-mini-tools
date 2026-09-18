@@ -78,6 +78,9 @@ class FileManager {
 	 */
 	private function normalize( string $rel ): string {
 		$parts = preg_split( '#[/\\\\]#', $rel );
+		if ( false === $parts ) {
+			$parts = [];
+		}
 		$clean = [];
 		foreach ( $parts as $p ) {
 			if ( $p === '' || $p === '.' ) {
@@ -144,9 +147,10 @@ class FileManager {
 				'path'     => $rel_item,
 				'type'     => $is_dir ? 'dir' : 'file',
 				'ext'      => $ext,
-				'size'     => $is_dir ? null : @filesize( $full ),
-				'modified' => @filemtime( $full ),
-				'perms'    => substr( sprintf( '%o', @fileperms( $full ) ), -4 ),
+				// Un fichier devenu illisible entre scandir() et ici fait juste un warning PHP : on lit « au mieux ».
+				'size'     => $is_dir ? null : @filesize( $full ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+				'modified' => @filemtime( $full ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+				'perms'    => substr( sprintf( '%o', @fileperms( $full ) ), -4 ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 				'owner'    => $this->get_owner( $full ),
 				'writable' => is_writable( $full ),
 			];
@@ -367,7 +371,8 @@ class FileManager {
 		if ( '/' === $name[0] || '\\' === $name[0] || preg_match( '#^[a-zA-Z]:#', $name ) ) {
 			return false;
 		}
-		foreach ( preg_split( '#[/\\\\]#', $name ) as $segment ) {
+		$segments = preg_split( '#[/\\\\]#', $name );
+		foreach ( false === $segments ? [] : $segments as $segment ) {
 			if ( '..' === $segment ) {
 				return false;
 			}
@@ -402,8 +407,12 @@ class FileManager {
 		if ( ! function_exists( 'posix_getpwuid' ) || ! function_exists( 'posix_getgrgid' ) ) {
 			return '';
 		}
-		$uid   = @fileowner( $path );
-		$gid   = @filegroup( $path );
+		// fileowner()/filegroup() émettent un warning sur un fichier inaccessible : l'échec est traité juste après.
+		$uid = @fileowner( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		$gid = @filegroup( $path ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+		if ( false === $uid || false === $gid ) {
+			return '';
+		}
 		$uinfo = posix_getpwuid( $uid );
 		$ginfo = posix_getgrgid( $gid );
 		$u     = $uinfo ? $uinfo['name'] : (string) $uid;

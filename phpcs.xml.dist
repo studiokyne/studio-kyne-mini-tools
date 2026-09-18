@@ -37,6 +37,12 @@
 	<rule ref="WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound">
 		<exclude-pattern>*/templates/*</exclude-pattern>
 		<exclude-pattern>*/settings-template.php</exclude-pattern>
+		<exclude-pattern>*/uninstall.php</exclude-pattern>
+	</rule>
+
+	<!-- uninstall.php est procédural par contrat WordPress : ses variables de boucle ne sont pas des globales à protéger. -->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>*/uninstall.php</exclude-pattern>
 	</rule>
 
 	<!-- Domaine de traduction -->
