@@ -391,10 +391,72 @@ class Admin {
 	}
 
 	/**
-	 * Termine la capture et stocke le HTML des notices WP.
+	 * Termine la capture : les notices WP partent dans le tiroir, tout le
+	 * reste est réémis en place.
+	 *
+	 * Certaines extensions impriment sur `admin_notices` autre chose qu'une
+	 * notice (bandeau d'onboarding, modale, script). Avaler tout le tampon
+	 * les faisait disparaître de la page sans jamais atteindre le tiroir,
+	 * qui ne garde que `.notice` / `.updated` / `.error`.
 	 */
 	public function capture_wp_notices_end(): void {
-		$this->captured_wp_notices = ob_get_clean() ?: '';
+		$html  = ob_get_clean() ?: '';
+		$split = $this->split_captured_notices( $html );
+
+		$this->captured_wp_notices = $split['notices'];
+
+		if ( '' !== $split['passthrough'] ) {
+			echo $split['passthrough']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML produit par d'autres extensions, réémis tel quel.
+		}
+	}
+
+	/**
+	 * Sépare le tampon `admin_notices` en deux : les nœuds de premier niveau
+	 * qui sont (ou contiennent) une notice WP, et les autres.
+	 *
+	 * @return array{notices: string, passthrough: string}
+	 */
+	private function split_captured_notices( string $html ): array {
+		$result = [ 'notices' => $html, 'passthrough' => '' ];
+
+		if ( '' === trim( $html ) || ! class_exists( '\DOMDocument' ) ) {
+			return $result;
+		}
+
+		$previous = libxml_use_internal_errors( true );
+		$dom      = new \DOMDocument();
+		$loaded   = $dom->loadHTML(
+			'<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div id="skmt-notices-root">' . $html . '</div></body></html>',
+			LIBXML_HTML_NODEFDTD
+		);
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+
+		$root = $loaded ? $dom->getElementById( 'skmt-notices-root' ) : null;
+		if ( ! $root ) {
+			return $result;
+		}
+
+		$notices     = '';
+		$passthrough = '';
+		$xpath       = new \DOMXPath( $dom );
+		$notice_test = "contains(concat(' ', normalize-space(@class), ' '), ' notice ')"
+			. " or contains(concat(' ', normalize-space(@class), ' '), ' updated ')"
+			. " or contains(concat(' ', normalize-space(@class), ' '), ' error ')";
+
+		foreach ( $root->childNodes as $node ) {
+			$is_notice = false;
+			if ( XML_ELEMENT_NODE === $node->nodeType ) {
+				$is_notice = $xpath->evaluate( "boolean(self::*[{$notice_test}] | descendant::*[{$notice_test}])", $node );
+			}
+			if ( $is_notice ) {
+				$notices .= $dom->saveHTML( $node );
+			} else {
+				$passthrough .= $dom->saveHTML( $node );
+			}
+		}
+
+		return [ 'notices' => $notices, 'passthrough' => $passthrough ];
 	}
 
 	/**
