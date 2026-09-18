@@ -191,13 +191,17 @@
     });
   }
 
+  var BADGE_MAX = 9;
+
   function updateBadge(count) {
     var badge = document.getElementById("skmt-notif-badge");
     if (!badge) return;
     if (count > 0) {
       badge.setAttribute("data-count", count);
+      badge.textContent = count > BADGE_MAX ? BADGE_MAX + "+" : String(count);
       badge.style.display = "";
     } else {
+      badge.textContent = "";
       badge.style.display = "none";
     }
   }
