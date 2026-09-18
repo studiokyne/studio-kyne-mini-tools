@@ -34,6 +34,18 @@ class Module extends AbstractModule {
 	 */
 	private array $settings = [];
 
+	/**
+	 * Paires d'URLs en attente de réécriture pendant un lot du bulk : elles
+	 * sont réunies puis passées en un seul appel à UrlRewriter (une requête
+	 * par table pour tout le lot, au lieu d'une par image).
+	 *
+	 * @var array<string, string>
+	 */
+	private array $pending_url_pairs = [];
+
+	/** Vrai entre begin_deferred_url_rewrites() et flush_url_rewrites(). */
+	private bool $defer_url_rewrites = false;
+
 	/* ================================================================
 	 * INITIALISATION
 	 * ================================================================ */
@@ -49,9 +61,13 @@ class Module extends AbstractModule {
 
 		$this->bulk = new BulkProcessor(
 			$this->get_module_option_key() . self::BULK_STATE_SUFFIX,
-			fn( int $id ) => $this->process_and_update_attachment( $id, true ),
+			function ( int $id ): void {
+				$this->begin_deferred_url_rewrites();
+				$this->process_and_update_attachment( $id, true );
+			},
 			fn(): array   => $this->get_stats(),
-			fn( int $user_id ) => $this->notify_bulk_complete( $user_id )
+			fn( int $user_id ) => $this->notify_bulk_complete( $user_id ),
+			fn() => $this->flush_url_rewrites()
 		);
 
 		$this->media_library = new MediaLibrary( $this, $this->processor );
@@ -234,6 +250,10 @@ class Module extends AbstractModule {
 			return $metadata;
 		}
 
+		// wp_generate_attachment_metadata ne sert pas qu'aux téléversements :
+		// un outil de régénération de miniatures le rejoue sur des médias déjà
+		// insérés en page. On réécrit donc ici aussi ; sur un vrai
+		// téléversement le balayage ne trouve simplement rien.
 		return $this->process_attachment_metadata( $metadata, $attachment_id, false );
 	}
 
@@ -286,12 +306,14 @@ class Module extends AbstractModule {
 		$base_path  = trailingslashit( $upload_dir['basedir'] );
 		$subdir     = dirname( $metadata['file'] );
 		$sizes_path = trailingslashit( $base_path . $subdir );
+		$rel_dir    = ( '.' === $subdir || '' === $subdir ) ? '' : trailingslashit( str_replace( '\\', '/', $subdir ) );
 
 		$total_before = 0;
 		$total_after  = 0;
 		$main_before  = 0;
 		$main_after   = 0;
 		$size_updates = [];
+		$url_pairs    = []; // ancien chemin relatif uploads => nouveau (voir UrlRewriter)
 
 		// --- Miniatures ---
 		if ( ! empty( $metadata['sizes'] ) ) {
@@ -320,6 +342,7 @@ class Module extends AbstractModule {
 						'file' => $converted,
 						'mime' => $this->processor->get_mime_type( $converted ),
 					];
+					$url_pairs[ $rel_dir . $size_data['file'] ] = $rel_dir . basename( $converted );
 				}
 			}
 		}
@@ -346,6 +369,18 @@ class Module extends AbstractModule {
 				$original_converted = true;
 				$original_new_file  = $converted;
 				$this->update_attachment_database_refs( $attachment_id, $original_file, $converted );
+				$url_pairs[ str_replace( '\\', '/', $metadata['file'] ) ] = $rel_dir . basename( $converted );
+			}
+		}
+
+		// Un fichier renommé est un lien cassé partout où son URL a déjà été
+		// insérée : on réécrit dans le même traitement. En lot (bulk), les
+		// paires sont accumulées et réécrites en une fois par flush.
+		if ( $url_pairs ) {
+			if ( $this->defer_url_rewrites ) {
+				$this->pending_url_pairs += $url_pairs;
+			} else {
+				( new UrlRewriter() )->rewrite( $url_pairs );
 			}
 		}
 
@@ -377,6 +412,27 @@ class Module extends AbstractModule {
 		}
 
 		return $metadata;
+	}
+
+	/**
+	 * Accumule les réécritures d'URL au lieu de les exécuter une par une.
+	 * À appeler avant chaque image d'un lot ; flush_url_rewrites() les vide.
+	 */
+	public function begin_deferred_url_rewrites(): void {
+		$this->defer_url_rewrites = true;
+	}
+
+	/**
+	 * Réécrit en une seule passe tout ce qu'un lot a accumulé.
+	 */
+	public function flush_url_rewrites(): void {
+		$this->defer_url_rewrites = false;
+		if ( ! $this->pending_url_pairs ) {
+			return;
+		}
+		$pairs                   = $this->pending_url_pairs;
+		$this->pending_url_pairs = [];
+		( new UrlRewriter() )->rewrite( $pairs );
 	}
 
 	/* ================================================================
@@ -492,6 +548,17 @@ class Module extends AbstractModule {
 				'ID'             => $attachment_id,
 				'post_mime_type' => $mime,
 			] );
+		}
+
+		// Le guid porte l'URL d'origine du fichier ; certains outils le lisent
+		// comme URL. wp_update_post() ne le réécrit pas sur une mise à jour :
+		// on passe par $wpdb, puis on purge le cache de l'objet.
+		global $wpdb;
+		$guid = (string) get_post_field( 'guid', $attachment_id );
+		if ( '' !== $guid && false !== strpos( $guid, basename( $old_file ) ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$wpdb->update( $wpdb->posts, [ 'guid' => str_replace( basename( $old_file ), basename( $new_file ), $guid ) ], [ 'ID' => $attachment_id ] );
+			clean_post_cache( $attachment_id );
 		}
 	}
 

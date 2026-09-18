@@ -36,16 +36,25 @@ class BulkProcessor {
 	 */
 	private ?\Closure $on_complete_fn;
 
+	/**
+	 * Callable optionnel : appelé après chaque lot, que ses images aient
+	 * réussi ou non. Le module y réécrit les URLs accumulées du lot.
+	 * Signature : function(): void
+	 */
+	private ?\Closure $after_batch_fn;
+
 	public function __construct(
 		string $state_key,
 		\Closure $process_fn,
 		\Closure $get_stats_fn,
-		?\Closure $on_complete_fn = null
+		?\Closure $on_complete_fn = null,
+		?\Closure $after_batch_fn = null
 	) {
 		$this->state_key      = $state_key;
 		$this->process_fn     = $process_fn;
 		$this->get_stats_fn   = $get_stats_fn;
 		$this->on_complete_fn = $on_complete_fn;
+		$this->after_batch_fn = $after_batch_fn;
 	}
 
 	/* ================================================================
@@ -182,6 +191,12 @@ class BulkProcessor {
 				// Un attachment en erreur ne bloque pas les suivants.
 			}
 			$processed_now++;
+		}
+
+		// Toujours, même après une erreur : ce qui a été converti avant doit
+		// voir ses URLs réécrites.
+		if ( $this->after_batch_fn ) {
+			( $this->after_batch_fn )();
 		}
 
 		$state['processed']  += $processed_now;
