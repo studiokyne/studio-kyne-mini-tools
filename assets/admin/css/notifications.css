@@ -500,6 +500,52 @@
   display: none !important;
 }
 
+/* ================================================================
+ * ADMIN BAR — repère no-index (site non indexable)
+ * ================================================================ */
+
+#wpadminbar #wp-admin-bar-skmt-noindex > .ab-item {
+  display: flex !important;
+  align-items: center;
+  padding: 0 8px !important;
+}
+
+#wpadminbar .skmt-noindex-wrap {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  height: 100% !important;
+  color: #f0b849 !important;
+}
+
+#wpadminbar #wp-admin-bar-skmt-noindex .skmt-noindex-icon {
+  width: 15px !important;
+  height: 15px !important;
+  display: block !important;
+  color: currentColor;
+  flex-shrink: 0;
+}
+
+#wpadminbar .skmt-noindex-label {
+  font-size: 12px !important;
+  line-height: 1 !important;
+  letter-spacing: 0.02em !important;
+}
+
+#wpadminbar #wp-admin-bar-skmt-noindex:hover > .ab-item .skmt-noindex-wrap,
+#wpadminbar #wp-admin-bar-skmt-noindex > .ab-item:focus .skmt-noindex-wrap {
+  color: #ffd27a !important;
+}
+
+@media screen and (max-width: 782px) {
+  #wpadminbar .skmt-noindex-label {
+    display: none !important;
+  }
+  #wpadminbar #wp-admin-bar-skmt-noindex > .ab-item {
+    padding: 0 10px !important;
+  }
+}
+
 /* Admin bar highlight quand drawer ouvert */
 #wpadminbar #wp-admin-bar-skmt-notif-center.drawer-open > .ab-item {
   background: rgba(255, 255, 255, 0.08);
