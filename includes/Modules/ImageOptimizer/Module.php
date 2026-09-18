@@ -34,6 +34,18 @@ class Module extends AbstractModule {
 	 */
 	private array $settings = [];
 
+	/**
+	 * Paires d'URLs en attente de réécriture pendant un lot du bulk : elles
+	 * sont réunies puis passées en un seul appel à UrlRewriter (une requête
+	 * par table pour tout le lot, au lieu d'une par image).
+	 *
+	 * @var array<string, string>
+	 */
+	private array $pending_url_pairs = [];
+
+	/** Vrai entre begin_deferred_url_rewrites() et flush_url_rewrites(). */
+	private bool $defer_url_rewrites = false;
+
 	/* ================================================================
 	 * INITIALISATION
 	 * ================================================================ */
@@ -49,9 +61,13 @@ class Module extends AbstractModule {
 
 		$this->bulk = new BulkProcessor(
 			$this->get_module_option_key() . self::BULK_STATE_SUFFIX,
-			fn( int $id ) => $this->process_and_update_attachment( $id, true ),
+			function ( int $id ): void {
+				$this->begin_deferred_url_rewrites();
+				$this->process_and_update_attachment( $id, true );
+			},
 			fn(): array   => $this->get_stats(),
-			fn( int $user_id ) => $this->notify_bulk_complete( $user_id )
+			fn( int $user_id ) => $this->notify_bulk_complete( $user_id ),
+			fn() => $this->flush_url_rewrites()
 		);
 
 		$this->media_library = new MediaLibrary( $this, $this->processor );
@@ -234,9 +250,11 @@ class Module extends AbstractModule {
 			return $metadata;
 		}
 
-		// Un média qui vient d'être téléversé n'est encore référencé nulle
-		// part : inutile de balayer contenus et métas.
-		return $this->process_attachment_metadata( $metadata, $attachment_id, false, false );
+		// wp_generate_attachment_metadata ne sert pas qu'aux téléversements :
+		// un outil de régénération de miniatures le rejoue sur des médias déjà
+		// insérés en page. On réécrit donc ici aussi ; sur un vrai
+		// téléversement le balayage ne trouve simplement rien.
+		return $this->process_attachment_metadata( $metadata, $attachment_id, false );
 	}
 
 	/* ================================================================
@@ -251,7 +269,7 @@ class Module extends AbstractModule {
 		$metadata = wp_get_attachment_metadata( $attachment_id );
 
 		if ( $metadata ) {
-			$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, $force, true );
+			$metadata = $this->process_attachment_metadata( $metadata, $attachment_id, $force );
 			wp_update_attachment_metadata( $attachment_id, $metadata );
 		}
 
@@ -261,12 +279,9 @@ class Module extends AbstractModule {
 	/**
 	 * Traite toutes les tailles d'un attachment (optimisation + conversion).
 	 *
-	 * @param bool $force        Ignore le flag "déjà optimisé".
-	 * @param bool $rewrite_urls Réécrit les URLs déjà insérées (contenus, métas,
-	 *                           options) quand un fichier change de nom. Faux
-	 *                           pour un téléversement : rien ne le référence.
+	 * @param bool $force Ignore le flag "déjà optimisé".
 	 */
-	public function process_attachment_metadata( array $metadata, int $attachment_id, bool $force, bool $rewrite_urls = true ): array {
+	public function process_attachment_metadata( array $metadata, int $attachment_id, bool $force ): array {
 		$mime_type = $this->processor->get_mime_type( '', $attachment_id );
 
 		if ( empty( $mime_type ) || ! $this->processor->is_supported_mime( $mime_type ) ) {
@@ -359,10 +374,14 @@ class Module extends AbstractModule {
 		}
 
 		// Un fichier renommé est un lien cassé partout où son URL a déjà été
-		// insérée : on réécrit avant de toucher aux métadonnées, pour que le
-		// média et ses références changent dans le même traitement.
-		if ( $rewrite_urls && $url_pairs ) {
-			( new UrlRewriter() )->rewrite( $url_pairs );
+		// insérée : on réécrit dans le même traitement. En lot (bulk), les
+		// paires sont accumulées et réécrites en une fois par flush.
+		if ( $url_pairs ) {
+			if ( $this->defer_url_rewrites ) {
+				$this->pending_url_pairs += $url_pairs;
+			} else {
+				( new UrlRewriter() )->rewrite( $url_pairs );
+			}
 		}
 
 		// --- Mise à jour des métadonnées WP ---
@@ -393,6 +412,27 @@ class Module extends AbstractModule {
 		}
 
 		return $metadata;
+	}
+
+	/**
+	 * Accumule les réécritures d'URL au lieu de les exécuter une par une.
+	 * À appeler avant chaque image d'un lot ; flush_url_rewrites() les vide.
+	 */
+	public function begin_deferred_url_rewrites(): void {
+		$this->defer_url_rewrites = true;
+	}
+
+	/**
+	 * Réécrit en une seule passe tout ce qu'un lot a accumulé.
+	 */
+	public function flush_url_rewrites(): void {
+		$this->defer_url_rewrites = false;
+		if ( ! $this->pending_url_pairs ) {
+			return;
+		}
+		$pairs                   = $this->pending_url_pairs;
+		$this->pending_url_pairs = [];
+		( new UrlRewriter() )->rewrite( $pairs );
 	}
 
 	/* ================================================================

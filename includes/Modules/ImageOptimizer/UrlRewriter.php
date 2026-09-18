@@ -13,17 +13,21 @@ defined( 'ABSPATH' ) || exit;
  * une optimisation en masse cassait chaque image déjà en page.
  *
  * Principes :
- *  - on cherche le chemin RELATIF au dossier uploads, précédé d'un « / »
- *    (`/2024/01/photo.jpg`) : indifférent au schéma, au domaine et à un CDN,
- *    et le « / » évite qu'`other-photo.jpg` ne contienne `photo.jpg` ;
+ *  - on cherche le chemin RELATIF au dossier uploads, précédé d'un « / » et
+ *    suivi d'une frontière (`/2024/01/photo.jpg`) : indifférent au schéma, au
+ *    domaine et à un CDN ; `other-photo.jpg` et `photo.jpg-old.jpg` ne sont
+ *    pas touchés ;
  *  - la variante à barres échappées (`\/2024\/01\/photo.jpg`) est traitée
- *    aussi : c'est la forme des attributs de blocs Gutenberg et des JSON
- *    (Elementor, options de thème) ;
+ *    aussi : c'est la forme des attributs de blocs Gutenberg et des JSON ;
  *  - les valeurs sérialisées sont désérialisées, parcourues, puis
  *    re-sérialisées — un remplacement textuel y fausserait les longueurs de
- *    chaîne (`s:42:"…"`) et corromprait la valeur ;
- *  - une seule requête LIKE par table, sur la racine commune du média
- *    (`/2024/01/photo`), couvre l'original et toutes ses tailles.
+ *    chaîne (`s:42:"…"`) et corromprait la valeur. Seul stdClass est
+ *    instancié : toute autre classe reste incomplète (pas de __wakeup) et
+ *    se re-sérialise sous son nom d'origine, intacte ;
+ *  - une seule requête par table et par appel, quel que soit le nombre de
+ *    médias : les racines (`/2024/01/photo`) sont réunies dans un même OR.
+ *    Le bulk regroupe ainsi les paires d'un lot entier avant d'appeler
+ *    rewrite() — cinq images, trois requêtes, et non quinze.
  */
 class UrlRewriter {
 
@@ -33,7 +37,7 @@ class UrlRewriter {
 	 * @param array<string, string> $pairs Chemins relatifs au dossier uploads,
 	 *                                     ancien => nouveau (ex. `2024/01/photo.jpg`
 	 *                                     => `2024/01/photo.webp`).
-	 * @return int Nombre de lignes modifiées.
+	 * @return int Nombre de lignes effectivement mises à jour.
 	 */
 	public function rewrite( array $pairs ): int {
 		$pairs = $this->normalize_pairs( $pairs );
@@ -41,17 +45,17 @@ class UrlRewriter {
 			return 0;
 		}
 
-		$stem = $this->common_stem( array_keys( $pairs ) );
-		if ( '' === $stem ) {
+		$stems = $this->stems( array_keys( $pairs ) );
+		if ( ! $stems ) {
 			return 0;
 		}
 
 		global $wpdb;
 
 		$updated = 0;
-		$updated += $this->rewrite_table( $wpdb->posts, 'ID', [ 'post_content', 'post_excerpt' ], $stem, $pairs );
-		$updated += $this->rewrite_table( $wpdb->postmeta, 'meta_id', [ 'meta_value' ], $stem, $pairs );
-		$updated += $this->rewrite_table( $wpdb->options, 'option_id', [ 'option_value' ], $stem, $pairs );
+		$updated += $this->rewrite_table( $wpdb->posts, 'ID', [ 'post_content', 'post_excerpt' ], $stems, $pairs );
+		$updated += $this->rewrite_table( $wpdb->postmeta, 'meta_id', [ 'meta_value' ], $stems, $pairs );
+		$updated += $this->rewrite_table( $wpdb->options, 'option_id', [ 'option_value' ], $stems, $pairs );
 
 		if ( $updated > 0 ) {
 			// Les caches objet de ces lignes sont périmés.
@@ -81,55 +85,47 @@ class UrlRewriter {
 	}
 
 	/**
-	 * Racine commune aux chemins (`2024/01/photo` pour `photo.jpg` et
-	 * `photo-300x200.jpg`) : c'est le motif LIKE, précédé d'un « / ».
+	 * Racines distinctes des chemins : `2024/01/photo` pour `photo.jpg` et
+	 * `photo-300x200.jpg`. Chaque racine devient un motif LIKE.
 	 *
 	 * @param string[] $paths
+	 * @return string[]
 	 */
-	private function common_stem( array $paths ): string {
-		$stem = null;
+	private function stems( array $paths ): array {
+		$stems = [];
 		foreach ( $paths as $path ) {
-			$without_ext = preg_replace( '/\.[a-z0-9]+$/i', '', $path );
-			$stem        = null === $stem ? $without_ext : $this->common_prefix( $stem, $without_ext );
+			$stem = (string) preg_replace( '/(-\d+x\d+)?\.[a-z0-9]+$/i', '', $path );
+			if ( '' !== $stem ) {
+				$stems[ $stem ] = true;
+			}
 		}
-		return (string) $stem;
-	}
-
-	private function common_prefix( string $a, string $b ): string {
-		$len = min( strlen( $a ), strlen( $b ) );
-		$i   = 0;
-		while ( $i < $len && $a[ $i ] === $b[ $i ] ) {
-			$i++;
-		}
-		return substr( $a, 0, $i );
+		return array_keys( $stems );
 	}
 
 	/**
-	 * Parcourt les lignes d'une table contenant la racine et réécrit celles
-	 * qui changent réellement.
+	 * Parcourt les lignes d'une table contenant l'une des racines et réécrit
+	 * celles qui changent réellement.
 	 *
 	 * @param string   $table   Nom de table.
 	 * @param string   $id_col  Clé primaire.
 	 * @param string[] $columns Colonnes texte à traiter.
-	 * @param string   $stem    Racine commune (relative uploads, sans slash de tête).
+	 * @param string[] $stems   Racines (relatives uploads, sans slash de tête).
 	 * @param array    $pairs   ancien => nouveau.
 	 */
-	private function rewrite_table( string $table, string $id_col, array $columns, string $stem, array $pairs ): int {
+	private function rewrite_table( string $table, string $id_col, array $columns, array $stems, array $pairs ): int {
 		global $wpdb;
 
-		$like    = '%' . $wpdb->esc_like( '/' . $stem ) . '%';
-		$escaped = '%' . $wpdb->esc_like( '\/' . str_replace( '/', '\/', $stem ) ) . '%';
-
 		$where = [];
+		$args  = [];
 		foreach ( $columns as $col ) {
-			$where[] = "`{$col}` LIKE %s OR `{$col}` LIKE %s";
+			foreach ( $stems as $stem ) {
+				$where[] = "`{$col}` LIKE %s";
+				$args[]  = '%' . $wpdb->esc_like( '/' . $stem ) . '%';
+				$where[] = "`{$col}` LIKE %s";
+				$args[]  = '%' . $wpdb->esc_like( '\/' . str_replace( '/', '\/', $stem ) ) . '%';
+			}
 		}
 		$cols_sql = '`' . implode( '`, `', $columns ) . '`';
-		$args     = [];
-		foreach ( $columns as $col ) {
-			$args[] = $like;
-			$args[] = $escaped;
-		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( $wpdb->prepare(
@@ -146,11 +142,25 @@ class UrlRewriter {
 					$changes[ $col ] = $new;
 				}
 			}
-			if ( $changes ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery
-				$wpdb->update( $table, $changes, [ $id_col => $row[ $id_col ] ] );
-				$updated++;
+			if ( ! $changes ) {
+				continue;
 			}
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery
+			$result = $wpdb->update( $table, $changes, [ $id_col => $row[ $id_col ] ] );
+			if ( false === $result ) {
+				// Le fichier a déjà changé de nom : une ligne non réécrite est un
+				// lien cassé. On ne peut pas revenir en arrière ici, mais on le
+				// dit, avec de quoi corriger à la main.
+				error_log( sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					'[SKMT Image Optimizer] réécriture d\'URL échouée dans %s (%s=%s) : %s',
+					$table,
+					$id_col,
+					(string) $row[ $id_col ],
+					$wpdb->last_error
+				) );
+				continue;
+			}
+			$updated++;
 		}
 
 		return $updated;
@@ -168,12 +178,11 @@ class UrlRewriter {
 		}
 
 		if ( is_serialized( $value ) ) {
-			// Mêmes règles que le cœur (get_option, get_post_meta désérialisent
-			// déjà ces valeurs avec toutes les classes) : rien de plus n'est
-			// exposé ici. Un objet dont la classe n'est pas chargée arrive en
-			// __PHP_Incomplete_Class : il est laissé tel quel (voir
-			// replace_recursive) et se re-sérialise sous son nom d'origine.
-			$data = @unserialize( $value ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize, WordPress.PHP.NoSilencedErrors.Discouraged
+			// Liste blanche : seul stdClass est instancié. Toute autre classe
+			// arrive en __PHP_Incomplete_Class — aucun __wakeup/__unserialize
+			// n'est exécuté (pas d'injection d'objet depuis une méta ou une
+			// option), et elle se re-sérialise sous son nom d'origine.
+			$data = @unserialize( $value, [ 'allowed_classes' => [ 'stdClass' ] ] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_unserialize, WordPress.PHP.NoSilencedErrors.Discouraged
 			if ( false !== $data || 'b:0;' === $value ) {
 				$replaced = $this->replace_recursive( $data, $pairs );
 				return serialize( $replaced ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.serialize_serialize
@@ -197,16 +206,13 @@ class UrlRewriter {
 			}
 			return $data;
 		}
-		if ( is_object( $data ) ) {
-			if ( $data instanceof \__PHP_Incomplete_Class ) {
-				return $data; // Propriétés non modifiables sans la classe.
-			}
+		if ( $data instanceof \stdClass ) {
 			foreach ( get_object_vars( $data ) as $k => $v ) {
 				$data->$k = $this->replace_recursive( $v, $pairs );
 			}
 			return $data;
 		}
-		return $data;
+		return $data; // Scalaires, null, __PHP_Incomplete_Class : intacts.
 	}
 
 	private function replace_in_string( string $value, array $pairs ): string {
@@ -214,15 +220,12 @@ class UrlRewriter {
 			$old_esc = str_replace( '/', '\/', $old );
 			$new_esc = str_replace( '/', '\/', $new );
 
-			// Frontière après l'extension : `photo.jpg` ne doit pas toucher
-			// `photo.jpg-old.jpg` ni `photo.jpgx`, mais `photo.jpg?ver=3`,
-			// `photo.jpg"` et `photo.jpg 300w` restent couverts.
 			// Callbacks plutôt qu'une chaîne de remplacement : preg_replace y
 			// interprète l'antislash, et `\/` en ressortirait doublé.
 			$value = (string) preg_replace_callback(
 				'#\\\\/' . preg_quote( $old_esc, '#' ) . '(?![A-Za-z0-9._-])#',
 				static function () use ( $new_esc ) {
-					return '\/' . $new_esc;
+					return '\\/' . $new_esc;
 				},
 				$value
 			);
