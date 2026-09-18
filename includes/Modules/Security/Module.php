@@ -44,11 +44,7 @@ class Module extends AbstractModule {
 			$auth['rate_limit_lockout'] ?? 1800,
 			$auth['ip_source'] ?? ClientIp::SOURCE_REMOTE_ADDR
 		);
-		$this->hardening     = new HardeningService(
-			$this->settings['hardening']['disable_xmlrpc'] ?? false,
-			$this->settings['hardening']['prevent_user_enum'] ?? false,
-			$this->settings['hardening']['hide_wp_version'] ?? false
-		);
+		$this->hardening     = new HardeningService();
 		$this->login_handler = new LoginUrlHandler( $this->settings['authentication']['custom_login_url'] ?? '/connexion' );
 
 		// === AUTHENTICATION HOOKS ===

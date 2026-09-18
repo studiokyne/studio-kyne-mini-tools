@@ -40,7 +40,7 @@ Chaque module est une classe qui étend `AbstractModule` (qui implémente `Modul
 - `get_settings(): array` — réglages courants
 - `save_settings(array $settings): bool` — assainir et persister ; le cœur n'applique aucun assainissement
 - `static get_defaults(): array` — tableau imbriqué de défauts, fusionné récursivement par `get_module_settings()`
-- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**) et `user_meta` pour le nettoyage à la désinstallation. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée.
+- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**), `user_meta`, `post_type` et `taxonomy` pour le nettoyage à la désinstallation ; chaque clé est optionnelle. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée.
 
 Surcharges optionnelles : `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `to_form_payload()`, `get_export_extras()` / `import_extras()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 

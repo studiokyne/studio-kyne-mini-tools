@@ -155,7 +155,7 @@ class MediaLibrary {
 
 		// Fallbacks pour les médias optimisés avant l'ajout du détail main.
 		if ( $is_optimized && 0 === $main_optimized_bytes ) {
-			$main_optimized_bytes = file_exists( $file ) ? (int) filesize( $file ) : 0;
+			$main_optimized_bytes = (int) filesize( $file );
 		}
 		if ( $is_optimized && 0 === $main_original_bytes && $main_optimized_bytes > 0 ) {
 			$main_original_bytes = max( $main_optimized_bytes + $main_bytes_saved, $main_optimized_bytes );

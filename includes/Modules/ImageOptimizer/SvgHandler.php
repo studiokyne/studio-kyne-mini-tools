@@ -221,11 +221,12 @@ class SvgHandler {
 			libxml_disable_entity_loader( $entity_previous );
 		}
 
-		if ( ! $loaded || ! $dom->documentElement ) {
+		$root = $dom->documentElement;
+		if ( ! $loaded || ! $root instanceof \DOMElement ) {
 			return null;
 		}
 
-		if ( 'svg' !== strtolower( $dom->documentElement->nodeName ) ) {
+		if ( 'svg' !== strtolower( $root->nodeName ) ) {
 			return null;
 		}
 
@@ -237,10 +238,10 @@ class SvgHandler {
 		}
 
 		// Nettoie les attributs de la racine <svg> elle-même, puis récursivement les enfants.
-		$this->clean_attributes( $dom->documentElement );
-		$this->clean_node( $dom->documentElement );
+		$this->clean_attributes( $root );
+		$this->clean_node( $root );
 
-		$out = $dom->saveXML( $dom->documentElement, LIBXML_NOEMPTYTAG );
+		$out = $dom->saveXML( $root, LIBXML_NOEMPTYTAG );
 		if ( false === $out ) {
 			return null;
 		}
@@ -258,7 +259,7 @@ class SvgHandler {
 			return;
 		}
 		foreach ( iterator_to_array( $node->childNodes ) as $child ) {
-			if ( XML_ELEMENT_NODE !== $child->nodeType ) {
+			if ( ! $child instanceof \DOMElement ) {
 				// Retire commentaires / PI / doctype résiduels.
 				if ( in_array( $child->nodeType, [ XML_COMMENT_NODE, XML_PI_NODE ], true ) ) {
 					$node->removeChild( $child );

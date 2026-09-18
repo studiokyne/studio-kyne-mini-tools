@@ -226,7 +226,11 @@ abstract class AbstractModule implements ModuleInterface {
 	 * ce sont deux tables distinctes, une clé rangée dans la mauvaise n'est
 	 * jamais supprimée.
 	 *
-	 * @return array{options: string[], meta: string[], user_meta: string[]}
+	 * Toutes les clés sont optionnelles : uninstall.php lit chacune avec `?? []`.
+	 * `post_type` et `taxonomy` déclenchent la suppression des contenus et des
+	 * termes correspondants.
+	 *
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [

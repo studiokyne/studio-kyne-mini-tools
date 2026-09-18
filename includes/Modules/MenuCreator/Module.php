@@ -158,7 +158,7 @@ class Module extends AbstractModule {
 					while ( isset( $menu[ $next_position ] ) ) {
 						++$next_position;
 					}
-					$menu[ $next_position ] = [ '', 'read', $slug, '', 'wp-menu-separator' ];
+					$menu[ $next_position ] = [ '', 'read', $slug, '', 'wp-menu-separator' ]; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 					++$next_position;
 				}
 				continue;
@@ -188,11 +188,11 @@ class Module extends AbstractModule {
 					if ( ! is_array( $menu_item ) || ( $menu_item[2] ?? '' ) !== $slug ) {
 						continue;
 					}
-					if ( isset( $item['label'] ) && $item['label'] !== null ) {
-						$menu[ $key ][0] = esc_html( $item['label'] );
+					if ( isset( $item['label'] ) ) {
+						$menu[ $key ][0] = esc_html( $item['label'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 					}
-					if ( isset( $item['icon'] ) && $item['icon'] !== null && strpos( $item['icon'], 'dashicons-' ) === 0 ) {
-						$menu[ $key ][6] = esc_attr( $item['icon'] );
+					if ( isset( $item['icon'] ) && strpos( $item['icon'], 'dashicons-' ) === 0 ) {
+						$menu[ $key ][6] = esc_attr( $item['icon'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 					}
 					break;
 				}
@@ -255,7 +255,7 @@ class Module extends AbstractModule {
 				continue;
 			}
 			$entry = $existing[ $child_slug ];
-			if ( isset( $child['label'] ) && $child['label'] !== null && '' !== $child['label'] ) {
+			if ( isset( $child['label'] ) && '' !== $child['label'] ) {
 				$entry[0] = esc_html( $child['label'] );
 			}
 			$reordered[] = $entry;
@@ -268,7 +268,7 @@ class Module extends AbstractModule {
 			$reordered[] = $entry;
 		}
 
-		$submenu[ $parent_slug ] = $reordered;
+		$submenu[ $parent_slug ] = $reordered; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 	}
 
 	/* ================================================================
@@ -1196,7 +1196,7 @@ class Module extends AbstractModule {
 			$sanitized[] = [
 				'type'         => $type,
 				'slug'         => sanitize_text_field( $item['slug'] ?? '' ),
-				'label'        => isset( $item['label'] ) && $item['label'] !== null ? sanitize_text_field( $item['label'] ) : null,
+				'label'        => isset( $item['label'] ) ? sanitize_text_field( $item['label'] ) : null,
 				'icon'         => $this->sanitize_icon_value( $item['icon'] ?? null ),
 				'visible'      => $visible,
 				// N'a de sens que sur un item masqué : un item visible et bloqué
