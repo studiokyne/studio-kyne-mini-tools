@@ -68,10 +68,19 @@ class Module extends AbstractModule {
 		add_action( 'wp_ajax_skmt_db_run_query', [ $this, 'ajax_run_query' ] );
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return []; }
+	/**
+	 * @param array<string, mixed> $s
+	 */
 	public function save_settings( array $s ): bool {
 		return false; }
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return []; }
 	public static function get_uninstall_keys(): array {
@@ -88,6 +97,9 @@ class Module extends AbstractModule {
 		return [ SKMT_ASSETS_URL . 'admin/js/modules/database.js' ];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [
 			'i18n' => [
@@ -239,7 +251,7 @@ class Module extends AbstractModule {
 
 	/**
 	 * Récupère les colonnes réelles d'une table indexées par nom (whitelist + typage).
-	 * @return array<string,array> Field => ligne SHOW COLUMNS.
+	 * @return array<string, array<string, mixed>> Field => ligne SHOW COLUMNS.
 	 */
 	private function get_columns_map( string $table ): array {
 		global $wpdb;
@@ -252,7 +264,11 @@ class Module extends AbstractModule {
 		return $map;
 	}
 
-	/** Détermine le placeholder $wpdb (%d/%f/%s) adapté au type SQL d'une colonne. */
+	/**
+	 * Détermine le placeholder $wpdb (%d/%f/%s) adapté au type SQL d'une colonne.
+	 *
+	 * @param array<string, mixed> $col Ligne SHOW COLUMNS.
+	 */
 	private function column_format( array $col ): string {
 		$type = strtolower( $col['Type'] ?? '' );
 		if ( preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|bit|year)\b/', $type ) ) {

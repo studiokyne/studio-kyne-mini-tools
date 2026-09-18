@@ -228,6 +228,8 @@ class BulkProcessor {
 
 	/**
 	 * Retourne l'état courant du bulk avec ses valeurs par défaut.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_state(): array {
 		$stored   = get_option( $this->state_key, [] );
@@ -244,6 +246,8 @@ class BulkProcessor {
 
 	/**
 	 * Calcule une estimation des gains potentiels du bulk.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_preview(): array {
 		$state     = $this->get_state();
@@ -290,6 +294,8 @@ class BulkProcessor {
 
 	/**
 	 * Retourne un lot d'IDs non optimisés.
+	 *
+	 * @return int[]
 	 */
 	private function get_unoptimized_ids( int $limit ): array {
 		$query = new \WP_Query(
@@ -307,6 +313,9 @@ class BulkProcessor {
 		return array_map( 'intval', $query->posts );
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	private function base_query_args(): array {
 		return [
 			'post_type'      => 'attachment',
@@ -326,6 +335,9 @@ class BulkProcessor {
 	 * PERSISTENCE ET CRON
 	 * ================================================================ */
 
+	/**
+	 * @param array<string, mixed> $state
+	 */
 	private function set_state( array $state ): void {
 		update_option( $this->state_key, $state, false );
 	}

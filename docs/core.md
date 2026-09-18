@@ -148,7 +148,7 @@ Composer sert **uniquement** au développement : aucune dépendance d'exécution
 ```bash
 composer install          # PHPCS (WPCS + PHPCompatibilityWP), PHPStan (+ stubs WordPress)
 composer lint             # phpcs — composer lint:fix pour phpcbf
-composer analyse          # phpstan, niveau 5
+composer analyse          # phpstan, niveau 6
 composer check            # les deux
 ```
 
@@ -160,6 +160,6 @@ MSYS_NO_PATHCONV=1 docker run --rm -v "$(pwd -W):/app" -w /app composer:2 check
 
 Le workflow `lint.yml` rejoue `php -l`, PHPCS et PHPStan sur chaque PR vers `dev` et `main`.
 
-**Baselines.** `phpcs.baseline.xml` gèle les constats PHPCS antérieurs à l'outillage : le code nouveau est tenu au standard, l'ancien ne bloque pas la CI. PHPStan tourne au niveau 5 **sans baseline** depuis la PR #52 ; le passage au niveau 6 (docblocs de tableaux, environ 160 constats) est suivi dans l'issue #50. Ne jamais régénérer une baseline pour faire passer un constat neuf — corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé. La baseline PHPCS s'appaire sur le contenu des lignes et leur voisinage : toucher une ligne voisine d'un constat gelé le fait ressortir, et il faut alors le corriger ou l'annoter (jamais le regeler). Quand la baseline se vide, la supprimer.
+**Baselines.** `phpcs.baseline.xml` gèle les constats PHPCS antérieurs à l'outillage : le code nouveau est tenu au standard, l'ancien ne bloque pas la CI. PHPStan tourne **sans baseline** depuis la PR #52, au niveau 6 depuis la PR suivante (types de tableaux dans les docblocs : `array<string, mixed>` pour les réglages et charges utiles, `string[]` pour les listes). **Cible : niveau 8**, pas au-delà. Mesure faite le 2026-09-19 : les niveaux 7 et 8 n'ajoutent qu'une trentaine de constats utiles (unions `string|false` passées à `esc_html()`, `foreach` sur `false`, appels sur nullable) ; les niveaux 9 et 10 doublent puis quadruplent le total en sanctionnant `mixed`, or WordPress renvoie `mixed` partout (`get_option()`, `get_post_meta()`, `$_POST`) — ce serait des centaines de casts défensifs sans gain. Suivi dans l'issue #50. Ne jamais régénérer une baseline pour faire passer un constat neuf — corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé. La baseline PHPCS s'appaire sur le contenu des lignes et leur voisinage : toucher une ligne voisine d'un constat gelé le fait ressortir, et il faut alors le corriger ou l'annoter (jamais le regeler). Quand la baseline se vide, la supprimer.
 
 Exclusions assumées dans `phpcs.xml.dist` : docblocs (`Squiz.Commenting`), noms de fichiers PSR-4 (`WordPress.Files.FileName`), fins de ligne (Git les normalise). Les gabarits (`templates/`, `settings-template.php`) sont inclus depuis une méthode d'`Admin` : PHPStan ne les analyse pas et PHPCS n'y exige pas de préfixe sur les variables. `tools/phpstan-bootstrap.php` déclare les constantes absentes des stubs (`WPINC`).

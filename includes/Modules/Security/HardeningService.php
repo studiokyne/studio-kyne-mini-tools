@@ -265,6 +265,9 @@ class HardeningService {
 
 	/**
 	 * Hook wp_headers : retire les headers exposant la version.
+	 *
+	 * @param array<string, string> $headers
+	 * @return array<string, string>
 	 */
 	public function hide_wp_version_headers( array $headers ): array {
 		unset( $headers['X-Powered-By'] );

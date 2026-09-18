@@ -23,11 +23,17 @@ class MenuProfileManager {
 	 * CRUD
 	 * ================================================================ */
 
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
 	public static function get_all(): array {
 		$profiles = get_option( self::OPTION_KEY, [] );
 		return is_array( $profiles ) ? $profiles : [];
 	}
 
+	/**
+	 * @return array<string, mixed>|null
+	 */
 	public static function get( string $id ): ?array {
 		foreach ( self::get_all() as $profile ) {
 			if ( isset( $profile['id'] ) && $profile['id'] === $id ) {
@@ -39,6 +45,8 @@ class MenuProfileManager {
 
 	/**
 	 * Insert ou met à jour un profil (match par id).
+	 *
+	 * @param array<string, mixed> $profile
 	 */
 	public static function save( array $profile ): bool {
 		$profiles = self::get_all();
@@ -82,6 +90,8 @@ class MenuProfileManager {
 	 * Priorité : include_users > include_roles > apply_to_all
 	 * En cas d'égalité : profil le plus récent (updated_at).
 	 * Les exclusions (exclude_users, exclude_roles) priment sur tout.
+	 *
+	 * @return array<string, mixed>|null
 	 */
 	public static function get_active_for_user( int $user_id ): ?array {
 		$cache_key = self::cache_key( $user_id );

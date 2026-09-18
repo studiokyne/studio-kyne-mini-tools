@@ -34,6 +34,9 @@ class MediaLibrary {
 
 	/**
 	 * Ajoute une colonne "Format" dans la liste des médias.
+	 *
+	 * @param array<string, string> $columns
+	 * @return array<string, string>
 	 */
 	public function add_column( array $columns ): array {
 		$result = [];
@@ -130,6 +133,9 @@ class MediaLibrary {
 
 	/**
 	 * Injecte la section Image Optimizer dans le formulaire d'édition d'un média.
+	 *
+	 * @param array<string, mixed> $form_fields
+	 * @return array<string, mixed>
 	 */
 	public function add_optimizer_fields( array $form_fields, \WP_Post $post ): array {
 		$mime = get_post_mime_type( $post->ID );

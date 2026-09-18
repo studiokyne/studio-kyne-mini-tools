@@ -42,6 +42,8 @@ class Admin {
 
 	/**
 	 * Données du toast SKMT à afficher (message + type).
+	 *
+	 * @var array<string, string>|null
 	 */
 	private ?array $skmt_toast = null;
 
@@ -1126,6 +1128,7 @@ class Admin {
 	 * survivent, et l'état d'activation se limite aux modules enregistrés.
 	 *
 	 * @param mixed $raw Valeur importée.
+	 * @return array<string, mixed>
 	 */
 	private function sanitize_imported_globals( $raw ): array {
 		$raw     = is_array( $raw ) ? $raw : [];
@@ -1198,7 +1201,8 @@ class Admin {
 	 * « false » : sans cette normalisation, un réglage désactivé à l'export
 	 * reviendrait activé à l'import.
 	 *
-	 * @param array $data Charge utile à normaliser.
+	 * @param array<string, mixed> $data Charge utile à normaliser.
+	 * @return array<string, mixed>
 	 */
 	private static function drop_false_values( array $data ): array {
 		$clean = [];
@@ -1298,6 +1302,9 @@ class Admin {
 			. '</button>';
 	}
 
+	/**
+	 * @return array<string, string> Nom Lucide => contenu SVG interne.
+	 */
 	private function get_icon_paths(): array {
 		return [
 			'layout-dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',

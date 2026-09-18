@@ -61,6 +61,8 @@ class ClientIp {
 
 	/**
 	 * Normalise une source lue depuis un formulaire ou une option.
+	 *
+	 * @param mixed $source
 	 */
 	public static function sanitize_source( $source ): string {
 		$source = is_string( $source ) ? sanitize_key( $source ) : '';

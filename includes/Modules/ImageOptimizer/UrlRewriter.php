@@ -110,7 +110,7 @@ class UrlRewriter {
 	 * @param string   $id_col  Clé primaire.
 	 * @param string[] $columns Colonnes texte à traiter.
 	 * @param string[] $stems   Racines (relatives uploads, sans slash de tête).
-	 * @param array    $pairs   ancien => nouveau.
+	 * @param array<string, string> $pairs   ancien => nouveau.
 	 */
 	private function rewrite_table( string $table, string $id_col, array $columns, array $stems, array $pairs ): int {
 		global $wpdb;
@@ -176,6 +176,7 @@ class UrlRewriter {
 	 *
 	 * @param mixed $value
 	 * @return mixed
+	 * @param array<string, string> $pairs
 	 */
 	public function replace_in_value( $value, array $pairs ) {
 		if ( ! is_string( $value ) || '' === $value ) {
@@ -200,6 +201,7 @@ class UrlRewriter {
 	/**
 	 * @param mixed $data
 	 * @return mixed
+	 * @param array<string, string> $pairs
 	 */
 	private function replace_recursive( $data, array $pairs ) {
 		if ( is_string( $data ) ) {
@@ -220,6 +222,9 @@ class UrlRewriter {
 		return $data; // Scalaires, null, __PHP_Incomplete_Class : intacts.
 	}
 
+	/**
+	 * @param array<string, string> $pairs
+	 */
 	private function replace_in_string( string $value, array $pairs ): string {
 		foreach ( $pairs as $old => $new ) {
 			$old_esc = str_replace( '/', '\/', $old );

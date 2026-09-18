@@ -79,7 +79,11 @@ class Module extends AbstractModule {
 		'htpasswd',
 	];
 
-	/** Réglages CodeMirror par extension, remplis par enqueue_code_editor(). */
+	/**
+	 * Réglages CodeMirror par extension, remplis par enqueue_code_editor().
+	 *
+	 * @var array<string, array<string, mixed>>
+	 */
 	private array $code_editor_settings = [];
 
 	/** Vrai uniquement sur l'onglet Fichiers du plugin. */
@@ -507,6 +511,9 @@ class Module extends AbstractModule {
 		return [ SKMT_ASSETS_URL . 'admin/js/modules/files.js' ];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [
 			'i18n'       => [
@@ -528,14 +535,23 @@ class Module extends AbstractModule {
 	 * MODULE INTERFACE
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return $this->get_module_settings( self::get_defaults() );
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		return true; // Aucun réglage : rien à écrire.
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [];
 	}

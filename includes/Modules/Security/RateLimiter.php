@@ -18,9 +18,15 @@ class RateLimiter {
 	private int $max_attempts;
 	private int $window;
 	private int $lockout;
+	/**
+	 * @var string[]
+	 */
 	private array $whitelist;
 	private string $ip_source;
 
+	/**
+	 * @param string[] $whitelist
+	 */
 	public function __construct( array $whitelist = [], int $max_attempts = self::DEFAULT_ATTEMPTS, int $window = self::DEFAULT_WINDOW, int $lockout = self::DEFAULT_LOCKOUT, string $ip_source = ClientIp::SOURCE_REMOTE_ADDR ) {
 		$this->whitelist    = $whitelist;
 		$this->max_attempts = max( 1, $max_attempts );
@@ -48,6 +54,9 @@ class RateLimiter {
 		return self::TRANSIENT_PREFIX . md5( $ip );
 	}
 
+	/**
+	 * @return array<string, int>
+	 */
 	private function get_attempt_data( string $ip ): array {
 		$data = get_transient( $this->get_transient_key( $ip ) );
 		if ( ! is_array( $data ) ) {
@@ -90,6 +99,10 @@ class RateLimiter {
 		set_transient( $key, $data, self::TRANSIENT_TTL );
 	}
 
+	/**
+	 * @param null|\WP_User|\WP_Error $user
+	 * @return null|\WP_User|\WP_Error
+	 */
 	public function maybe_block_login( $user ) {
 		if ( $this->is_whitelisted() ) {
 			return $user;

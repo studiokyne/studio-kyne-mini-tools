@@ -28,6 +28,9 @@ class Module extends AbstractModule {
 	private RateLimiter $rate_limiter;
 	private HardeningService $hardening;
 	private LoginUrlHandler $login_handler;
+	/**
+	 * @var array<string, mixed>
+	 */
 	private array $settings = [];
 
 	/**
@@ -198,7 +201,8 @@ class Module extends AbstractModule {
 	 * des clés à plat : sans cette conversion, un import écraserait tout par
 	 * les valeurs par défaut.
 	 *
-	 * @param array $stored Réglages tels qu'ils sont en base.
+	 * @param array<string, mixed> $stored Réglages tels qu'ils sont en base.
+	 * @return array<string, mixed>
 	 */
 	public function to_form_payload( array $stored ): array {
 		$auth      = is_array( $stored['authentication'] ?? null ) ? $stored['authentication'] : [];
@@ -217,7 +221,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les settings du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function get_settings(): array {
 		// Une instance créée hors du cycle d'initialisation (import de
@@ -233,7 +237,7 @@ class Module extends AbstractModule {
 	/**
 	 * Sauvegarde les settings du module.
 	 *
-	 * @param array $settings
+	 * @param array<string, mixed> $settings
 	 * @return bool
 	 */
 	public function save_settings( array $settings ): bool {
@@ -304,7 +308,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les CSS du module.
 	 *
-	 * @return array
+	 * @return string[]
 	 */
 	public function get_admin_css(): array {
 		return [
@@ -315,7 +319,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les JS du module.
 	 *
-	 * @return array
+	 * @return string[]
 	 */
 	public function get_admin_js(): array {
 		return [
@@ -326,7 +330,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les données JS du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function get_admin_js_data(): array {
 		return [
@@ -339,7 +343,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les defaults du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public static function get_defaults(): array {
 		return [
@@ -366,7 +370,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les clés à supprimer à la désinstallation.
 	 *
-	 * @return array
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [

@@ -11,7 +11,7 @@ class Modules {
 	/**
 	 * Liste des modules enregistrés.
 	 *
-	 * @var array<string, array>
+	 * @var array<string, array<string, mixed>>
 	 */
 	private array $registered = [];
 
@@ -142,6 +142,9 @@ class Modules {
 
 	/**
 	 * Normalise une définition de module.
+	 *
+	 * @param array<string, mixed> $args
+	 * @return array<string, mixed>
 	 */
 	private function normalize_definition( array $args ): array {
 		$normalized = wp_parse_args(
@@ -168,6 +171,8 @@ class Modules {
 
 	/**
 	 * Enregistre un module.
+	 *
+	 * @param array<string, mixed> $args
 	 */
 	public function register( string $id, array $args ): void {
 		$this->registered[ $id ] = wp_parse_args(
@@ -185,6 +190,8 @@ class Modules {
 
 	/**
 	 * Retourne tous les modules enregistrés.
+	 *
+	 * @return array<string, array<string, mixed>>
 	 */
 	public function get_all(): array {
 		return $this->registered;
@@ -192,6 +199,8 @@ class Modules {
 
 	/**
 	 * Retourne un module spécifique.
+	 *
+	 * @return array<string, mixed>|null
 	 */
 	public function get( string $id ): ?array {
 		return $this->registered[ $id ] ?? null;
@@ -282,6 +291,8 @@ class Modules {
 
 	/**
 	 * Retourne les instances des modules actifs.
+	 *
+	 * @return array<string, ModuleInterface>
 	 */
 	public function get_active_instances(): array {
 		return $this->active;
