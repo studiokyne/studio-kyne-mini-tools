@@ -1,0 +1,43 @@
+name: Lint
+
+on:
+  pull_request:
+    branches:
+      - dev
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: skmt-lint-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: PHPCS + PHPStan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          coverage: none
+          tools: composer:v2, cs2pr
+
+      - name: Install dev dependencies
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # La compatibilité PHP 7.4 est vérifiée par PHPCompatibilityWP dans PHPCS.
+      - name: PHP syntax check
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 -P4 php -l > /dev/null
+
+      - name: PHPCS
+        run: vendor/bin/phpcs --report=checkstyle | cs2pr
+
+      - name: PHPStan
+        run: vendor/bin/phpstan analyse --memory-limit=2G --no-progress --error-format=github
