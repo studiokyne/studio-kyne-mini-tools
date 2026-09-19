@@ -22,10 +22,11 @@
       el[id] = document.getElementById('skmt-al-' + id);
     });
 
-    // Entrée dans la recherche soumettrait le formulaire de réglages qui
-    // englobe la liste.
-    el.search.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter') { e.preventDefault(); reload(); }
+    // Entrée dans n'importe quel filtre (recherche, dates) soumettrait le
+    // formulaire de réglages qui englobe la liste : rechargement de la page,
+    // filtres perdus et faux « Réglages modifiés » au journal.
+    wrap.querySelector('.skmt-al__filters').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT') { e.preventDefault(); reload(); }
     });
     el.search.addEventListener('input', function () {
       clearTimeout(state.timer);

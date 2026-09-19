@@ -47,9 +47,10 @@ class Store {
 	 * Crée ou met à jour la table si le schéma installé n'est pas le bon.
 	 *
 	 * Appelé à chaque chargement du module : le test ne coûte qu'une lecture
-	 * d'option autochargée. L'activation seule ne suffit pas — un module activé
-	 * par import de configuration, ou une table supprimée depuis l'onglet Base
-	 * de données, n'y passent pas.
+	 * d'option autochargée. L'activation seule ne suffit pas : un module activé
+	 * par import de configuration n'y passe pas. Une table supprimée à la main
+	 * (onglet Base de données) garde l'option à jour : ce cas-là est rattrapé
+	 * par insert(), au premier échec d'écriture.
 	 */
 	public static function maybe_install(): void {
 		if ( self::SCHEMA_VERSION === get_option( self::SCHEMA_OPTION ) ) {
@@ -104,25 +105,37 @@ class Store {
 		global $wpdb;
 
 		$details = $row['details'] ?? [];
+		$data    = [
+			'created_at'   => current_time( 'mysql', true ),
+			'user_id'      => absint( $row['user_id'] ?? 0 ),
+			'user_login'   => self::cut( (string) ( $row['user_login'] ?? '' ), 60 ),
+			'user_role'    => self::cut( (string) ( $row['user_role'] ?? '' ), 64 ),
+			'ip'           => self::cut( (string) ( $row['ip'] ?? '' ), 45 ),
+			'event_group'  => self::cut( (string) ( $row['event_group'] ?? '' ), 20 ),
+			'event'        => self::cut( (string) ( $row['event'] ?? '' ), 40 ),
+			'object_type'  => self::cut( (string) ( $row['object_type'] ?? '' ), 20 ),
+			'object_id'    => absint( $row['object_id'] ?? 0 ),
+			'object_label' => self::cut( (string) ( $row['object_label'] ?? '' ), 255 ),
+			'details'      => empty( $details ) ? null : wp_json_encode( $details ),
+		];
+		$format  = [ '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' ];
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- table propre au module, pas d'API WordPress pour l'écrire.
-		$wpdb->insert(
-			self::table(),
-			[
-				'created_at'   => current_time( 'mysql', true ),
-				'user_id'      => absint( $row['user_id'] ?? 0 ),
-				'user_login'   => self::cut( (string) ( $row['user_login'] ?? '' ), 60 ),
-				'user_role'    => self::cut( (string) ( $row['user_role'] ?? '' ), 64 ),
-				'ip'           => self::cut( (string) ( $row['ip'] ?? '' ), 45 ),
-				'event_group'  => self::cut( (string) ( $row['event_group'] ?? '' ), 20 ),
-				'event'        => self::cut( (string) ( $row['event'] ?? '' ), 40 ),
-				'object_type'  => self::cut( (string) ( $row['object_type'] ?? '' ), 20 ),
-				'object_id'    => absint( $row['object_id'] ?? 0 ),
-				'object_label' => self::cut( (string) ( $row['object_label'] ?? '' ), 255 ),
-				'details'      => empty( $details ) ? null : wp_json_encode( $details ),
-			],
-			[ '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%d', '%s', '%s' ]
-		);
+		if ( false !== $wpdb->insert( self::table(), $data, $format ) ) {
+			return;
+		}
+
+		// Table supprimée depuis l'onglet Base de données : l'option de schéma
+		// dit encore « installée », maybe_install() ne la recrée donc pas, et
+		// chaque écriture échouait en silence — journal muet jusqu'à une
+		// réactivation. Tester l'existence de la table à chaque requête
+		// coûterait une requête SQL par page ; on ne paie qu'en cas d'échec.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- lecture de schéma, pas de cache pertinent.
+		if ( self::table() !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( self::table() ) ) ) ) {
+			self::install();
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery -- voir plus haut.
+			$wpdb->insert( self::table(), $data, $format );
+		}
 	}
 
 	/**
