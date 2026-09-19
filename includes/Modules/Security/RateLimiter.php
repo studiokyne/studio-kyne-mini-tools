@@ -117,6 +117,7 @@ class RateLimiter {
 			return new \WP_Error(
 				'too_many_attempts',
 				sprintf(
+					/* translators: %d: minutes restantes avant déblocage. */
 					__( '<b>Accès bloqué :</b> Trop de tentatives de connexion. Réessayez dans %d minute(s).', 'studio-kyne-mini-tools' ),
 					$remaining_minutes
 				)

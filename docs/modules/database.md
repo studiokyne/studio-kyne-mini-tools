@@ -17,7 +17,7 @@ Tout côté serveur, jamais de confiance au client.
   - Toute écriture exige `$_POST['confirm']` (`database.js` pré-confirme via `window.skmtModal` et **miroite** `normalize_sql()`/`is_read_query()` — sinon l'interface croit la requête inoffensive et le serveur répond `needs_confirm`) ; sans lui, retour `needs_confirm`.
   - Le plafond `QUERY_ROW_CAP` (1000) ne s'applique qu'aux requêtes ouvertes par `SELECT` ou `WITH` : `SHOW`, `DESCRIBE` et `EXPLAIN` rendent un jeu déjà fini et **n'acceptent pas de `LIMIT`** — l'ajouter transformait `SHOW CREATE TABLE x` en erreur de syntaxe. La présence d'un `LIMIT` se lit sur la forme normalisée, sinon un `/* LIMIT 1 */` en commentaire faisait sauter le plafond.
 - `friendly_db_error()` traduit les erreurs MySQL courantes (entrée dupliquée, contrainte FK, NOT NULL, valeur incorrecte) en messages lisibles.
-- **Export** (`ajax_export_sql`) : émission des valeurs selon le type (numériques sans guillemets, hex `0x…` pour le binaire, `NULL`, liste de colonnes explicite, `SET NAMES utf8mb4`).
+- **Export** (`ajax_export_sql`) : émission des valeurs selon le type (numériques sans guillemets, hex `0x…` pour le binaire, `NULL`, liste de colonnes explicite, `SET NAMES utf8mb4`). Les chaînes passent par `$wpdb->remove_placeholder_escape( esc_sql( … ) )` : depuis WP 4.8.3, `esc_sql()` remplace chaque `%` par un jeton de hachage que seul `$wpdb->prepare()` retire. Hors `prepare()`, le jeton restait dans le dump, et une valeur `50% off` ressortait en `50{64 caractères hexa} off` à la réimportation (corrigé à l'issue #50).
 
 ## Interface
 

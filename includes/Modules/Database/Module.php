@@ -133,6 +133,7 @@ class Module extends AbstractModule {
 				'rowsLabel'       => __( 'lignes', 'studio-kyne-mini-tools' ),
 				'perPageLabel'    => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
 				'setNull'         => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
+				/* translators: %d: nombre maximal de lignes affichées. */
 				'queryTruncated'  => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
 			],
 		];
@@ -485,6 +486,7 @@ class Module extends AbstractModule {
 			// Colonne explicitement NULL → valeur null typée (refusée si NOT NULL sans défaut).
 			if ( in_array( $field, $nulls, true ) ) {
 				if ( 'YES' !== ( $col['Null'] ?? 'NO' ) ) {
+					/* translators: %s: nom de la colonne. */
 					wp_send_json_error( [ 'message' => sprintf( __( 'La colonne « %s » n\'accepte pas NULL.', 'studio-kyne-mini-tools' ), $field ) ] );
 				}
 				$data[ $field ] = null;
@@ -672,6 +674,7 @@ class Module extends AbstractModule {
 		// Garde-fou 1 : opérations interdites (gestion des bases/utilisateurs, arrêt serveur…).
 		$forbidden = $this->find_forbidden_keyword( $sql );
 		if ( null !== $forbidden ) {
+			/* translators: %s: mot-clé SQL interdit. */
 			wp_send_json_error( [ 'message' => sprintf( __( 'Opération interdite dans cet éditeur : %s.', 'studio-kyne-mini-tools' ), $forbidden ) ] );
 		}
 
@@ -777,6 +780,10 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$create = $wpdb->get_row( 'SHOW CREATE TABLE `' . $table . '`', ARRAY_N );
 
+		// Sortie SQL brute téléchargée en application/octet-stream, jamais rendue
+		// en HTML : un échappement HTML corromprait le dump. La table sort de
+		// read_table() (liste blanche SHOW TABLES), les valeurs de esc_sql().
+		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo "-- Studio Kyne Mini Tools - Export SQL\n";
 		echo '-- Table: ' . $table . "\n";
 		echo '-- Date: ' . gmdate( 'Y-m-d H:i:s' ) . " UTC\n\n";
@@ -804,13 +811,17 @@ class Module extends AbstractModule {
 					} elseif ( ! empty( $is_num[ $field ] ) && is_numeric( $v ) ) {
 						$values[] = $v; // numérique → non quoté.
 					} else {
-						$values[] = "'" . esc_sql( (string) $v ) . "'";
+						// esc_sql() remplace chaque « % » par un jeton de hachage destiné à
+						// $wpdb->prepare() : hors prepare(), il faut le retirer, sinon le
+						// dump contient ce jeton à la place des « % » d'origine.
+						$values[] = "'" . $wpdb->remove_placeholder_escape( esc_sql( (string) $v ) ) . "'";
 					}
 				}
 				echo 'INSERT INTO `' . $table . '` (' . $col_list . ') VALUES (' . implode( ', ', $values ) . ");\n";
 			}
 			$offset += $batch;
 		} while ( count( $rows ) === $batch );
+		// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		exit;
 	}

@@ -1265,7 +1265,7 @@ class Admin {
 	}
 
 	public function output_menu_separator_css(): void {
-		echo '<style>' . $this->get_menu_separator_css() . '</style>';
+		echo '<style>' . $this->get_menu_separator_css() . '</style>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS littérale, sans aucune donnée variable.
 	}
 
 	/* ================================================================

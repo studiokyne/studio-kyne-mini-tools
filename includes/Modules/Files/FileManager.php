@@ -255,14 +255,14 @@ class FileManager {
 			throw new \InvalidArgumentException( 'Not a file.' );
 		}
 		if ( ! is_writable( $abs ) ) {
-			throw new \RuntimeException( 'Fichier en lecture seule : ' . $rel );
+			throw new \RuntimeException( 'Fichier en lecture seule : ' . $rel ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- message renvoyé en JSON, échappé à l'affichage par le toast.
 		}
 
 		// L'échec doit remonter : sans exception, l'appelant annonce un
 		// enregistrement réussi alors que rien n'a été écrit sur le disque.
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
 		if ( file_put_contents( $abs, $content ) === false ) {
-			throw new \RuntimeException( 'Écriture impossible : ' . $rel );
+			throw new \RuntimeException( 'Écriture impossible : ' . $rel ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- message renvoyé en JSON, échappé à l'affichage par le toast.
 		}
 
 		return true;
@@ -331,14 +331,14 @@ class FileManager {
 			$name = (string) $zip->getNameIndex( $i );
 			if ( ! $this->is_safe_zip_entry( $name ) ) {
 				$zip->close();
-				throw new \RuntimeException( 'Archive refusée : entrée hors racine (' . $name . ').' );
+				throw new \RuntimeException( 'Archive refusée : entrée hors racine (' . $name . ').' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- message renvoyé en JSON, échappé à l'affichage par le toast.
 			}
 			// Un lien symbolique au nom anodin peut pointer hors de la racine ;
 			// une entrée suivante écrirait alors À TRAVERS le lien. On refuse
 			// tout lien plutôt que d'en suivre la cible.
 			if ( $this->zip_entry_is_symlink( $zip, $i ) ) {
 				$zip->close();
-				throw new \RuntimeException( 'Archive refusée : lien symbolique (' . $name . ').' );
+				throw new \RuntimeException( 'Archive refusée : lien symbolique (' . $name . ').' ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- message renvoyé en JSON, échappé à l'affichage par le toast.
 			}
 		}
 
