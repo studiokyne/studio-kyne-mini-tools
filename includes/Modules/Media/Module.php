@@ -155,7 +155,7 @@ class Module extends AbstractModule {
 	 * @return array<string, mixed>
 	 */
 	public function filter_media_query( array $query ): array {
-		$raw = $_REQUEST['query'][ self::QUERY_VAR ] ?? null; // phpcs:ignore WordPress.Security.NonceVerification
+		$raw = isset( $_REQUEST['query'][ self::QUERY_VAR ] ) ? sanitize_text_field( wp_unslash( $_REQUEST['query'][ self::QUERY_VAR ] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification -- requête AJAX de wp.media, nonce porté par WordPress.
 
 		// On retire toujours la valeur brute : laissée en place, WP_Query
 		// tenterait de la résoudre comme un slug de terme.
@@ -199,7 +199,7 @@ class Module extends AbstractModule {
 			return;
 		}
 
-		$raw = $_GET[ self::QUERY_VAR ] ?? null; // phpcs:ignore WordPress.Security.NonceVerification
+		$raw = isset( $_GET[ self::QUERY_VAR ] ) ? sanitize_text_field( wp_unslash( $_GET[ self::QUERY_VAR ] ) ) : null; // phpcs:ignore WordPress.Security.NonceVerification -- simple filtre d'affichage en GET.
 
 		$tax_query = $this->build_tax_query( $raw );
 		if ( null === $tax_query ) {
@@ -257,8 +257,8 @@ class Module extends AbstractModule {
 	 * l'upload (transmis par le JS dans le POST du plupload).
 	 */
 	public function assign_uploaded_attachment( int $attachment_id ): void {
-		$raw       = $_POST[ self::QUERY_VAR ] ?? ''; // phpcs:ignore WordPress.Security.NonceVerification
-		$folder_id = (int) sanitize_text_field( wp_unslash( (string) $raw ) );
+		// phpcs:ignore WordPress.Security.NonceVerification -- upload plupload, nonce vérifié par async-upload.php.
+		$folder_id = isset( $_POST[ self::QUERY_VAR ] ) ? (int) $_POST[ self::QUERY_VAR ] : 0;
 
 		if ( $folder_id <= 0 || ! current_user_can( 'upload_files' ) ) {
 			return;
@@ -636,8 +636,8 @@ class Module extends AbstractModule {
 	public function ajax_create_folder(): void {
 		$this->guard_manage();
 
-		$name      = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
-		$parent_id = (int) ( $_POST['parent_id'] ?? 0 );
+		$name      = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$parent_id = isset( $_POST['parent_id'] ) ? (int) $_POST['parent_id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 
 		if ( ! $name ) {
 			wp_send_json_error( [ 'message' => __( 'Nom requis.', 'studio-kyne-mini-tools' ) ] );
@@ -657,8 +657,8 @@ class Module extends AbstractModule {
 	public function ajax_rename_folder(): void {
 		$this->guard_manage();
 
-		$id   = (int) ( $_POST['id'] ?? 0 );
-		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) );
+		$id   = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$name = sanitize_text_field( wp_unslash( $_POST['name'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 
 		if ( ! $id || ! $name ) {
 			wp_send_json_error( [ 'message' => __( 'Paramètres manquants.', 'studio-kyne-mini-tools' ) ] );
@@ -686,7 +686,7 @@ class Module extends AbstractModule {
 	public function ajax_delete_folder(): void {
 		$this->guard_manage();
 
-		$id = (int) ( $_POST['id'] ?? 0 );
+		$id = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 		if ( ! $id || ! term_exists( $id, self::TAXONOMY ) ) {
 			wp_send_json_error( [ 'message' => __( 'Dossier introuvable.', 'studio-kyne-mini-tools' ) ] );
 		}
@@ -736,9 +736,9 @@ class Module extends AbstractModule {
 	public function ajax_move_items(): void {
 		$this->guard();
 
-		$attachment_ids = array_filter( array_map( 'absint', (array) ( $_POST['ids'] ?? [] ) ) );
-		$folder_id      = (int) ( $_POST['folder_id'] ?? 0 );
-		$mode           = sanitize_key( wp_unslash( $_POST['mode'] ?? 'replace' ) );
+		$attachment_ids = array_filter( array_map( 'absint', (array) ( $_POST['ids'] ?? [] ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$folder_id      = isset( $_POST['folder_id'] ) ? (int) $_POST['folder_id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$mode           = sanitize_key( wp_unslash( $_POST['mode'] ?? 'replace' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 
 		if ( ! in_array( $mode, [ 'replace', 'add', 'remove' ], true ) ) {
 			$mode = 'replace';
@@ -808,8 +808,8 @@ class Module extends AbstractModule {
 	public function ajax_move_folder(): void {
 		$this->guard_manage();
 
-		$id        = (int) ( $_POST['id'] ?? 0 );
-		$parent_id = (int) ( $_POST['parent_id'] ?? 0 );
+		$id        = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$parent_id = isset( $_POST['parent_id'] ) ? (int) $_POST['parent_id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 
 		if ( ! $id || ! term_exists( $id, self::TAXONOMY ) ) {
 			wp_send_json_error( [ 'message' => __( 'Dossier introuvable.', 'studio-kyne-mini-tools' ) ] );
@@ -841,8 +841,8 @@ class Module extends AbstractModule {
 	public function ajax_set_folder_color(): void {
 		$this->guard_manage();
 
-		$id    = (int) ( $_POST['id'] ?? 0 );
-		$color = sanitize_text_field( wp_unslash( $_POST['color'] ?? '' ) );
+		$id    = isset( $_POST['id'] ) ? (int) $_POST['id'] : 0; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
+		$color = sanitize_text_field( wp_unslash( $_POST['color'] ?? '' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard().
 
 		if ( ! $id || ! term_exists( $id, self::TAXONOMY ) ) {
 			wp_send_json_error( [ 'message' => __( 'Dossier introuvable.', 'studio-kyne-mini-tools' ) ] );
