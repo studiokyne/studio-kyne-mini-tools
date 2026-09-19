@@ -15,6 +15,9 @@ $active_count = count(
 		ARRAY_FILTER_USE_KEY
 	)
 );
+
+// Lecture du cache seulement : aucun appel à GitHub depuis le tableau de bord.
+$update_status = \StudioKyne\MiniTools\Core\Plugin::instance()->updater->get_status();
 ?>
 <div class="skmt-page">
 	<div class="skmt-page__header">
@@ -51,7 +54,21 @@ $active_count = count(
 				</div>
 				<div class="skmt-card__content">
 					<span class="skmt-card__value"><?php echo esc_html( SKMT_VERSION ); ?></span>
-					<span class="skmt-card__label"><?php echo esc_html__( 'Version', 'studio-kyne-mini-tools' ); ?></span>
+					<span class="skmt-card__label">
+						<?php
+						echo esc_html(
+							'dev' === $update_status['channel']
+								? __( 'Version · canal dev', 'studio-kyne-mini-tools' )
+								: __( 'Version · canal stable', 'studio-kyne-mini-tools' )
+						);
+						?>
+					</span>
+					<?php if ( $update_status['has_update'] ) : ?>
+						<?php /* translators: %s: numéro de la version disponible. */ ?>
+						<a href="<?php echo esc_url( self_admin_url( 'plugins.php' ) ); ?>" class="skmt-badge skmt-badge--warning"><?php echo esc_html( sprintf( __( 'v%s disponible', 'studio-kyne-mini-tools' ), $update_status['remote'] ) ); ?></a>
+					<?php elseif ( null !== $update_status['remote'] ) : ?>
+						<span class="skmt-badge skmt-badge--success"><?php echo esc_html__( 'À jour', 'studio-kyne-mini-tools' ); ?></span>
+					<?php endif; ?>
 				</div>
 			</div>
 		</div>

@@ -328,6 +328,12 @@ textarea.skmt-input:focus {
   color: var(--skmt-text-secondary);
 }
 
+/* La colonne flex étire ses enfants : un badge garderait toute la largeur. */
+.skmt-card__content .skmt-badge {
+  align-self: flex-start;
+  margin-top: 4px;
+}
+
 .skmt-card__header {
   padding: 20px 20px 0;
 }
