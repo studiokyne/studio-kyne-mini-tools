@@ -629,22 +629,47 @@ class Module extends AbstractModule {
 			return;
 		}
 
-		// Supprimé à la main puis re-téléversé, un fichier de repli peut être
-		// devenu le fichier d'un autre média : on ne touche pas à ses fichiers.
-		global $wpdb;
-		$owned = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- suppression ponctuelle, rien à mettre en cache.
-			$wpdb->prepare(
-				"SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND post_id <> %d AND meta_value IN (" . implode( ',', array_fill( 0, count( $rels ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- une paire %s par chemin.
-				array_merge( [ $attachment_id ], array_map( 'strval', $rels ) )
-			)
-		);
-		if ( $owned ) {
+		$rels = array_values( array_filter( $rels, 'is_string' ) );
+		if ( ! $rels ) {
 			return;
 		}
 
+		// Supprimé à la main puis re-téléversé, un fichier de repli peut être
+		// devenu le fichier d'un autre média, ou son propre repli : on ne
+		// touche pas à ce qui appartient à un autre.
+		global $wpdb;
+		$like  = implode( ' OR ', array_fill( 0, count( $rels ), 'meta_value LIKE %s' ) );
+		$other = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- suppression ponctuelle, rien à mettre en cache.
+			$wpdb->prepare(
+				"SELECT meta_key, meta_value FROM {$wpdb->postmeta} WHERE post_id <> %d AND ( ( meta_key = '_wp_attached_file' AND meta_value IN (" . implode( ',', array_fill( 0, count( $rels ), '%s' ) ) . ") ) OR ( meta_key = %s AND ( {$like} ) ) )", // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- un %s par chemin.
+				array_merge(
+					[ $attachment_id ],
+					$rels,
+					[ self::FALLBACK_META ],
+					array_map(
+						static function ( string $rel ) use ( $wpdb ): string {
+							return '%' . $wpdb->esc_like( '"' . $rel . '"' ) . '%';
+						},
+						$rels
+					)
+				)
+			)
+		);
+
+		$taken = [];
+		foreach ( $other as $row ) {
+			// Le fichier principal d'un autre média : ses tailles portent le
+			// même nom de base, aucun de nos replis n'est sûr.
+			if ( '_wp_attached_file' === $row->meta_key ) {
+				return;
+			}
+			$list  = maybe_unserialize( $row->meta_value );
+			$taken = array_merge( $taken, is_array( $list ) ? $list : [] );
+		}
+
 		$base_path = trailingslashit( wp_upload_dir()['basedir'] );
-		foreach ( $rels as $rel ) {
-			if ( is_string( $rel ) && 0 === validate_file( $rel ) ) {
+		foreach ( array_diff( $rels, $taken ) as $rel ) {
+			if ( 0 === validate_file( $rel ) ) {
 				wp_delete_file( $base_path . $rel );
 			}
 		}
@@ -743,9 +768,11 @@ class Module extends AbstractModule {
 			$format = strtolower( pathinfo( $file, PATHINFO_EXTENSION ) );
 			$this->with_format(
 				in_array( $format, [ 'webp', 'avif' ], true ) ? $format : '',
-				function () use ( &$metadata, $file, $rel_dir ): void {
-					$sizes    = $this->process_sizes( $metadata, $this->processor->get_mime_type( $file ), trailingslashit( wp_upload_dir()['basedir'] ) . $rel_dir, $rel_dir );
-					$metadata = $this->update_metadata_after_conversion( $metadata, '', '', $sizes['updates'] );
+				function () use ( &$metadata, $file, $rel_dir, $attachment_id ): void {
+					$base_path = trailingslashit( wp_upload_dir()['basedir'] );
+					$sizes     = $this->process_sizes( $metadata, $this->processor->get_mime_type( $file ), $base_path . $rel_dir, $rel_dir );
+					$metadata  = $this->update_metadata_after_conversion( $metadata, '', '', $sizes['updates'] );
+					$this->record_fallbacks( $attachment_id, array_keys( $sizes['url_pairs'] ), $base_path );
 				}
 			);
 		}
@@ -795,6 +822,10 @@ class Module extends AbstractModule {
 		foreach ( self::OPTIMIZATION_META as $key ) {
 			delete_post_meta( $attachment_id, $key );
 		}
+
+		// Les fichiers de repli sont redevenus les fichiers du média, ou ont
+		// été écrasés : une liste périmée finirait par viser ceux d'un autre.
+		delete_post_meta( $attachment_id, self::FALLBACK_META );
 
 		if ( ! $keep_backup ) {
 			wp_delete_file( $backup );
