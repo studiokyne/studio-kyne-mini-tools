@@ -242,9 +242,11 @@ abstract class AbstractModule implements ModuleInterface {
 	 *
 	 * Toutes les clés sont optionnelles : uninstall.php lit chacune avec `?? []`.
 	 * `post_type` et `taxonomy` déclenchent la suppression des contenus et des
-	 * termes correspondants.
+	 * termes correspondants. `tables` liste des tables propres au module, SANS
+	 * préfixe (supprimées par DROP TABLE), `cron` des hooks de tâches
+	 * planifiées — aussi désinscrits à la désactivation de l'extension.
 	 *
-	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[]}
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[], tables?: string[], cron?: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [

@@ -17,5 +17,6 @@ Documentation interne du plugin, exclue des ZIP de release. `CLAUDE.md` à la ra
 | Files | [modules/files.md](modules/files.md) | `FileManager`, CodeMirror du cœur, `DISALLOW_FILE_*` |
 | Media | [modules/media.md](modules/media.md) | taxonomie de dossiers, filtrage serveur, capacités, drag & drop |
 | Database | [modules/database.md](modules/database.md) | validation des identifiants, `normalize_sql()`, éditeur SQL, export |
+| ActivityLog | [modules/activity-log.md](modules/activity-log.md) | table dédiée, pièges de journalisation (auto-draft, Gutenberg, Bricks), plafond de force brute, purge, export CSV |
 
 Chaque page de module documente les **pièges et décisions** (ce qui a cassé, pourquoi la solution est celle-là), pas le code lui-même : le code se lit dans `includes/Modules/<Module>/`.

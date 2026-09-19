@@ -40,7 +40,7 @@ Chaque module est une classe qui étend `AbstractModule` (qui implémente `Modul
 - `get_settings(): array` — réglages courants
 - `save_settings(array $settings): bool` — assainir et persister ; le cœur n'applique aucun assainissement
 - `static get_defaults(): array` — tableau imbriqué de défauts, fusionné récursivement par `get_module_settings()`
-- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**), `user_meta`, `post_type` et `taxonomy` pour le nettoyage à la désinstallation ; chaque clé est optionnelle. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée.
+- `static get_uninstall_keys(): array` — déclare `options`, `meta` (métas de **post**), `user_meta`, `post_type`, `taxonomy`, `tables` (tables propres, **sans préfixe**, supprimées par `DROP TABLE`) et `cron` (hooks de tâches planifiées) pour le nettoyage à la désinstallation ; chaque clé est optionnelle. Les deux canaux méta vivent dans des tables différentes : une méta utilisateur déclarée sous `meta` n'est jamais supprimée. Les hooks `cron` sont aussi désinscrits par `Deactivator` à la désactivation de l'extension : sans ça, WordPress relançait chaque jour un hook que plus personne n'écoute.
 
 Surcharges optionnelles : `get_admin_css()`, `get_admin_js()`, `get_admin_js_deps()`, `get_admin_js_data()`, `to_form_payload()`, `get_export_extras()` / `import_extras()`, `get_required_capability()`, `on_activate()`, `on_deactivate()`.
 
@@ -129,7 +129,7 @@ Toute donnée de requête passe par `sanitize_text_field( wp_unslash( $_POST[...
 
 ## Icônes
 
-Les icônes sont des SVG inline rendus via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Les icônes disponibles sont définies dans `Admin::get_icon_paths()` : `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`, `bell`, `x`, `log-in`, `folder`, `chevron-down`, `palette`, `menu`.
+Les icônes sont des SVG inline rendus via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Les icônes disponibles sont définies dans `Admin::get_icon_paths()` : `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`, `bell`, `x`, `log-in`, `folder`, `chevron-down`, `palette`, `menu`, `database`, `eye-off`, `folder-tree`, `history`.
 
 **Ne jamais inventer ni dessiner un SVG à la main.** Toutes les icônes viennent de [Lucide](https://lucide.dev) (lucide-static v1.34.0). Pour une icône absente de `get_icon_paths()` ou du JS d'un module, récupérer le fichier officiel tel quel. Ne pas approximer en éditant le path d'une autre icône, ne pas fabriquer de coordonnées : le résultat paraît cassé et s'écarte du reste de l'interface. Ça vaut aussi pour les SVG inline des modules JS (icônes de dossier dans `assets/admin/js/modules/media.js`).
 

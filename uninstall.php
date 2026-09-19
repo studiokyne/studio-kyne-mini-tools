@@ -41,6 +41,22 @@ foreach ( $module_classes as $id => $class ) {
 		delete_post_meta_by_key( $meta_key );
 	}
 
+	// Tables propres à un module, déclarées sans préfixe. Le nom ne vient que
+	// du code du module, jamais d'une saisie : on le restreint quand même aux
+	// caractères d'un identifiant avant de l'interpoler.
+	foreach ( $keys['tables'] ?? [] as $table ) {
+		if ( ! preg_match( '/^[a-z0-9_]+$/', $table ) ) {
+			continue;
+		}
+		$table = $GLOBALS['wpdb']->prefix . $table;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- nom de table validé ci-dessus.
+		$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS `{$table}`" );
+	}
+
+	foreach ( $keys['cron'] ?? [] as $hook ) {
+		wp_clear_scheduled_hook( $hook );
+	}
+
 	// Métadonnées d'utilisateur : delete_post_meta_by_key() ne les touche pas,
 	// elles vivent dans une autre table.
 	foreach ( $keys['user_meta'] ?? [] as $meta_key ) {
