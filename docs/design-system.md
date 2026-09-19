@@ -88,6 +88,12 @@ La classe `.skmt-modal-close` et le clic hors-boîte sont gérés automatiquemen
 </label>
 ```
 
+### Types d'`input` et `forms.css` de WordPress
+
+`forms.css` de wp-admin cible les champs par type (`input[type="date"]`, `input[type="url"]`…), une spécificité (0,1,1) qui bat `.skmt-input` (0,1,0) : le champ garde alors la hauteur, la bordure et le rayon de WordPress. `components.css` redéclare donc le composant sur `input[type="…"].skmt-input` pour chaque type utilisé (`text`, `number`, `email`, `password`, `date`). **Nouveau type d'`input` → l'ajouter aux deux listes de sélecteurs** (état normal et `:focus`).
+
+Pour `date`, Chromium ajoute des sous-champs internes qui portent la hauteur à ≈ 50px malgré le `min-height` : la hauteur est figée à 42px, et l'indicateur natif est remplacé par l'icône Lucide `calendar` (via `::-webkit-calendar-picker-indicator`, comme le chevron des `skmt-select`). Firefox garde son icône, non stylable.
+
 ### Champs hors enregistrement
 
 Recherche, filtres de liste, champ d'un mail de test : ces contrôles vivent souvent dans le formulaire de réglages, mais ne doivent **pas avoir d'attribut `name`**. Ils ne partent pas à l'enregistrement, et l'avertissement « modifications non sauvegardées » d'`admin.js` les ignore (il ne compte que les champs nommés). Autre conséquence : ne pas leur donner un `type` que le navigateur valide (`email`, `url`, `required`), parce que la validation native s'applique aussi aux champs sans `name` et bloquerait « Enregistrer ».
