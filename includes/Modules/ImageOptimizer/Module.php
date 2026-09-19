@@ -20,8 +20,9 @@ class Module extends AbstractModule {
 	private const STATS_SUFFIX      = '_stats';
 	private const BULK_STATE_SUFFIX = '_bulk_state';
 
-	/** Dossier (sous uploads) des originaux intacts conservés par keep_original. */
-	private const BACKUP_DIR = 'skmt-originals';
+	/** Dossier (sous uploads) des originaux intacts, suffixé d'un jeton : voir get_backup_dir(). */
+	private const BACKUP_DIR          = 'skmt-originals';
+	private const BACKUP_TOKEN_SUFFIX = '_backup_token';
 
 	/** Métas qui décrivent l'optimisation d'un média (effacées à la restauration). */
 	private const OPTIMIZATION_META = [
@@ -269,6 +270,7 @@ class Module extends AbstractModule {
 				'skmt_module_image_optimizer',
 				'skmt_module_image_optimizer' . self::STATS_SUFFIX,
 				'skmt_module_image_optimizer' . self::BULK_STATE_SUFFIX,
+				'skmt_module_image_optimizer' . self::BACKUP_TOKEN_SUFFIX,
 			],
 			// Les fichiers de skmt-originals/ restent sur le disque : ce sont
 			// des photos du client, pas des données du plugin.
@@ -525,9 +527,28 @@ class Module extends AbstractModule {
 			return '';
 		}
 
-		$path = trailingslashit( wp_upload_dir()['basedir'] ) . self::BACKUP_DIR . '/' . $rel;
+		$path = $this->get_backup_dir() . '/' . $rel;
 
 		return file_exists( $path ) ? $path : '';
+	}
+
+	/**
+	 * Dossier des originaux : uploads/skmt-originals-{jeton}.
+	 *
+	 * Les originaux gardent leurs EXIF (GPS compris), et uploads/ est servi
+	 * tel quel : un nom fixe rendrait chaque copie devinable depuis l'URL
+	 * publique de l'image. Le .htaccess ne protège que sous Apache (nginx
+	 * l'ignore) ; c'est le jeton aléatoire, propre au site, qui protège.
+	 */
+	private function get_backup_dir(): string {
+		$key   = $this->get_module_option_key() . self::BACKUP_TOKEN_SUFFIX;
+		$token = (string) get_option( $key, '' );
+		if ( '' === $token ) {
+			$token = strtolower( wp_generate_password( 24, false ) );
+			update_option( $key, $token, false );
+		}
+
+		return trailingslashit( wp_upload_dir()['basedir'] ) . self::BACKUP_DIR . '-' . $token;
 	}
 
 	/**
@@ -540,10 +561,17 @@ class Module extends AbstractModule {
 			return;
 		}
 
-		$dest = trailingslashit( wp_upload_dir()['basedir'] ) . self::BACKUP_DIR . '/' . $rel;
+		$dir  = $this->get_backup_dir();
+		$dest = $dir . '/' . $rel;
 
 		if ( ! wp_mkdir_p( dirname( $dest ) ) || ! copy( $file, $dest ) ) {
 			return;
+		}
+
+		// Pas de listage du dossier, et refus d'accès sous Apache.
+		if ( ! file_exists( $dir . '/index.php' ) ) {
+			file_put_contents( $dir . '/index.php', "<?php\n// Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- fichier local créé une fois.
+			file_put_contents( $dir . '/.htaccess', "Require all denied\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- idem.
 		}
 
 		update_post_meta( $attachment_id, '_skmt_backup_file', $rel );
@@ -576,6 +604,8 @@ class Module extends AbstractModule {
 			}
 		}
 
+		$previous = strtolower( pathinfo( (string) get_attached_file( $attachment_id ), PATHINFO_EXTENSION ) );
+
 		if ( '' !== $this->get_backup_path( $attachment_id ) ) {
 			$error = $this->restore_original( $attachment_id, true );
 			if ( $error ) {
@@ -594,6 +624,15 @@ class Module extends AbstractModule {
 				$this->process_and_update_attachment( $attachment_id, true );
 			}
 		);
+
+		// convert() ne garde le format demandé que s'il allège l'image. Parti
+		// de l'original, un WebP converti en vain vers l'AVIF retomberait en
+		// JPEG : on le ré-encode dans son format précédent.
+		$result = strtolower( pathinfo( (string) get_attached_file( $attachment_id ), PATHINFO_EXTENSION ) );
+		if ( '' !== $format && $result !== $format && $result !== $previous
+			&& in_array( $previous, [ 'webp', 'avif' ], true ) && ! empty( $this->processor->get_capabilities()[ $previous ] ) ) {
+			return $this->reprocess_attachment( $attachment_id, $previous );
+		}
 
 		return null;
 	}
@@ -711,6 +750,27 @@ class Module extends AbstractModule {
 	private function generate_metadata( int $attachment_id, string $file, array $old_metadata ): ?array {
 		require_once ABSPATH . 'wp-admin/includes/image.php';
 
+		// Grande image : WordPress tire les miniatures de l'original d'avant
+		// « -scaled » (photo-150x150.jpg), pas du fichier réduit
+		// (photo-scaled-150x150.jpg). On fait de même, sinon chaque miniature
+		// change de nom et toute URL hors base (cache, CDN, e-mail) casse.
+		$original = empty( $old_metadata['original_image'] ) ? '' : path_join( dirname( $file ), $old_metadata['original_image'] );
+		if ( '' !== $original && file_exists( $original ) ) {
+			$metadata          = $old_metadata;
+			$metadata['file']  = _wp_relative_upload_path( $file );
+			$metadata['sizes'] = [];
+			$dimensions        = wp_getimagesize( $file );
+			if ( $dimensions ) {
+				$metadata['width']  = $dimensions[0];
+				$metadata['height'] = $dimensions[1];
+			}
+
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- filtre du cœur, appliqué comme dans wp_create_image_subsizes().
+			$sizes = apply_filters( 'intermediate_image_sizes_advanced', wp_get_registered_image_subsizes(), $metadata, $attachment_id );
+
+			return _wp_make_subsizes( $sizes, $original, $metadata, $attachment_id );
+		}
+
 		// Sans notre filtre : l'appelant décide de ce qui s'optimise. Sans le
 		// seuil « big image » : le fichier principal est déjà le bon, WordPress
 		// en ferait sinon un « -scaled » de plus.
@@ -724,11 +784,6 @@ class Module extends AbstractModule {
 
 		if ( empty( $metadata['file'] ) ) {
 			return null;
-		}
-
-		// L'original d'avant « -scaled » n'est pas régénéré : on garde son lien.
-		if ( ! empty( $old_metadata['original_image'] ) ) {
-			$metadata['original_image'] = $old_metadata['original_image'];
 		}
 
 		return $metadata;

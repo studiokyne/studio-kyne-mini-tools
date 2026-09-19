@@ -309,6 +309,12 @@ class MediaLibrary {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par get_request_attachment().
 		$format = isset( $_POST['format'] ) ? sanitize_key( wp_unslash( $_POST['format'] ) ) : '';
 
+		// '' voudrait dire « réglages » pour reprocess_attachment() : ici, un
+		// format explicite est obligatoire.
+		if ( ! in_array( $format, [ 'webp', 'avif' ], true ) ) {
+			wp_send_json_error( __( 'Format invalide.', 'studio-kyne-mini-tools' ) );
+		}
+
 		$error = $this->module->reprocess_attachment( $attachment_id, $format );
 		if ( $error ) {
 			wp_send_json_error( $error->get_error_message() );
