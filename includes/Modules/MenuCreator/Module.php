@@ -772,12 +772,12 @@ class Module extends AbstractModule {
 	 */
 	private function resolve_icon_render( string $icon ): ?array {
 		if ( 0 === strpos( $icon, 'svg:' ) ) {
-			$svg_xml = base64_decode( substr( $icon, 4 ), true );
+			$svg_xml = base64_decode( substr( $icon, 4 ), true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- icône SVG assainie, stockée et rendue en data URI.
 			if ( false === $svg_xml ) {
 				return null;
 			}
 			return [
-				'src'  => 'data:image/svg+xml;base64,' . base64_encode( $svg_xml ),
+				'src'  => 'data:image/svg+xml;base64,' . base64_encode( $svg_xml ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 				'mask' => self::svg_is_monochrome( $svg_xml ),
 			];
 		}
@@ -914,11 +914,11 @@ class Module extends AbstractModule {
 		}
 		if ( strpos( $icon, 'svg:' ) === 0 ) {
 			$svg_b64 = substr( $icon, 4 );
-			$svg_xml = base64_decode( $svg_b64, true );
+			$svg_xml = base64_decode( $svg_b64, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- icône SVG assainie, stockée et rendue en data URI.
 			if ( false === $svg_xml ) {
 				return 'dashicons-admin-links';
 			}
-			return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) );
+			return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 		}
 		if ( strpos( $icon, 'http' ) === 0 ) {
 			// Un SVG monochrome servi par URL s'afficherait en noir (currentColor
@@ -926,7 +926,7 @@ class Module extends AbstractModule {
 			// teintant, comme pour la bibliothèque interne.
 			$local = $this->read_local_svg( $icon );
 			if ( null !== $local && false !== stripos( $local, 'currentColor' ) ) {
-				return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $local ) );
+				return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $local ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 			}
 			return esc_url_raw( $icon );
 		}
@@ -1143,7 +1143,7 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => __( 'Ce SVG est invalide ou contient du code non autorisé.', 'studio-kyne-mini-tools' ) ] );
 		}
 
-		wp_send_json_success( [ 'icon' => 'svg:' . base64_encode( $clean ) ] );
+		wp_send_json_success( [ 'icon' => 'svg:' . base64_encode( $clean ) ] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 	}
 
 	public function ajax_search_users(): void {

@@ -534,6 +534,10 @@ class Module extends AbstractModule {
 			$direct[ (int) $term->term_id ] = (int) $term->count;
 		}
 
+		// Lecture directe voulue : WP n'expose pas les paires terme/objet d'une
+		// taxonomie, et un cache servirait des compteurs périmés après chaque
+		// déplacement de média.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$pair_count = (int) $wpdb->get_var(
 			$wpdb->prepare(
 				"SELECT COUNT(*) FROM {$wpdb->term_relationships} tr
@@ -547,6 +551,7 @@ class Module extends AbstractModule {
 			return $this->rollup_counts_additive( $direct, $parent_map );
 		}
 
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- même motif que ci-dessus.
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
 				"SELECT tt.term_id, tr.object_id FROM {$wpdb->term_relationships} tr
@@ -621,10 +626,11 @@ class Module extends AbstractModule {
 				'no_found_rows'          => false,
 				'update_post_meta_cache' => false,
 				'update_post_term_cache' => false,
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- seul moyen de compter les médias sans dossier (voir docblock).
 				'tax_query'              => [
-					[ // phpcs:ignore WordPress.DB.SlowDBQuery
-															'taxonomy' => self::TAXONOMY,
-															'operator' => 'NOT EXISTS',
+					[
+						'taxonomy' => self::TAXONOMY,
+						'operator' => 'NOT EXISTS',
 					],
 				],
 			]
@@ -703,11 +709,12 @@ class Module extends AbstractModule {
 				'post_status'    => 'inherit',
 				'posts_per_page' => -1,
 				'fields'         => 'ids',
+				// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_tax_query -- action ponctuelle de suppression de dossier.
 				'tax_query'      => [
-					[ // phpcs:ignore WordPress.DB.SlowDBQuery
-													'taxonomy' => self::TAXONOMY,
-													'field'    => 'term_id',
-													'terms'    => $to_delete,
+					[
+						'taxonomy' => self::TAXONOMY,
+						'field'    => 'term_id',
+						'terms'    => $to_delete,
 					],
 				],
 			]

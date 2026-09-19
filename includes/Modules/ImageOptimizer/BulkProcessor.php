@@ -326,6 +326,7 @@ class BulkProcessor {
 			'post_mime_type' => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ],
 			'post_status'    => 'inherit',
 			'fields'         => 'ids',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- repérer les images non optimisées n'a pas d'alternative sans index dédié.
 			'meta_query'     => [
 				[
 					'key'     => '_skmt_optimized',

@@ -130,7 +130,7 @@ class UrlRewriter {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results(
 			$wpdb->prepare(
-				"SELECT `{$id_col}`, {$cols_sql} FROM `{$table}` WHERE " . implode( ' OR ', $where ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				"SELECT `{$id_col}`, {$cols_sql} FROM `{$table}` WHERE " . implode( ' OR ', $where ), // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- identifiants codés en dur par rewrite(), placeholders %s portés par $where.
 				$args
 			),
 			ARRAY_A
