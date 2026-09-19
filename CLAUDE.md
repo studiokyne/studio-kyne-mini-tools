@@ -12,7 +12,7 @@ Cycle : `plugins_loaded` → `Plugin::instance()` → `init` → chargement du t
 
 ## Règles absolues
 
-- **Jamais de bump de version manuel.** La CI le fait (`* Version:` et `SKMT_VERSION` dans `studio-kyne-mini-tools.php`, toujours en phase). Push sur `dev` → pré-release automatique ; stable → `workflow_dispatch` sur `main`.
+- **Jamais de bump de version manuel.** La CI le fait (`* Version:` et `SKMT_VERSION` dans `studio-kyne-mini-tools.php`, toujours en phase). Push sur `dev` → pré-release automatique ; stable → `workflow_dispatch` sur `main`, entrée `bump` = `patch` (défaut), `minor` ou `major` (`gh workflow run release-please.yml -f bump=minor`).
 - **Garde `ABSPATH`** sur tout fichier PHP : `defined( 'ABSPATH' ) || exit;` après `namespace`, sinon après le docbloc.
 - **Jamais de SVG dessiné ou approximé.** Toute icône vient de [Lucide](https://lucide.dev) (lucide-static v1.34.0), fichier officiel récupéré tel quel — en PHP (`Admin::get_icon_paths()`) comme dans le JS des modules.
 - **Composants du design system uniquement** (`components.css` + `admin.js`) : modales, tooltips, toasts, boutons, formulaires, onglets. Ne pas recoder d'équivalent. Voir [docs/design-system.md](docs/design-system.md).
