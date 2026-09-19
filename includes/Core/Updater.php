@@ -142,53 +142,18 @@ class Updater {
 	}
 
 	/**
-	 * Compare deux versions en tenant compte des suffixes (dev, beta, etc).
+	 * Indique si la version distante est plus récente que la version installée.
+	 *
+	 * Les pré-versions visent le patch suivant (1.1.0 → 1.1.1-dev.N), donc
+	 * l'ordre SemVer de version_compare() suffit : 1.1.0 < 1.1.1-dev.2 <
+	 * 1.1.1-dev.10 < 1.1.1.
 	 *
 	 * @param string $installed_version Version installée.
 	 * @param string $remote_version    Version distante.
 	 * @return bool True si mise à jour disponible.
 	 */
 	private function compare_versions( string $installed_version, string $remote_version ): bool {
-		// Séparer version base et suffixe
-		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $remote_version, $remote_match );
-		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $installed_version, $installed_match );
-
-		$remote_base      = $remote_match[1] ?? $remote_version;
-		$remote_suffix    = $remote_match[2] ?? '';
-		$installed_base   = $installed_match[1] ?? $installed_version;
-		$installed_suffix = $installed_match[2] ?? '';
-
-		// Comparer les versions de base
-		$base_cmp = version_compare( $installed_base, $remote_base, '=' );
-
-		if ( 'dev' !== $this->channel ) {
-			// Canal stable : mettre à jour seulement si version base supérieure
-			return version_compare( $installed_base, $remote_base, '<' );
-		}
-
-		// Canal dev
-		if ( ! $base_cmp ) {
-			// Versions de base différentes
-			return version_compare( $installed_base, $remote_base, '<' );
-		}
-
-		// Même version de base
-		if ( empty( $remote_suffix ) && ! empty( $installed_suffix ) ) {
-			// Remote est stable, installed est dev → pas de downgrade
-			return false;
-		}
-
-		if ( ! empty( $remote_suffix ) && empty( $installed_suffix ) ) {
-			// Remote est dev, installed est stable → mettre à jour
-			return true;
-		}
-
-		// Comparer les suffixes dev (comparaison numérique via version_compare)
-		if ( ! empty( $remote_suffix ) && ! empty( $installed_suffix ) ) {
-			return version_compare( $installed_version, $remote_version, '<' );
-		}
-
-		return false;
+		return version_compare( $installed_version, $remote_version, '<' );
 	}
 
 	/**
@@ -387,21 +352,23 @@ class Updater {
 				}
 			);
 
-			$prereleases = array_values(
+			// Pré-versions ET stables : le canal dev suit la plus haute des deux,
+			// sinon un site en 1.0.13-dev.19 ne voit jamais la 1.1.0 stable.
+			$releases = array_values(
 				array_filter(
 					$body,
 					function ( $release ) {
-						return is_array( $release ) && ! empty( $release['prerelease'] ) && ! empty( $release['tag_name'] );
+						return is_array( $release ) && empty( $release['draft'] ) && ! empty( $release['tag_name'] );
 					}
 				)
 			);
 
-			if ( [] === $prereleases ) {
+			if ( [] === $releases ) {
 				return false;
 			}
 
-			$payload          = $this->format_release_payload( $prereleases[0] );
-			$payload['notes'] = array_map( [ $this, 'format_release_note' ], array_slice( $prereleases, 0, self::MAX_NOTES ) );
+			$payload          = $this->format_release_payload( $releases[0] );
+			$payload['notes'] = array_map( [ $this, 'format_release_note' ], array_slice( $releases, 0, self::MAX_NOTES ) );
 
 			return $payload;
 		}
