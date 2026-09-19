@@ -88,23 +88,19 @@
 					</div>
 				</div>
 
-				<!-- Tabs Données / Structure / Requête SQL -->
-				<div class="skmt-db__tabs">
-					<button type="button" class="skmt-db__tab is-active" data-tab="data">
-						<?php esc_html_e( 'Données', 'studio-kyne-mini-tools' ); ?>
-					</button>
-					<button type="button" class="skmt-db__tab" data-tab="structure">
-						<?php esc_html_e( 'Structure', 'studio-kyne-mini-tools' ); ?>
-					</button>
-					<button type="button" class="skmt-db__tab" data-tab="query">
-						<?php esc_html_e( 'Requête SQL', 'studio-kyne-mini-tools' ); ?>
-					</button>
+				<!-- Onglets Données / Structure / Requête SQL : composant skmt-tabs.
+					Le chargement de chaque onglet est piloté par database.js
+					(événement skmt:tab). -->
+				<div class="skmt-tabs" role="tablist" data-skmt-tabs="database" aria-label="<?php esc_attr_e( 'Vues de la table', 'studio-kyne-mini-tools' ); ?>">
+					<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="data"><?php esc_html_e( 'Données', 'studio-kyne-mini-tools' ); ?></button>
+					<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="structure"><?php esc_html_e( 'Structure', 'studio-kyne-mini-tools' ); ?></button>
+					<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="query"><?php esc_html_e( 'Requête SQL', 'studio-kyne-mini-tools' ); ?></button>
 				</div>
 
-				<!-- Contenu des tabs (généré en JS) -->
-				<div id="skmt-db-tab-data" class="skmt-db__tab-content"></div>
-				<div id="skmt-db-tab-structure" class="skmt-db__tab-content" style="display:none"></div>
-				<div id="skmt-db-tab-query" class="skmt-db__tab-content" style="display:none"></div>
+				<!-- Contenu des onglets (généré en JS) -->
+				<div id="skmt-db-tab-data" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="data"></div>
+				<div id="skmt-db-tab-structure" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="structure" hidden></div>
+				<div id="skmt-db-tab-query" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="query" hidden></div>
 
 			</div><!-- #skmt-db-table-view -->
 		</div><!-- .skmt-db__main -->

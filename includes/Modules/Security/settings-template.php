@@ -36,7 +36,14 @@ $ip_sources = [
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="security" aria-label="<?php esc_attr_e( 'Sections du module Sécurité', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="auth"><?php esc_html_e( 'Authentification', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="hardening"><?php esc_html_e( 'Hardening', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="security" data-skmt-tab-panel="auth">
 
 	<!-- ============================================================
 		AUTHENTIFICATION
@@ -232,8 +239,9 @@ $ip_sources = [
 
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="security" data-skmt-tab-panel="hardening" hidden>
 
 	<!-- ============================================================
 		HARDENING
@@ -324,6 +332,7 @@ $ip_sources = [
 			</div>
 
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

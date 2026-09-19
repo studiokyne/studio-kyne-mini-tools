@@ -132,24 +132,20 @@
     switchTab('data');
   }
 
+  // Onglets : composant partagé skmt-tabs (admin.js). On ne fait ici que
+  // charger la vue ouverte. Pas de table choisie (restauration de l'onglet
+  // mémorisé au chargement de la page) : rien à charger.
   function initTabs() {
-    document.addEventListener('click', function (e) {
-      var btn = e.target.closest && e.target.closest('.skmt-db__tab');
-      if (!btn) return;
-      switchTab(btn.dataset.tab);
+    document.addEventListener('skmt:tab', function (e) {
+      if (e.detail.group !== 'database' || !db.currentTable) return;
+      if (e.detail.name === 'data')      loadData(dataState.page);
+      if (e.detail.name === 'structure') loadStructure();
+      if (e.detail.name === 'query')     initQueryTab();
     });
   }
 
   function switchTab(tab) {
-    document.querySelectorAll('.skmt-db__tab').forEach(function (btn) {
-      btn.classList.toggle('is-active', btn.dataset.tab === tab);
-    });
-    document.querySelectorAll('.skmt-db__tab-content').forEach(function (el) {
-      el.style.display = el.id === 'skmt-db-tab-' + tab ? '' : 'none';
-    });
-    if (tab === 'data')      loadData(dataState.page);
-    if (tab === 'structure') loadStructure();
-    if (tab === 'query')     initQueryTab();
+    window.skmtTabs.activate('database', tab);
   }
 
   /* ================================================================

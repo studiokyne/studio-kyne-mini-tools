@@ -31,7 +31,14 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="login" aria-label="<?php esc_attr_e( 'Sections du module Connexion', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="appearance"><?php esc_html_e( 'Apparence', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="options"><?php esc_html_e( 'Options', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="login" data-skmt-tab-panel="appearance">
 
 	<!-- ============================================================
 		LAYOUT — PANNEAU IMAGE
@@ -231,8 +238,9 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="login" data-skmt-tab-panel="options" hidden>
 
 	<!-- ============================================================
 		OPTIONS DIVERSES
@@ -341,6 +349,7 @@ $logo_url = $logo_id ? wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
 			</div>
 
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

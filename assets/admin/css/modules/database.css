@@ -121,13 +121,8 @@
 /* ================================================================
  * TABS
  * ================================================================ */
-.skmt-db__tabs { display: flex; border-bottom: 1px solid var(--skmt-border); padding: 0 16px; gap: 0; flex-shrink: 0; }
-.skmt-db__tab {
-  padding: 10px 16px; background: none; border: none; border-bottom: 2px solid transparent;
-  cursor: pointer; font-size: 13px; color: var(--skmt-text-secondary); margin-bottom: -1px;
-}
-.skmt-db__tab:hover { color: var(--skmt-text); }
-.skmt-db__tab.is-active { color: var(--skmt-accent); border-bottom-color: var(--skmt-accent); font-weight: 500; }
+/* Composant partagé skmt-tabs, resserré sur la marge de l'explorateur. */
+.skmt-db .skmt-tabs { padding: 0 16px; gap: 0; }
 
 /* Chaque tab-content remplit l'espace restant et scrolle en interne */
 .skmt-db__tab-content { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }

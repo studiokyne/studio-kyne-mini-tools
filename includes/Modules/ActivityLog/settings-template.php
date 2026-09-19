@@ -26,7 +26,14 @@ $log_users       = Store::users();
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="activity_log" aria-label="<?php esc_attr_e( 'Sections du journal d\'activité', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="log"><?php esc_html_e( 'Journal', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="settings"><?php esc_html_e( 'Réglages', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="activity_log" data-skmt-tab-panel="log">
 
 	<!-- ============================================================
 		JOURNAL
@@ -117,8 +124,9 @@ $log_users       = Store::users();
 			</div>
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="activity_log" data-skmt-tab-panel="settings" hidden>
 
 	<!-- ============================================================
 		CONSERVATION
@@ -200,6 +208,7 @@ $log_users       = Store::users();
 				<?php endforeach; ?>
 			</div>
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->
