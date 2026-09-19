@@ -88,7 +88,14 @@ La classe `.skmt-modal-close` et le clic hors-boîte sont gérés automatiquemen
 </label>
 ```
 
+### Champs hors enregistrement
+
+Recherche, filtres de liste, champ d'un mail de test : ces contrôles vivent souvent dans le formulaire de réglages, mais ne doivent **pas avoir d'attribut `name`**. Ils ne partent pas à l'enregistrement, et l'avertissement « modifications non sauvegardées » d'`admin.js` les ignore (il ne compte que les champs nommés). Autre conséquence : ne pas leur donner un `type` que le navigateur valide (`email`, `url`, `required`), parce que la validation native s'applique aussi aux champs sans `name` et bloquerait « Enregistrer ».
+
 ## Onglets
+
+**Quand s'en servir** : un écran qui mélange des natures différentes (réglages, outil, liste ou journal), ou plus de trois ou quatre sections longues. Un onglet par nature de contenu, pas un par section : quelques sections courtes restent sur une seule page.
+
 
 Sous-onglets d'un écran, côté client (`components.css` + `initTabs()` dans `admin.js`, aucune initialisation à écrire) :
 

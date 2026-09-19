@@ -15,7 +15,7 @@ Cycle : `plugins_loaded` → `Plugin::instance()` → `init` → chargement du t
 - **Jamais de bump de version manuel.** La CI le fait (`* Version:` et `SKMT_VERSION` dans `studio-kyne-mini-tools.php`, toujours en phase). Push sur `dev` → pré-release automatique ; stable → `workflow_dispatch` sur `main`.
 - **Garde `ABSPATH`** sur tout fichier PHP : `defined( 'ABSPATH' ) || exit;` après `namespace`, sinon après le docbloc.
 - **Jamais de SVG dessiné ou approximé.** Toute icône vient de [Lucide](https://lucide.dev) (lucide-static v1.34.0), fichier officiel récupéré tel quel — en PHP (`Admin::get_icon_paths()`) comme dans le JS des modules.
-- **Composants du design system uniquement** (`components.css` + `admin.js`) : modales, tooltips, toasts, boutons, formulaires. Ne pas recoder d'équivalent. Voir [docs/design-system.md](docs/design-system.md).
+- **Composants du design system uniquement** (`components.css` + `admin.js`) : modales, tooltips, toasts, boutons, formulaires, onglets. Ne pas recoder d'équivalent. Voir [docs/design-system.md](docs/design-system.md).
 - **Ne jamais faire confiance au client** : tout `$_POST`/`$_GET`/`$_FILES` passe par l'assainisseur adapté après `wp_unslash()` ; chemins, identifiants SQL, IP et JSON importé sont validés côté serveur (voir les pages de module).
 - **Pas de baseline PHPCS/PHPStan** : ne jamais en recréer une pour faire passer un constat. Corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé.
 - **Documenter les pièges dans `docs/`**, pas ici : quand une correction naît d'un comportement contre-intuitif de WordPress ou d'un bug qui a coûté, l'écrire dans la page du module (ce qui cassait, pourquoi cette solution).

@@ -262,7 +262,9 @@ $smtp_provider   = (string) $module_settings['provider'];
 
 	<!-- ============================================================
 		MAIL DE TEST
-		Champ sans attribut name : il ne part pas avec les réglages.
+		Champ sans attribut name : il ne part pas avec les réglages. En
+		type="text" et non "email" : le navigateur valide un champ email même
+		sans name, et une adresse incomplète ici bloquait « Enregistrer ».
 		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
@@ -271,7 +273,7 @@ $smtp_provider   = (string) $module_settings['provider'];
 		</div>
 		<div class="skmt-section__content">
 			<div class="skmt-sm__test">
-				<input type="email" id="skmt-sm-test-to" class="skmt-input skmt-input--sm" value="<?php echo esc_attr( $smtp_admin_mail ); ?>"
+				<input type="text" inputmode="email" autocomplete="email" spellcheck="false" id="skmt-sm-test-to" class="skmt-input skmt-input--sm" value="<?php echo esc_attr( $smtp_admin_mail ); ?>"
 					aria-label="<?php esc_attr_e( 'Destinataire du mail de test', 'studio-kyne-mini-tools' ); ?>">
 				<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary" id="skmt-sm-test-send"><?php esc_html_e( 'Envoyer un mail de test', 'studio-kyne-mini-tools' ); ?></button>
 			</div>

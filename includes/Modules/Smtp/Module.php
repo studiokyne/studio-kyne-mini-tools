@@ -351,11 +351,41 @@ class Module extends AbstractModule {
 			$this->logger->set_resent_of( (int) $row['id'] );
 		}
 
+		// Rejouer les arguments de wp_mail() ne suffit pas : beaucoup
+		// d'extensions posent expéditeur et type de contenu par des filtres
+		// actifs le temps de leur envoi (WooCommerce : wp_mail_from,
+		// wp_mail_content_type). Au renvoi, ces filtres sont absents — la
+		// commande repartait de l'expéditeur par défaut, le HTML en texte
+		// brut. On réapplique donc ce qui est réellement parti, journalisé.
+		// Priorité 9000 : sous celle de l'expéditeur forcé (9999), qui garde
+		// le dernier mot.
+		$sent_from = self::parse_address( (string) $row['from_address'] );
+		$sent_type = (string) $row['content_type'];
+		$filters   = [
+			'wp_mail_from'         => static function ( $email ) use ( $sent_from ) {
+				return '' !== $sent_from['email'] ? $sent_from['email'] : $email;
+			},
+			'wp_mail_from_name'    => static function ( $name ) use ( $sent_from ) {
+				return '' !== $sent_from['email'] ? $sent_from['name'] : $name;
+			},
+			'wp_mail_content_type' => static function ( $type ) use ( $sent_type ) {
+				return '' !== $sent_type ? $sent_type : $type;
+			},
+		];
+
+		foreach ( $filters as $hook => $callback ) {
+			add_filter( $hook, $callback, 9000 );
+		}
+
 		$error = $this->send_capturing_error(
 			static function () use ( $row, $attachments ): bool {
 				return wp_mail( (string) $row['to_address'], (string) $row['subject'], (string) $row['message'], self::json_list( $row['headers'] ?? '' ), $attachments );
 			}
 		);
+
+		foreach ( $filters as $hook => $callback ) {
+			remove_filter( $hook, $callback, 9000 );
+		}
 
 		if ( null !== $error ) {
 			wp_send_json_error( [ 'message' => $error ] );
@@ -557,6 +587,25 @@ class Module extends AbstractModule {
 			'subject'   => (string) $row['subject'],
 			'error'     => (string) $row['error'],
 			'resent_of' => (int) $row['resent_of'],
+		];
+	}
+
+	/**
+	 * « Nom <adresse> » ou « adresse » => nom et adresse.
+	 *
+	 * @return array{name: string, email: string}
+	 */
+	private static function parse_address( string $value ): array {
+		if ( preg_match( '/^(.*)<([^<>]+)>\s*$/', $value, $match ) ) {
+			return [
+				'name'  => trim( $match[1], " \t\"" ),
+				'email' => is_email( trim( $match[2] ) ) ? trim( $match[2] ) : '',
+			];
+		}
+
+		return [
+			'name'  => '',
+			'email' => is_email( trim( $value ) ) ? trim( $value ) : '',
 		];
 	}
 

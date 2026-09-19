@@ -166,17 +166,16 @@
       ".skmt-form, #skmt-save-settings-form, #skmt-module-form",
     );
 
+    // Seul un champ nommé part à l'enregistrement. Recherche, filtres d'une
+    // liste ou champ de test (journaux, SMTP) n'ont pas de name : les
+    // manipuler ne laisse rien de non sauvegardé.
+    function markDirty(e) {
+      if (e.target && e.target.name) isDirty = true;
+    }
+
     forms.forEach(function (form) {
-      form.addEventListener(
-        "input",
-        function () { isDirty = true; },
-        { passive: true },
-      );
-      form.addEventListener(
-        "change",
-        function () { isDirty = true; },
-        { passive: true },
-      );
+      form.addEventListener("input", markDirty, { passive: true });
+      form.addEventListener("change", markDirty, { passive: true });
       // Soumettre le form reset l'état dirty
       form.addEventListener("submit", function () { isDirty = false; });
     });
