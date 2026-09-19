@@ -24,6 +24,13 @@ class Module extends AbstractModule {
 	private const BACKUP_DIR          = 'skmt-originals';
 	private const BACKUP_TOKEN_SUFFIX = '_backup_token';
 
+	/**
+	 * Méta : fichiers source laissés à côté des convertis (keep_original),
+	 * chemins relatifs au dossier uploads. Absents des métadonnées WordPress,
+	 * ils ne partiraient pas avec le média sans cette liste.
+	 */
+	private const FALLBACK_META = '_skmt_fallback_files';
+
 	/** Métas qui décrivent l'optimisation d'un média (effacées à la restauration). */
 	private const OPTIMIZATION_META = [
 		'_skmt_optimized',
@@ -103,8 +110,9 @@ class Module extends AbstractModule {
 		// Alt text automatique
 		add_action( 'add_attachment', [ $this, 'generate_alt_text' ] );
 
-		// L'original conservé suit le média dans la corbeille définitive.
-		add_action( 'delete_attachment', [ $this, 'delete_backup' ] );
+		// L'original conservé et les fichiers de repli suivent le média dans
+		// la corbeille définitive.
+		add_action( 'delete_attachment', [ $this, 'delete_kept_files' ] );
 
 		// Bulk AJAX
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk_scan', [ $this, 'ajax_bulk_scan' ] );
@@ -274,7 +282,7 @@ class Module extends AbstractModule {
 			],
 			// Les fichiers de skmt-originals/ restent sur le disque : ce sont
 			// des photos du client, pas des données du plugin.
-			'meta'    => array_merge( self::OPTIMIZATION_META, [ '_skmt_backup_file' ] ),
+			'meta'    => array_merge( self::OPTIMIZATION_META, [ '_skmt_backup_file', self::FALLBACK_META ] ),
 		];
 	}
 
@@ -401,6 +409,10 @@ class Module extends AbstractModule {
 				$url_pairs[ str_replace( '\\', '/', $metadata['file'] ) ] = $rel_dir . basename( $converted );
 			}
 		}
+
+		// Avec keep_original, convert() laisse la source à côté du converti.
+		// Les clés de $url_pairs sont justement les anciens chemins.
+		$this->record_fallbacks( $attachment_id, array_keys( $url_pairs ), $base_path );
 
 		// Un fichier renommé est un lien cassé partout où son URL a déjà été
 		// insérée : on réécrit dans le même traitement. En lot (bulk), les
@@ -578,12 +590,63 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Hook delete_attachment : supprime l'original conservé du média.
+	 * Mémorise les fichiers source restés sur le disque après conversion.
+	 *
+	 * L'extension d'origine n'est plus connue une fois les métadonnées
+	 * réécrites : c'est maintenant ou jamais.
+	 *
+	 * @param string[] $rels Chemins relatifs au dossier uploads.
 	 */
-	public function delete_backup( int $attachment_id ): void {
+	private function record_fallbacks( int $attachment_id, array $rels, string $base_path ): void {
+		$rels = array_filter(
+			$rels,
+			static function ( string $rel ) use ( $base_path ): bool {
+				return 0 === validate_file( $rel ) && file_exists( $base_path . $rel );
+			}
+		);
+		if ( ! $rels ) {
+			return;
+		}
+
+		$known = get_post_meta( $attachment_id, self::FALLBACK_META, true );
+		$known = is_array( $known ) ? $known : [];
+
+		update_post_meta( $attachment_id, self::FALLBACK_META, array_values( array_unique( array_merge( $known, $rels ) ) ) );
+	}
+
+	/**
+	 * Hook delete_attachment : supprime l'original conservé et les fichiers
+	 * de repli du média.
+	 */
+	public function delete_kept_files( int $attachment_id ): void {
 		$backup = $this->get_backup_path( $attachment_id );
 		if ( '' !== $backup ) {
 			wp_delete_file( $backup );
+		}
+
+		$rels = get_post_meta( $attachment_id, self::FALLBACK_META, true );
+		if ( ! is_array( $rels ) || ! $rels ) {
+			return;
+		}
+
+		// Supprimé à la main puis re-téléversé, un fichier de repli peut être
+		// devenu le fichier d'un autre média : on ne touche pas à ses fichiers.
+		global $wpdb;
+		$owned = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching -- suppression ponctuelle, rien à mettre en cache.
+			$wpdb->prepare(
+				"SELECT meta_value FROM {$wpdb->postmeta} WHERE meta_key = '_wp_attached_file' AND post_id <> %d AND meta_value IN (" . implode( ',', array_fill( 0, count( $rels ), '%s' ) ) . ')', // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- une paire %s par chemin.
+				array_merge( [ $attachment_id ], array_map( 'strval', $rels ) )
+			)
+		);
+		if ( $owned ) {
+			return;
+		}
+
+		$base_path = trailingslashit( wp_upload_dir()['basedir'] );
+		foreach ( $rels as $rel ) {
+			if ( is_string( $rel ) && 0 === validate_file( $rel ) ) {
+				wp_delete_file( $base_path . $rel );
+			}
 		}
 	}
 
