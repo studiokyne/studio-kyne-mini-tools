@@ -57,7 +57,7 @@ $smtp_provider   = (string) $module_settings['provider'];
 		</div>
 	<?php endif; ?>
 
-	<?php if ( ! Crypto::available() && ! ( $smtp_pass_const && $smtp_key_const ) ) : ?>
+	<?php if ( ! Crypto::available() && ! ( 'smtp' === $smtp_transport ? $smtp_pass_const : $smtp_key_const ) ) : ?>
 		<div class="skmt-notice skmt-notice--error">
 			<?php esc_html_e( 'L\'extension PHP OpenSSL est absente : le mot de passe et la clé API ne peuvent pas être chiffrés et ne seront pas enregistrés. Définissez-les dans wp-config.php avec les constantes SKMT_SMTP_PASSWORD et SKMT_BREVO_API_KEY.', 'studio-kyne-mini-tools' ); ?>
 		</div>

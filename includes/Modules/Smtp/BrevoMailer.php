@@ -64,6 +64,10 @@ class BrevoMailer extends PHPMailer {
 
 		$this->skmt_last_response = null;
 
+		// Lu avant preSend(), qui passe le type sur multipart/alternative dès
+		// qu'un AltBody existe : le HTML partirait sinon comme texte brut.
+		$is_html = PHPMailer::CONTENT_TYPE_TEXT_HTML === $this->ContentType;
+
 		try {
 			// Validation des adresses et lecture des pièces jointes : les
 			// erreurs sont celles, traduites, d'un envoi ordinaire.
@@ -71,7 +75,7 @@ class BrevoMailer extends PHPMailer {
 				return false;
 			}
 
-			return $this->send_via_api();
+			return $this->send_via_api( $is_html );
 		} catch ( PHPMailerException $exc ) {
 			$this->setError( $exc->getMessage() );
 			if ( $this->exceptions ) {
@@ -85,12 +89,12 @@ class BrevoMailer extends PHPMailer {
 	/**
 	 * @throws PHPMailerException
 	 */
-	private function send_via_api(): bool {
+	private function send_via_api( bool $is_html ): bool {
 		if ( '' === $this->skmt_api_key ) {
 			throw new PHPMailerException( __( 'Clé API Brevo absente ou illisible : saisissez-la à nouveau dans les réglages SMTP.', 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- texte brut (WP_Error, journal), pas du HTML.
 		}
 
-		$body = wp_json_encode( $this->payload() );
+		$body = wp_json_encode( $this->payload( $is_html ) );
 
 		if ( false === $body ) {
 			throw new PHPMailerException( __( 'Message impossible à encoder pour l\'API Brevo (encodage des caractères invalide).', 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- idem.
@@ -145,7 +149,7 @@ class BrevoMailer extends PHPMailer {
 	 * @return array<string, mixed>
 	 * @throws PHPMailerException
 	 */
-	private function payload(): array {
+	private function payload( bool $is_html ): array {
 		$payload = [
 			'sender'  => self::contact( $this->From, $this->FromName ),
 			'to'      => self::contacts( $this->getToAddresses() ),
@@ -168,15 +172,14 @@ class BrevoMailer extends PHPMailer {
 			$payload['replyTo'] = self::contact( (string) $reply_to[0][0], (string) ( $reply_to[0][1] ?? '' ) );
 		}
 
-		// L'API exige un htmlContent ou un textContent non vide : un espace
-		// évite qu'un mail sans corps ne parte en erreur.
-		if ( PHPMailer::CONTENT_TYPE_TEXT_HTML === $this->ContentType ) {
-			$payload['htmlContent'] = '' !== $this->Body ? $this->Body : ' ';
+		// Corps jamais vide ici : preSend() l'a déjà refusé.
+		if ( $is_html ) {
+			$payload['htmlContent'] = $this->Body;
 			if ( '' !== $this->AltBody ) {
 				$payload['textContent'] = $this->AltBody;
 			}
 		} else {
-			$payload['textContent'] = '' !== $this->Body ? $this->Body : ' ';
+			$payload['textContent'] = $this->Body;
 		}
 
 		$headers = [];
