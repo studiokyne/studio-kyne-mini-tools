@@ -115,6 +115,16 @@
     var host = document.getElementById('skmt_sm_host');
     var username = document.getElementById('skmt_sm_username');
     var presets = skmtAdmin.smProviders || {};
+    var transport = document.getElementById('skmt_sm_transport');
+    var smtpFields = document.getElementById('skmt-sm-smtp-fields');
+    var apiFields = document.getElementById('skmt-sm-api-fields');
+
+    // Les champs de l'autre transport sont masqués, pas vidés : ils partent
+    // quand même à l'enregistrement, et revenir en arrière ne perd rien.
+    transport.addEventListener('change', function () {
+      smtpFields.hidden = transport.value !== 'smtp';
+      apiFields.hidden = transport.value === 'smtp';
+    });
 
     // Un préréglage remplit hôte, port, chiffrement et, s'il en impose un,
     // l'identifiant (SendGrid : « apikey »). Tout reste modifiable ensuite ;

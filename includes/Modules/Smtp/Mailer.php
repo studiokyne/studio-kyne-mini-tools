@@ -4,8 +4,8 @@ namespace StudioKyne\MiniTools\Modules\Smtp;
 defined( 'ABSPATH' ) || exit;
 
 /**
- * Branche PHPMailer (celui du cœur) sur le serveur SMTP configuré et impose
- * l'expéditeur.
+ * Branche PHPMailer (celui du cœur) sur le serveur SMTP ou l'API configurés
+ * et impose l'expéditeur.
  *
  * FluentSMTP remplace la fonction enfichable wp_mail() tout entière pour
  * router par adresse d'expédition et parler aux API des fournisseurs. Un seul
@@ -16,6 +16,19 @@ class Mailer {
 
 	/** Option du mot de passe chiffré, hors de `skmt_module_smtp` : voir Module::save_settings(). */
 	const PASSWORD_OPTION = 'skmt_smtp_password';
+
+	/** Option de la clé API Brevo chiffrée, même traitement que le mot de passe. */
+	const BREVO_KEY_OPTION = 'skmt_smtp_brevo_key';
+
+	/**
+	 * Transport « API Brevo ». Défini ici et pas dans BrevoMailer : toucher une
+	 * constante de BrevoMailer charge la classe, qui étend PHPMailer, et
+	 * PHPMailer n'est chargé qu'au premier wp_mail() — erreur fatale sinon.
+	 */
+	const BREVO = 'brevo';
+
+	/** Transports proposés : relais SMTP ou API HTTP de Brevo. */
+	const TRANSPORTS = [ 'smtp', self::BREVO ];
 
 	/**
 	 * Délai de connexion SMTP (secondes). Le défaut de PHPMailer est de cinq
@@ -41,6 +54,10 @@ class Mailer {
 	public function register(): void {
 		if ( $this->smtp_ready() ) {
 			add_action( 'phpmailer_init', [ $this, 'configure' ] );
+		} elseif ( $this->brevo_ready() ) {
+			// pre_wp_mail tourne avant que wp_mail() ne crée son instance.
+			add_filter( 'pre_wp_mail', [ $this, 'install_brevo' ], PHP_INT_MAX );
+			add_action( 'phpmailer_init', [ $this, 'configure_brevo' ] );
 		}
 
 		// Priorité tardive : un expéditeur forcé doit l'emporter sur celui
@@ -58,7 +75,75 @@ class Mailer {
 	 * activer l'interrupteur sur un formulaire vide ne doit pas couper l'envoi.
 	 */
 	public function smtp_ready(): bool {
-		return ! empty( $this->settings['smtp_enabled'] ) && '' !== (string) ( $this->settings['host'] ?? '' );
+		return ! empty( $this->settings['smtp_enabled'] ) && 'smtp' === self::transport( $this->settings ) && '' !== (string) ( $this->settings['host'] ?? '' );
+	}
+
+	/**
+	 * Même règle pour l'API : activée, et une clé enregistrée (qu'elle se
+	 * déchiffre ou non : une clé illisible doit échouer bruyamment à l'envoi,
+	 * pas retomber en silence sur mail()).
+	 */
+	public function brevo_ready(): bool {
+		return ! empty( $this->settings['smtp_enabled'] ) && self::BREVO === self::transport( $this->settings ) && self::has_brevo_key();
+	}
+
+	/**
+	 * @param array<string, mixed> $settings
+	 */
+	public static function transport( array $settings ): string {
+		$transport = (string) ( $settings['transport'] ?? 'smtp' );
+
+		return in_array( $transport, self::TRANSPORTS, true ) ? $transport : 'smtp';
+	}
+
+	/**
+	 * Installe BrevoMailer comme instance globale : wp_mail() garde toute
+	 * instance de PHPMailer existante. Une instance d'une autre classe (une
+	 * autre extension d'envoi) est laissée en place, et configure_brevo() ne
+	 * la touche pas.
+	 *
+	 * @param mixed $pre Valeur du filtre, rendue telle quelle.
+	 * @return mixed
+	 */
+	public function install_brevo( $pre ) {
+		global $phpmailer;
+
+		if ( null !== $pre || $phpmailer instanceof BrevoMailer ) {
+			return $pre;
+		}
+
+		require_once ABSPATH . WPINC . '/PHPMailer/PHPMailer.php';
+		require_once ABSPATH . WPINC . '/PHPMailer/SMTP.php';
+		require_once ABSPATH . WPINC . '/PHPMailer/Exception.php';
+
+		if ( is_object( $phpmailer ) && ! in_array( get_class( $phpmailer ), [ \PHPMailer\PHPMailer\PHPMailer::class, 'WP_PHPMailer' ], true ) ) {
+			return $pre;
+		}
+
+		if ( file_exists( ABSPATH . WPINC . '/class-wp-phpmailer.php' ) ) {
+			require_once ABSPATH . WPINC . '/class-wp-phpmailer.php';
+		}
+
+		// Comme wp_mail() : exceptions actives, validation par is_email().
+		$phpmailer = new BrevoMailer( true ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- instance d'envoi de wp_mail(), remplacée à dessein.
+
+		$phpmailer::$validator = static function ( $email ) {
+			return (bool) is_email( $email );
+		};
+
+		return $pre;
+	}
+
+	/**
+	 * @param \PHPMailer\PHPMailer\PHPMailer $phpmailer
+	 */
+	public function configure_brevo( $phpmailer ): void {
+		if ( ! $phpmailer instanceof BrevoMailer ) {
+			return;
+		}
+
+		$phpmailer->Mailer       = BrevoMailer::MAILER;
+		$phpmailer->skmt_api_key = (string) self::brevo_key();
 	}
 
 	/**
@@ -185,6 +270,23 @@ class Mailer {
 		}
 
 		return Crypto::decrypt( (string) get_option( self::PASSWORD_OPTION, '' ) );
+	}
+
+	public static function has_brevo_key(): bool {
+		return defined( 'SKMT_BREVO_API_KEY' ) || '' !== (string) get_option( self::BREVO_KEY_OPTION, '' );
+	}
+
+	/**
+	 * Clé API Brevo en clair, depuis `SKMT_BREVO_API_KEY` ou l'option chiffrée.
+	 *
+	 * @return string|null null si l'option ne se déchiffre plus.
+	 */
+	public static function brevo_key(): ?string {
+		if ( defined( 'SKMT_BREVO_API_KEY' ) ) {
+			return (string) SKMT_BREVO_API_KEY;
+		}
+
+		return Crypto::decrypt( (string) get_option( self::BREVO_KEY_OPTION, '' ) );
 	}
 
 	/**

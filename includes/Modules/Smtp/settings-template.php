@@ -22,7 +22,13 @@ $smtp_pass_const = defined( 'SKMT_SMTP_PASSWORD' );
 $smtp_has_pass   = $smtp_pass_const || '' !== (string) get_option( Mailer::PASSWORD_OPTION, '' );
 $smtp_pass_ok    = null !== Mailer::password();
 $smtp_override   = Mailer::wp_mail_override();
-$smtp_ready      = ( new Mailer( $module_settings ) )->smtp_ready();
+$smtp_mailer     = new Mailer( $module_settings );
+$smtp_ready      = $smtp_mailer->smtp_ready();
+$smtp_brevo      = $smtp_mailer->brevo_ready();
+$smtp_transport  = Mailer::transport( $module_settings );
+$smtp_key_const  = defined( 'SKMT_BREVO_API_KEY' );
+$smtp_has_key    = Mailer::has_brevo_key();
+$smtp_key_ok     = null !== Mailer::brevo_key();
 $smtp_encryption = (string) $module_settings['encryption'];
 $smtp_admin_mail = (string) wp_get_current_user()->user_email;
 $smtp_providers  = Providers::all();
@@ -51,27 +57,36 @@ $smtp_provider   = (string) $module_settings['provider'];
 		</div>
 	<?php endif; ?>
 
-	<?php if ( ! Crypto::available() && ! $smtp_pass_const ) : ?>
+	<?php if ( ! Crypto::available() && ! ( 'smtp' === $smtp_transport ? $smtp_pass_const : $smtp_key_const ) ) : ?>
 		<div class="skmt-notice skmt-notice--error">
-			<?php esc_html_e( 'L\'extension PHP OpenSSL est absente : le mot de passe ne peut pas être chiffré et ne sera pas enregistré. Définissez-le dans wp-config.php avec la constante SKMT_SMTP_PASSWORD.', 'studio-kyne-mini-tools' ); ?>
+			<?php esc_html_e( 'L\'extension PHP OpenSSL est absente : le mot de passe et la clé API ne peuvent pas être chiffrés et ne seront pas enregistrés. Définissez-les dans wp-config.php avec les constantes SKMT_SMTP_PASSWORD et SKMT_BREVO_API_KEY.', 'studio-kyne-mini-tools' ); ?>
 		</div>
-	<?php elseif ( ! $smtp_pass_ok ) : ?>
-		<div class="skmt-notice skmt-notice--error">
-			<?php esc_html_e( 'Le mot de passe enregistré ne se déchiffre plus (les clés de wp-config.php ont changé, après une migration par exemple). Saisissez-le à nouveau.', 'studio-kyne-mini-tools' ); ?>
-		</div>
+	<?php else : ?>
+		<?php if ( ! $smtp_pass_ok ) : ?>
+			<div class="skmt-notice skmt-notice--error">
+				<?php esc_html_e( 'Le mot de passe enregistré ne se déchiffre plus (les clés de wp-config.php ont changé, après une migration par exemple). Saisissez-le à nouveau.', 'studio-kyne-mini-tools' ); ?>
+			</div>
+		<?php endif; ?>
+		<?php if ( ! $smtp_key_ok ) : ?>
+			<div class="skmt-notice skmt-notice--error">
+				<?php esc_html_e( 'La clé API Brevo enregistrée ne se déchiffre plus (les clés de wp-config.php ont changé, après une migration par exemple). Saisissez-la à nouveau.', 'studio-kyne-mini-tools' ); ?>
+			</div>
+		<?php endif; ?>
 	<?php endif; ?>
 
 	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="smtp" data-skmt-tab-panel="settings">
 
 	<!-- ============================================================
-		SERVEUR SMTP
+		ENVOI : SERVEUR SMTP OU API
 		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
-			<h2 class="skmt-section__title"><?php esc_html_e( 'Serveur SMTP', 'studio-kyne-mini-tools' ); ?></h2>
+			<h2 class="skmt-section__title"><?php esc_html_e( 'Envoi', 'studio-kyne-mini-tools' ); ?></h2>
 			<p class="skmt-section__desc">
 				<?php
-				if ( $smtp_ready ) {
+				if ( $smtp_brevo ) {
+					esc_html_e( 'Les mails du site partent par l\'API HTTP de Brevo.', 'studio-kyne-mini-tools' );
+				} elseif ( $smtp_ready ) {
 					/* translators: 1: hôte SMTP, 2: port. */
 					echo esc_html( sprintf( __( 'Les mails du site partent par %1$s, port %2$s.', 'studio-kyne-mini-tools' ), $module_settings['host'], $module_settings['port'] ) );
 				} else {
@@ -83,8 +98,8 @@ $smtp_provider   = (string) $module_settings['provider'];
 		<div class="skmt-section__content">
 			<div class="skmt-option">
 				<div class="skmt-option__content">
-					<label for="skmt_sm_enabled" class="skmt-option__label"><?php esc_html_e( 'Envoyer par SMTP', 'studio-kyne-mini-tools' ); ?></label>
-					<p class="skmt-option__desc"><?php esc_html_e( 'Sans hôte renseigné, l\'envoi reste sur mail() même activé.', 'studio-kyne-mini-tools' ); ?></p>
+					<label for="skmt_sm_enabled" class="skmt-option__label"><?php esc_html_e( 'Envoi personnalisé', 'studio-kyne-mini-tools' ); ?></label>
+					<p class="skmt-option__desc"><?php esc_html_e( 'Sans hôte (SMTP) ou sans clé (API), l\'envoi reste sur mail() même activé.', 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
@@ -93,6 +108,34 @@ $smtp_provider   = (string) $module_settings['provider'];
 					</label>
 				</div>
 			</div>
+
+			<div class="skmt-form__group">
+				<label for="skmt_sm_transport" class="skmt-form__label"><?php esc_html_e( 'Méthode d\'envoi', 'studio-kyne-mini-tools' ); ?></label>
+				<select id="skmt_sm_transport" name="skmt_module_settings[transport]" class="skmt-select skmt-select--sm">
+					<option value="smtp" <?php selected( $smtp_transport, 'smtp' ); ?>><?php esc_html_e( 'Serveur SMTP', 'studio-kyne-mini-tools' ); ?></option>
+					<option value="brevo" <?php selected( $smtp_transport, 'brevo' ); ?>><?php esc_html_e( 'API Brevo', 'studio-kyne-mini-tools' ); ?></option>
+				</select>
+				<p class="skmt-form__help"><?php esc_html_e( 'L\'API passe par HTTPS : utile quand l\'hébergeur bloque les ports SMTP, et ses erreurs sont plus parlantes.', 'studio-kyne-mini-tools' ); ?></p>
+			</div>
+
+			<div class="skmt-form__group skmt-sm__api" id="skmt-sm-api-fields" <?php echo 'brevo' === $smtp_transport ? '' : 'hidden'; ?>>
+				<label for="skmt_sm_brevo_key" class="skmt-form__label">
+					<?php esc_html_e( 'Clé API Brevo', 'studio-kyne-mini-tools' ); ?>
+					<?php
+					$smtp_key_tip = $smtp_key_const
+						? __( 'Définie dans wp-config.php par SKMT_BREVO_API_KEY.', 'studio-kyne-mini-tools' )
+						: __( 'Brevo › Paramètres › SMTP & API › Clés API (clé « xkeysib-… », pas la clé SMTP). Chiffrée en base, jamais réaffichée ni exportée. Laissez vide pour garder la clé enregistrée. Pour ne pas la stocker en base, définissez SKMT_BREVO_API_KEY dans wp-config.php.', 'studio-kyne-mini-tools' );
+					echo $this->render_help_tip( $smtp_key_tip ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+					?>
+				</label>
+				<input type="password" id="skmt_sm_brevo_key" name="skmt_module_settings[brevo_key]" class="skmt-input"
+					value="" autocomplete="new-password" spellcheck="false"
+					placeholder="<?php echo $smtp_has_key ? esc_attr__( 'Enregistrée — laisser vide pour conserver', 'studio-kyne-mini-tools' ) : 'xkeysib-…'; ?>"
+					<?php disabled( $smtp_key_const ); ?>>
+				<p class="skmt-form__help"><?php esc_html_e( 'L\'adresse d\'expédition doit appartenir à un expéditeur ou à un domaine validé dans Brevo.', 'studio-kyne-mini-tools' ); ?></p>
+			</div>
+
+			<div id="skmt-sm-smtp-fields" <?php echo 'smtp' === $smtp_transport ? '' : 'hidden'; ?>>
 
 			<div class="skmt-form__group skmt-sm__provider">
 				<label for="skmt_sm_provider" class="skmt-form__label"><?php esc_html_e( 'Fournisseur', 'studio-kyne-mini-tools' ); ?></label>
@@ -180,6 +223,8 @@ $smtp_provider   = (string) $module_settings['provider'];
 						<?php disabled( $smtp_pass_const ); ?>>
 				</div>
 			</div>
+
+			</div><!-- #skmt-sm-smtp-fields -->
 		</div>
 	</div>
 
@@ -194,7 +239,7 @@ $smtp_provider   = (string) $module_settings['provider'];
 			<p class="skmt-section__desc">
 				<?php
 				/* translators: %s: adresse d'expédition par défaut de WordPress. */
-				echo esc_html( sprintf( __( 'Remplace l\'expéditeur par défaut de WordPress (%s). Utilisez une adresse du domaine autorisé par le serveur SMTP, sinon les mails échouent au contrôle SPF/DMARC.', 'studio-kyne-mini-tools' ), Mailer::wp_default_from_email() ) );
+				echo esc_html( sprintf( __( 'Remplace l\'expéditeur par défaut de WordPress (%s). Utilisez une adresse du domaine autorisé par le serveur SMTP ou validé dans Brevo, sinon les mails échouent au contrôle SPF/DMARC.', 'studio-kyne-mini-tools' ), Mailer::wp_default_from_email() ) );
 				?>
 			</p>
 		</div>
@@ -269,7 +314,7 @@ $smtp_provider   = (string) $module_settings['provider'];
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Mail de test', 'studio-kyne-mini-tools' ); ?></h2>
-			<p class="skmt-section__desc"><?php esc_html_e( 'Envoie un mail avec les réglages enregistrés : enregistrez d\'abord vos modifications. En cas d\'échec, l\'échange avec le serveur s\'affiche, identifiants masqués.', 'studio-kyne-mini-tools' ); ?></p>
+			<p class="skmt-section__desc"><?php esc_html_e( 'Envoie un mail avec les réglages enregistrés : enregistrez d\'abord vos modifications. En cas d\'échec, l\'échange avec le serveur SMTP (identifiants masqués) ou la réponse de l\'API s\'affiche.', 'studio-kyne-mini-tools' ); ?></p>
 		</div>
 		<div class="skmt-section__content">
 			<div class="skmt-sm__test">

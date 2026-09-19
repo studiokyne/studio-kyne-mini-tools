@@ -1,8 +1,9 @@
 # Module Smtp
 
-`includes/Modules/Smtp/` + `assets/admin/js/modules/smtp.js`. Envoi par un serveur SMTP authentifié, mail de test et journal des mails (issue #20, remplace FluentSMTP). Cinq classes :
+`includes/Modules/Smtp/` + `assets/admin/js/modules/smtp.js`. Envoi par un serveur SMTP authentifié ou par l'API HTTP de Brevo, mail de test et journal des mails (issues #20 et #65, remplace FluentSMTP). Six classes :
 
-- `Mailer` : branche PHPMailer sur le serveur configuré (`phpmailer_init`) et impose l'expéditeur (`wp_mail_from`, `wp_mail_from_name`).
+- `Mailer` : branche PHPMailer sur le serveur configuré (`phpmailer_init`) ou installe `BrevoMailer`, et impose l'expéditeur (`wp_mail_from`, `wp_mail_from_name`).
+- `BrevoMailer` : sous-classe de PHPMailer qui envoie par l'API Brevo (voir [plus bas](#api-brevo)).
 - `Crypto` : chiffrement du mot de passe au repos.
 - `Logger` : capture de chaque appel à `wp_mail()` et écriture dans la table.
 - `Providers` : préréglages SMTP des fournisseurs courants (Brevo, Mailgun US/UE, SendGrid, Postmark, SES, Mailjet, OVHcloud, Gmail, Microsoft 365).
@@ -20,7 +21,21 @@ FluentSMTP redéfinit la fonction enfichable `wp_mail()` tout entière (routage 
 
 Un préréglage **pré-remplit** l'hôte, le port, le chiffrement et, s'il y en a un d'imposé, l'identifiant (`apikey` pour SendGrid). Il affiche aussi une aide sur l'endroit où trouver les identifiants. Tout reste modifiable, et l'envoi passe par le même relais SMTP générique : le réglage `provider` ne sert qu'à l'affichage. Repasser sur « Serveur personnalisé » ne vide aucun champ.
 
-L'envoi par **API HTTP** (Brevo en priorité, utile quand l'hébergeur bloque les ports SMTP) fait l'objet de #65. Architecture retenue : celle de WP Mail SMTP, pas celle de FluentSMTP. On installe tôt une sous-classe de PHPMailer dans `$GLOBALS['phpmailer']` (`wp_mail()` garde toute instance existante), et seul `send()` est surchargé. `wp_mail()` construit donc toujours le message, et le journal comme les hooks de succès et d'échec restent inchangés.
+## API Brevo
+
+Réglage `transport` : `smtp` (défaut) ou `brevo`. L'interrupteur `smtp_enabled` reste l'interrupteur général (« Envoi personnalisé ») ; l'API n'est branchée qu'avec une clé enregistrée. Utile quand l'hébergeur bloque les ports SMTP, et les erreurs de l'API sont plus parlantes que celles d'un relais.
+
+Architecture de WP Mail SMTP, pas celle de FluentSMTP : `BrevoMailer` étend PHPMailer, et seul `send()` est surchargé. `wp_mail()` construit donc toujours le message, et le journal comme les hooks de succès et d'échec restent inchangés. Un refus de l'API lève une `PHPMailer\Exception`, que `wp_mail()` transforme en `wp_mail_failed`.
+
+- **Installation dans `pre_wp_mail`** (priorité maximale, la valeur du filtre est rendue telle quelle) : ce filtre tourne juste avant que `wp_mail()` ne crée son instance, et `wp_mail()` garde toute instance existante. On ne remplace qu'une instance du cœur (`PHPMailer` ou `WP_PHPMailer`) : celle d'une autre extension d'envoi est laissée en place, et `configure_brevo()` ne la touche pas.
+- **`$Mailer = 'brevo'` à chaque envoi** (`phpmailer_init`) : `wp_mail()` repasse l'instance sur `isMail()` à chaque appel. Sans ce marqueur, `send()` retombe sur l'envoi normal de PHPMailer, ce qui couvre un changement de réglage en cours de requête.
+- **Ne jamais toucher une constante de `BrevoMailer` hors d'un envoi.** La classe étend PHPMailer, que WordPress ne charge qu'au premier `wp_mail()`. Lire `BrevoMailer::MAILER` depuis `Mailer::TRANSPORTS` déclenchait l'autoload à chaque chargement de page, donc une erreur fatale sur tout le site. La constante du transport vit dans `Mailer::BREVO` ; `BrevoMailer` n'est nommé qu'après un `instanceof` (qui, lui, n'autocharge pas).
+- **`WP_PHPMailer`** (WordPress 6.8+) ne fait que traduire les messages d'erreur de PHPMailer dans une propriété statique partagée. `BrevoMailer` étend donc `PHPMailer` et appelle `WP_PHPMailer::setLanguage()` s'il existe, ce qui garde la compatibilité avec WordPress 6.0.
+- `preSend()` est conservé : il valide les adresses et lit les pièces jointes, avec les messages d'erreur traduits d'un envoi ordinaire (corps vide compris). Le MIME qu'il assemble n'est pas utilisé. **Mais il modifie le message** : dès qu'un `AltBody` existe (posé par une extension de modèles de mail dans `phpmailer_init`), il passe `ContentType` sur `multipart/alternative`. Le type HTML est donc lu **avant** `preSend()`. Sinon le HTML partait en `textContent`, et le destinataire voyait les balises.
+- **Correspondances** : une seule adresse de réponse (la première), les en-têtes personnalisés passent dans `headers`, les images intégrées (`cid:`) partent comme pièces jointes ordinaires, faute d'équivalent. Le Return-Path ne s'applique pas : Brevo gère l'enveloppe lui-même.
+- **Clé API** : même traitement que le mot de passe (voir ci-dessous) : option `skmt_smtp_brevo_key` chiffrée, hors export, champ vide = inchangée, constante `SKMT_BREVO_API_KEY` prioritaire. Seuls lettres, chiffres, `-` et `_` sont conservés (format `xkeysib-…`).
+- **Mail de test** : en cas d'échec, la requête, le code HTTP et le corps de la réponse remplacent la transcription SMTP. La clé ne part que dans l'en-tête `api-key` : elle n'apparaît pas.
+- Pas encore faits : Mailgun (MIME brut), Postmark, SendGrid, SES (signature v4). Google et Microsoft (OAuth2) sont écartés.
 
 ## Expéditeur
 

@@ -13,6 +13,10 @@
   max-width: none;
 }
 
+.skmt-sm__api {
+  max-width: 480px;
+}
+
 .skmt-form__row .skmt-sm__port {
   max-width: 110px;
 }
