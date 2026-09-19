@@ -21,6 +21,12 @@ class Cleanup {
 	/** Nombre d'objets traités par appel. */
 	const BATCH = 200;
 
+	/** Espace libre minimal (octets) pour signaler une table fragmentée. */
+	const MIN_FREE = 1048576;
+
+	/** Part minimale d'espace libre rapportée à la taille de la table. */
+	const MIN_FREE_RATIO = 0.2;
+
 	/**
 	 * Préfixes de tables connus qui ne ressemblent pas au nom de l'extension
 	 * qui les crée. Jeton (premier segment du nom court) => dossiers
@@ -272,30 +278,39 @@ class Cleanup {
 	 * FROM … WHERE des relations dont l'objet n'est plus un contenu.
 	 *
 	 * `term_relationships.object_id` n'est pas toujours un ID d'article : les
-	 * catégories de liens pointent vers des liens, et une taxonomie peut être
-	 * enregistrée sur les utilisateurs. Ces taxonomies-là sont exclues, sans
-	 * quoi on supprimerait des relations parfaitement valides.
+	 * catégories de liens pointent vers des liens, une taxonomie peut être
+	 * enregistrée sur les utilisateurs (types de membres BuddyPress…).
+	 *
+	 * D'où une liste BLANCHE : seules les taxonomies enregistrées, et
+	 * rattachées uniquement à des types de contenu, sont purgées. Une liste
+	 * noire des taxonomies « non contenu » ne voit que celles enregistrées au
+	 * moment du nettoyage : extension désactivée, ses relations vers des
+	 * utilisateurs passaient pour orphelines et partaient définitivement.
 	 */
 	private function orphan_relationships_sql(): string {
 		global $wpdb;
 
-		$excluded   = [ 'link_category' ];
+		$allowed    = [];
 		$post_types = get_post_types();
 		foreach ( get_taxonomies( [], 'objects' ) as $tax ) {
-			if ( array_diff( (array) $tax->object_type, $post_types ) ) {
-				$excluded[] = $tax->name;
+			$types = (array) $tax->object_type;
+			if ( $types && ! array_diff( $types, $post_types ) ) {
+				$allowed[] = $tax->name;
 			}
 		}
-		$excluded     = array_values( array_unique( $excluded ) );
-		$placeholders = implode( ', ', array_fill( 0, count( $excluded ), '%s' ) );
+		if ( ! $allowed ) {
+			// Aucune taxonomie sûre : une condition toujours fausse.
+			return "FROM {$wpdb->term_relationships} tr INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id WHERE 1 = 0";
+		}
+		$placeholders = implode( ', ', array_fill( 0, count( $allowed ), '%s' ) );
 
-		// $placeholders ne contient que des %s, un par taxonomie exclue.
+		// $placeholders ne contient que des %s, un par taxonomie autorisée.
 		return $wpdb->prepare(
 			"FROM {$wpdb->term_relationships} tr
 			INNER JOIN {$wpdb->term_taxonomy} tt ON tt.term_taxonomy_id = tr.term_taxonomy_id
 			LEFT JOIN {$wpdb->posts} p ON p.ID = tr.object_id
-			WHERE p.ID IS NULL AND tt.taxonomy NOT IN ( {$placeholders} )", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
-			$excluded
+			WHERE p.ID IS NULL AND tt.taxonomy IN ( {$placeholders} )", // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.PreparedSQL.InterpolatedNotPrepared, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+			$allowed
 		);
 	}
 
@@ -446,10 +461,26 @@ class Cleanup {
 	 * @return list<array{name: string, free: int}>
 	 */
 	public function fragmented_tables(): array {
+		global $wpdb;
+
+		// Tablespace InnoDB partagé : chaque table y rapporte l'espace libre
+		// du fichier COMMUN, que OPTIMIZE ne rend jamais au disque. Compter
+		// ces tables multipliait le total et les laissait « fragmentées » à vie.
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$per_table = $wpdb->get_var( 'SELECT @@innodb_file_per_table' );
+		$shared    = null !== $per_table && ! in_array( strtoupper( (string) $per_table ), [ '1', 'ON' ], true );
+
 		$tables = [];
 		foreach ( $this->site_table_status() as $t ) {
 			$free = (int) $t['Data_free'];
-			if ( $free > 0 ) {
+			$used = (int) $t['Data_length'] + (int) $t['Index_length'];
+			if ( $shared && 'InnoDB' === $t['Engine'] ) {
+				continue;
+			}
+			// InnoDB garde quelques Mo réservés par table, qu'OPTIMIZE ne
+			// libère pas sur une grosse table : sans seuil relatif, elle
+			// restait signalée après chaque optimisation.
+			if ( $free >= self::MIN_FREE && $free > $used * self::MIN_FREE_RATIO ) {
 				$tables[] = [
 					'name' => (string) $t['Name'],
 					'free' => $free,
@@ -575,7 +606,19 @@ class Cleanup {
 		global $wpdb;
 		// Nom vérifié par is_site_table() : issu de SHOW TABLE STATUS.
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-		return false !== $wpdb->query( 'OPTIMIZE TABLE `' . str_replace( '`', '``', $table ) . '`' );
+		$rows = $wpdb->get_results( 'OPTIMIZE TABLE `' . str_replace( '`', '``', $table ) . '`', ARRAY_A );
+		if ( '' !== $wpdb->last_error ) {
+			return false;
+		}
+		// MySQL ne lève pas d'erreur SQL quand OPTIMIZE échoue (table
+		// verrouillée, corrompue) : l'échec est une ligne Msg_type = error.
+		foreach ( (array) $rows as $row ) {
+			if ( isset( $row['Msg_type'] ) && 'error' === strtolower( (string) $row['Msg_type'] ) ) {
+				$wpdb->last_error = (string) ( $row['Msg_text'] ?? '' );
+				return false;
+			}
+		}
+		return true;
 	}
 
 	/**
