@@ -239,7 +239,7 @@ class Admin {
 	 * Charge les assets des modules actifs sur leur page de réglages.
 	 */
 	private function enqueue_module_assets(): void {
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 
 		if ( strpos( $tab, 'module_' ) !== 0 ) {
 			return;
@@ -727,7 +727,7 @@ class Admin {
 			}
 
 			if ( $instance && isset( $_POST['skmt_module_settings'] ) && is_array( $_POST['skmt_module_settings'] ) ) {
-				$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) );
+				$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce et capacité vérifiés plus haut ; chaque module assainit ses réglages dans save_settings() (contrat AbstractModule).
 			}
 		}
 
@@ -1229,7 +1229,7 @@ class Admin {
 	 * ================================================================ */
 
 	public function filter_parent_file( ?string $parent_file ): string {
-		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 			return $parent_file ?? '';
 		}
 
@@ -1243,7 +1243,7 @@ class Admin {
 	}
 
 	public function filter_submenu_file( ?string $submenu_file, ?string $parent_file ): string {
-		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 			return $submenu_file ?? '';
 		}
 
@@ -1334,7 +1334,7 @@ class Admin {
 	 * ================================================================ */
 
 	private function get_current_tab(): string {
-		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 	}
 
 	private function is_plugin_screen(): bool {
