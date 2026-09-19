@@ -6,7 +6,8 @@ defined( 'ABSPATH' ) || exit;
 use StudioKyne\MiniTools\Core\AbstractModule;
 
 /**
- * Module SMTP — envoi par un serveur SMTP authentifié et journal des mails.
+ * Module SMTP — envoi par un serveur SMTP authentifié ou l'API Brevo, et
+ * journal des mails.
  */
 class Module extends AbstractModule {
 
@@ -67,10 +68,10 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Le mot de passe n'est PAS rangé dans `skmt_module_smtp` mais dans sa
+	 * Le mot de passe et la clé API ne sont PAS rangés dans `skmt_module_smtp` mais dans leur
 	 * propre option : l'export de configuration écrit les options de module
 	 * telles quelles dans le JSON, et le journal d'activité en liste les
-	 * champs modifiés. Champ vide = mot de passe inchangé (le formulaire ne le
+	 * champs modifiés. Champ vide = secret inchangé (le formulaire ne le
 	 * réaffiche jamais) ; l'import, qui n'en porte pas, le laisse donc en place.
 	 *
 	 * @param array<string, mixed> $settings
@@ -82,6 +83,7 @@ class Module extends AbstractModule {
 
 		$sanitized = [
 			'smtp_enabled'       => ! empty( $settings['smtp_enabled'] ),
+			'transport'          => Mailer::transport( $settings ),
 			'provider'           => Providers::is_valid( $provider ) ? $provider : Providers::CUSTOM,
 			'host'               => self::sanitize_host( (string) ( $settings['host'] ?? '' ) ),
 			'port'               => min( 65535, max( 1, absint( $settings['port'] ?? 587 ) ) ),
@@ -99,18 +101,32 @@ class Module extends AbstractModule {
 			'log_max_rows'       => min( self::ROWS_MAX, max( self::ROWS_MIN, absint( $settings['log_max_rows'] ?? 5000 ) ) ),
 		];
 
-		$password = self::sanitize_password( $settings['password'] ?? '' );
+		if ( ! defined( 'SKMT_SMTP_PASSWORD' ) ) {
+			self::store_secret( Mailer::PASSWORD_OPTION, self::sanitize_password( $settings['password'] ?? '' ) );
+		}
 
-		if ( '' !== $password && ! defined( 'SKMT_SMTP_PASSWORD' ) ) {
-			$encrypted = Crypto::encrypt( $password );
-			// Jamais en clair : sans openssl, le mot de passe n'est pas
-			// enregistré, et l'écran le signale (voir le gabarit).
-			if ( '' !== $encrypted ) {
-				update_option( Mailer::PASSWORD_OPTION, $encrypted, false );
-			}
+		if ( ! defined( 'SKMT_BREVO_API_KEY' ) ) {
+			// Une clé Brevo (`xkeysib-…`) n'a que des lettres, chiffres et tirets.
+			self::store_secret( Mailer::BREVO_KEY_OPTION, (string) preg_replace( '/[^A-Za-z0-9_\-]/', '', self::sanitize_password( $settings['brevo_key'] ?? '' ) ) );
 		}
 
 		return $this->save_module_settings( $sanitized );
+	}
+
+	/**
+	 * Jamais en clair : sans openssl, le secret n'est pas enregistré, et
+	 * l'écran le signale (voir le gabarit). Vide = inchangé.
+	 */
+	private static function store_secret( string $option, string $value ): void {
+		if ( '' === $value ) {
+			return;
+		}
+
+		$encrypted = Crypto::encrypt( $value );
+
+		if ( '' !== $encrypted ) {
+			update_option( $option, $encrypted, false );
+		}
 	}
 
 	/**
@@ -119,6 +135,7 @@ class Module extends AbstractModule {
 	public static function get_defaults(): array {
 		return [
 			'smtp_enabled'       => false,
+			'transport'          => 'smtp',
 			'provider'           => Providers::CUSTOM,
 			'host'               => '',
 			'port'               => 587,
@@ -142,7 +159,7 @@ class Module extends AbstractModule {
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ 'skmt_module_smtp', Mailer::PASSWORD_OPTION, Store::SCHEMA_OPTION ],
+			'options' => [ 'skmt_module_smtp', Mailer::PASSWORD_OPTION, Mailer::BREVO_KEY_OPTION, Store::SCHEMA_OPTION ],
 			'tables'  => [ Store::TABLE ],
 			'cron'    => [ self::CRON_HOOK ],
 		];
@@ -409,7 +426,8 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Mail de test, avec la transcription de l'échange SMTP en cas d'échec :
+	 * Mail de test, avec la transcription de l'échange SMTP (ou la réponse de
+	 * l'API) en cas d'échec :
 	 * « Could not authenticate » ne dit pas si c'est l'identifiant, le port ou
 	 * le chiffrement qui cloche, la réponse du serveur si.
 	 */
@@ -453,6 +471,17 @@ class Module extends AbstractModule {
 		);
 
 		remove_action( 'phpmailer_init', $debug, 1000 );
+
+		// Envoi par l'API : la réponse HTTP tient lieu de transcription. Elle
+		// ne contient pas la clé, qui ne part que dans un en-tête.
+		global $phpmailer;
+		if ( null !== $error && $phpmailer instanceof BrevoMailer && null !== $phpmailer->skmt_last_response ) {
+			$transcript = [
+				'POST ' . BrevoMailer::ENDPOINT,
+				'HTTP ' . $phpmailer->skmt_last_response['code'],
+				$phpmailer->skmt_last_response['body'],
+			];
+		}
 
 		if ( null !== $error ) {
 			wp_send_json_error(
@@ -574,6 +603,7 @@ class Module extends AbstractModule {
 			'mail'     => 'PHP mail()',
 			'sendmail' => 'Sendmail',
 			'qmail'    => 'Qmail',
+			'brevo'    => 'API Brevo',
 		];
 		$transport  = (string) $row['transport'];
 
