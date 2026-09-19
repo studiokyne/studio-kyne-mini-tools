@@ -26,6 +26,7 @@ class Activator {
 		'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
 		'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
 		'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
+		'activity_log'    => \StudioKyne\MiniTools\Modules\ActivityLog\Module::class,
 	];
 
 	/**

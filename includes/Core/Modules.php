@@ -104,6 +104,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Media\\Module',
 				'icon'        => 'folder-tree',
 			],
+			'activity_log'    => [
+				'name'        => __( 'Journal d\'activité', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Qui a modifié quoi, et quand : connexions, contenus, extensions, utilisateurs et réglages.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Journal d\'activité', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Consulter l\'historique', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\ActivityLog\\Module',
+				'icon'        => 'history',
+			],
 		];
 
 		/**
