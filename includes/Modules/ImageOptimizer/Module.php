@@ -20,6 +20,23 @@ class Module extends AbstractModule {
 	private const STATS_SUFFIX      = '_stats';
 	private const BULK_STATE_SUFFIX = '_bulk_state';
 
+	/** Dossier (sous uploads) des originaux intacts, suffixé d'un jeton : voir get_backup_dir(). */
+	private const BACKUP_DIR          = 'skmt-originals';
+	private const BACKUP_TOKEN_SUFFIX = '_backup_token';
+
+	/** Métas qui décrivent l'optimisation d'un média (effacées à la restauration). */
+	private const OPTIMIZATION_META = [
+		'_skmt_optimized',
+		'_skmt_original_bytes',
+		'_skmt_optimized_bytes',
+		'_skmt_bytes_saved',
+		'_skmt_main_original_bytes',
+		'_skmt_main_optimized_bytes',
+		'_skmt_main_bytes_saved',
+		'_skmt_optimized_format',
+		'_skmt_optimized_mime',
+	];
+
 	/* ================================================================
 	 * SOUS-OBJETS (initialisés dans init())
 	 * ================================================================ */
@@ -85,6 +102,9 @@ class Module extends AbstractModule {
 
 		// Alt text automatique
 		add_action( 'add_attachment', [ $this, 'generate_alt_text' ] );
+
+		// L'original conservé suit le média dans la corbeille définitive.
+		add_action( 'delete_attachment', [ $this, 'delete_backup' ] );
 
 		// Bulk AJAX
 		add_action( 'wp_ajax_skmt_image_optimizer_bulk_scan', [ $this, 'ajax_bulk_scan' ] );
@@ -187,9 +207,26 @@ class Module extends AbstractModule {
 				'bulkDone'      => __( 'Optimisation terminée', 'studio-kyne-mini-tools' ),
 				'bulkComplete'  => __( 'Toutes les images ont été optimisées.', 'studio-kyne-mini-tools' ),
 				'bulkRetry'     => __( 'Réessayer', 'studio-kyne-mini-tools' ),
-				'singleRunning' => __( 'Optimisation…', 'studio-kyne-mini-tools' ),
-				'singleDone'    => __( 'Optimisée', 'studio-kyne-mini-tools' ),
-				'singleError'   => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				'mediaRunning'  => __( 'Traitement…', 'studio-kyne-mini-tools' ),
+				'mediaError'    => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				'cancel'        => __( 'Annuler', 'studio-kyne-mini-tools' ),
+				'format'        => __( 'Format cible', 'studio-kyne-mini-tools' ),
+				'reoptimize'    => [
+					'title'    => __( "Ré-optimiser l'image ?", 'studio-kyne-mini-tools' ),
+					'backup'   => __( "L'image est retraitée depuis l'original conservé, avec les réglages actuels.", 'studio-kyne-mini-tools' ),
+					'nobackup' => __( "Aucun original n'a été conservé : l'image est recompressée depuis sa version actuelle, et la qualité baisse un peu à chaque passage.", 'studio-kyne-mini-tools' ),
+					'confirm'  => __( 'Ré-optimiser', 'studio-kyne-mini-tools' ),
+				],
+				'convert'       => [
+					'title'   => __( "Convertir l'image", 'studio-kyne-mini-tools' ),
+					'message' => __( "Le fichier et ses miniatures changent d'extension ; les URL déjà insérées dans le site sont réécrites.", 'studio-kyne-mini-tools' ),
+					'confirm' => __( 'Convertir', 'studio-kyne-mini-tools' ),
+				],
+				'restore'       => [
+					'title'   => __( "Restaurer l'original ?", 'studio-kyne-mini-tools' ),
+					'message' => __( "Les versions optimisées sont supprimées, les miniatures régénérées depuis l'original et les URL du site réécrites vers lui.", 'studio-kyne-mini-tools' ),
+					'confirm' => __( 'Restaurer', 'studio-kyne-mini-tools' ),
+				],
 			],
 		];
 	}
@@ -233,18 +270,11 @@ class Module extends AbstractModule {
 				'skmt_module_image_optimizer',
 				'skmt_module_image_optimizer' . self::STATS_SUFFIX,
 				'skmt_module_image_optimizer' . self::BULK_STATE_SUFFIX,
+				'skmt_module_image_optimizer' . self::BACKUP_TOKEN_SUFFIX,
 			],
-			'meta'    => [
-				'_skmt_optimized',
-				'_skmt_original_bytes',
-				'_skmt_optimized_bytes',
-				'_skmt_bytes_saved',
-				'_skmt_main_original_bytes',
-				'_skmt_main_optimized_bytes',
-				'_skmt_main_bytes_saved',
-				'_skmt_optimized_format',
-				'_skmt_optimized_mime',
-			],
+			// Les fichiers de skmt-originals/ restent sur le disque : ce sont
+			// des photos du client, pas des données du plugin.
+			'meta'    => array_merge( self::OPTIMIZATION_META, [ '_skmt_backup_file' ] ),
 		];
 	}
 
@@ -329,44 +359,15 @@ class Module extends AbstractModule {
 		$sizes_path = trailingslashit( $base_path . $subdir );
 		$rel_dir    = ( '.' === $subdir || '' === $subdir ) ? '' : trailingslashit( str_replace( '\\', '/', $subdir ) );
 
-		$total_before = 0;
-		$total_after  = 0;
-		$main_before  = 0;
-		$main_after   = 0;
-		$size_updates = [];
-		$url_pairs    = []; // ancien chemin relatif uploads => nouveau (voir UrlRewriter)
+		$main_before = 0;
+		$main_after  = 0;
 
 		// --- Miniatures ---
-		if ( ! empty( $metadata['sizes'] ) ) {
-			foreach ( $metadata['sizes'] as $size => $size_data ) {
-				if ( empty( $size_data['file'] ) ) {
-					continue;
-				}
-
-				$size_file = $sizes_path . $size_data['file'];
-				if ( ! file_exists( $size_file ) ) {
-					continue;
-				}
-
-				$before        = (int) filesize( $size_file );
-				$total_before += $before;
-
-				$this->processor->optimize( $size_file );
-				$converted  = $this->processor->convert( $size_file, $mime_type );
-				$final_file = false !== $converted ? $converted : $size_file;
-
-				$after        = file_exists( $final_file ) ? (int) filesize( $final_file ) : $before;
-				$total_after += $after;
-
-				if ( $converted && $converted !== $size_file ) {
-					$size_updates[ $size ]                      = [
-						'file' => $converted,
-						'mime' => $this->processor->get_mime_type( $converted ),
-					];
-					$url_pairs[ $rel_dir . $size_data['file'] ] = $rel_dir . basename( $converted );
-				}
-			}
-		}
+		$sizes        = $this->process_sizes( $metadata, $mime_type, $sizes_path, $rel_dir );
+		$total_before = $sizes['before'];
+		$total_after  = $sizes['after'];
+		$size_updates = $sizes['updates'];
+		$url_pairs    = $sizes['url_pairs']; // ancien chemin relatif uploads => nouveau (voir UrlRewriter)
 
 		// --- Fichier original ---
 		$original_file      = $base_path . $metadata['file'];
@@ -374,6 +375,13 @@ class Module extends AbstractModule {
 		$original_new_file  = '';
 
 		if ( file_exists( $original_file ) ) {
+			// Sauvegarde AVANT optimize() : c'est lui qui recompresse et
+			// redimensionne en place. Un média déjà optimisé n'a plus d'original
+			// à sauver — on ne copierait qu'une version dégradée.
+			if ( ! $this->is_already_optimized( $attachment_id ) ) {
+				$this->backup_original( $attachment_id, $original_file, str_replace( '\\', '/', $metadata['file'] ) );
+			}
+
 			$before        = (int) filesize( $original_file );
 			$main_before   = $before;
 			$total_before += $before;
@@ -439,6 +447,51 @@ class Module extends AbstractModule {
 	}
 
 	/**
+	 * Optimise et convertit les miniatures d'un attachment.
+	 *
+	 * @param array<string, mixed> $metadata
+	 * @return array{before: int, after: int, updates: array<string, array<string, string>>, url_pairs: array<string, string>}
+	 */
+	private function process_sizes( array $metadata, string $mime_type, string $sizes_path, string $rel_dir ): array {
+		$result = [
+			'before'    => 0,
+			'after'     => 0,
+			'updates'   => [],
+			'url_pairs' => [],
+		];
+
+		foreach ( $metadata['sizes'] ?? [] as $size => $size_data ) {
+			if ( empty( $size_data['file'] ) ) {
+				continue;
+			}
+
+			$size_file = $sizes_path . $size_data['file'];
+			if ( ! file_exists( $size_file ) ) {
+				continue;
+			}
+
+			$before            = (int) filesize( $size_file );
+			$result['before'] += $before;
+
+			$this->processor->optimize( $size_file );
+			$converted  = $this->processor->convert( $size_file, $mime_type );
+			$final_file = false !== $converted ? $converted : $size_file;
+
+			$result['after'] += file_exists( $final_file ) ? (int) filesize( $final_file ) : $before;
+
+			if ( $converted && $converted !== $size_file ) {
+				$result['updates'][ $size ]                           = [
+					'file' => $converted,
+					'mime' => $this->processor->get_mime_type( $converted ),
+				];
+				$result['url_pairs'][ $rel_dir . $size_data['file'] ] = $rel_dir . basename( $converted );
+			}
+		}
+
+		return $result;
+	}
+
+	/**
 	 * Accumule les réécritures d'URL au lieu de les exécuter une par une.
 	 * À appeler avant chaque image d'un lot ; flush_url_rewrites() les vide.
 	 */
@@ -457,6 +510,387 @@ class Module extends AbstractModule {
 		$pairs                   = $this->pending_url_pairs;
 		$this->pending_url_pairs = [];
 		( new UrlRewriter() )->rewrite( $pairs );
+	}
+
+	/* ================================================================
+	 * ACTIONS SUR UN MÉDIA (panneau de la fiche)
+	 * ================================================================ */
+
+	/**
+	 * Chemin absolu de l'original conservé, '' s'il n'y en a pas.
+	 */
+	public function get_backup_path( int $attachment_id ): string {
+		$rel = (string) get_post_meta( $attachment_id, '_skmt_backup_file', true );
+
+		// Le chemin finit dans copy() et wp_delete_file() : pas de « .. ».
+		if ( '' === $rel || 0 !== validate_file( $rel ) ) {
+			return '';
+		}
+
+		$path = $this->get_backup_dir() . '/' . $rel;
+
+		return file_exists( $path ) ? $path : '';
+	}
+
+	/**
+	 * Dossier des originaux : uploads/skmt-originals-{jeton}.
+	 *
+	 * Les originaux gardent leurs EXIF (GPS compris), et uploads/ est servi
+	 * tel quel : un nom fixe rendrait chaque copie devinable depuis l'URL
+	 * publique de l'image. Le .htaccess ne protège que sous Apache (nginx
+	 * l'ignore) ; c'est le jeton aléatoire, propre au site, qui protège.
+	 */
+	private function get_backup_dir(): string {
+		$key   = $this->get_module_option_key() . self::BACKUP_TOKEN_SUFFIX;
+		$token = (string) get_option( $key, '' );
+		if ( '' === $token ) {
+			$token = strtolower( wp_generate_password( 24, false ) );
+			update_option( $key, $token, false );
+		}
+
+		return trailingslashit( wp_upload_dir()['basedir'] ) . self::BACKUP_DIR . '-' . $token;
+	}
+
+	/**
+	 * Copie le fichier principal intact dans skmt-originals/, une seule fois.
+	 *
+	 * @param string $rel Chemin relatif au dossier uploads (metadata['file']).
+	 */
+	private function backup_original( int $attachment_id, string $file, string $rel ): void {
+		if ( ! $this->settings['keep_original'] || '' !== $this->get_backup_path( $attachment_id ) || 0 !== validate_file( $rel ) ) {
+			return;
+		}
+
+		$dir  = $this->get_backup_dir();
+		$dest = $dir . '/' . $rel;
+
+		if ( ! wp_mkdir_p( dirname( $dest ) ) || ! copy( $file, $dest ) ) {
+			return;
+		}
+
+		// Pas de listage du dossier, et refus d'accès sous Apache.
+		if ( ! file_exists( $dir . '/index.php' ) ) {
+			file_put_contents( $dir . '/index.php', "<?php\n// Silence is golden.\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- fichier local créé une fois.
+			file_put_contents( $dir . '/.htaccess', "Require all denied\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents -- idem.
+		}
+
+		update_post_meta( $attachment_id, '_skmt_backup_file', $rel );
+	}
+
+	/**
+	 * Hook delete_attachment : supprime l'original conservé du média.
+	 */
+	public function delete_backup( int $attachment_id ): void {
+		$backup = $this->get_backup_path( $attachment_id );
+		if ( '' !== $backup ) {
+			wp_delete_file( $backup );
+		}
+	}
+
+	/**
+	 * Ré-optimise un média avec les réglages actuels, éventuellement vers un
+	 * autre format.
+	 *
+	 * Repart de l'original conservé s'il existe : sinon chaque passage
+	 * recompresse une image déjà compressée.
+	 *
+	 * @param string $format '' (réglages) ou 'webp' / 'avif'.
+	 */
+	public function reprocess_attachment( int $attachment_id, string $format = '' ): ?\WP_Error {
+		if ( '' !== $format ) {
+			$cap = $this->processor->get_capabilities();
+			if ( ! in_array( $format, [ 'webp', 'avif' ], true ) || empty( $cap[ $format ] ) ) {
+				return new \WP_Error( 'skmt_format', __( 'Ce format n\'est pas disponible sur ce serveur.', 'studio-kyne-mini-tools' ) );
+			}
+		}
+
+		$previous = strtolower( pathinfo( (string) get_attached_file( $attachment_id ), PATHINFO_EXTENSION ) );
+
+		if ( '' !== $this->get_backup_path( $attachment_id ) ) {
+			$error = $this->restore_original( $attachment_id, true );
+			if ( $error ) {
+				return $error;
+			}
+		} else {
+			// Les métas restent : le média est toujours « optimisé », et
+			// process_attachment_metadata() ne sauvegarde pas sa version
+			// dégradée comme s'il s'agissait d'un original.
+			$this->unrecord_stats( $attachment_id );
+		}
+
+		$this->with_format(
+			$format,
+			function () use ( $attachment_id ): void {
+				$this->process_and_update_attachment( $attachment_id, true );
+			}
+		);
+
+		// convert() ne garde le format demandé que s'il allège l'image. Parti
+		// de l'original, un WebP converti en vain vers l'AVIF retomberait en
+		// JPEG : on le ré-encode dans son format précédent.
+		$result = strtolower( pathinfo( (string) get_attached_file( $attachment_id ), PATHINFO_EXTENSION ) );
+		if ( '' !== $format && $result !== $format && $result !== $previous
+			&& in_array( $previous, [ 'webp', 'avif' ], true ) && ! empty( $this->processor->get_capabilities()[ $previous ] ) ) {
+			return $this->reprocess_attachment( $attachment_id, $previous );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Exécute $callback avec un format de conversion imposé ('' : réglages).
+	 */
+	private function with_format( string $format, callable $callback ): void {
+		$processor = $this->processor;
+		if ( '' !== $format ) {
+			$this->processor = new ImageProcessor( array_merge( $this->settings, [ 'format_mode' => $format ] ) );
+		}
+
+		try {
+			$callback();
+		} finally {
+			$this->processor = $processor;
+		}
+	}
+
+	/**
+	 * Recrée les miniatures depuis le fichier principal, puis les optimise
+	 * si le média l'est.
+	 */
+	public function regenerate_thumbnails( int $attachment_id ): ?\WP_Error {
+		$old_metadata = wp_get_attachment_metadata( $attachment_id );
+		$file         = (string) get_attached_file( $attachment_id );
+
+		if ( ! is_array( $old_metadata ) || '' === $file || ! file_exists( $file ) ) {
+			return new \WP_Error( 'skmt_missing', __( 'Fichier introuvable.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$metadata = $this->generate_metadata( $attachment_id, $file, $old_metadata );
+		if ( null === $metadata ) {
+			return new \WP_Error( 'skmt_regenerate', __( 'La génération des miniatures a échoué.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( $this->is_already_optimized( $attachment_id ) ) {
+			$subdir  = dirname( $metadata['file'] );
+			$rel_dir = ( '.' === $subdir || '' === $subdir ) ? '' : trailingslashit( str_replace( '\\', '/', $subdir ) );
+
+			// Les miniatures suivent le format du fichier principal : après une
+			// conversion en WebP depuis la fiche, les réglages (AVIF, auto…)
+			// donneraient un principal WebP et des miniatures AVIF.
+			$format = strtolower( pathinfo( $file, PATHINFO_EXTENSION ) );
+			$this->with_format(
+				in_array( $format, [ 'webp', 'avif' ], true ) ? $format : '',
+				function () use ( &$metadata, $file, $rel_dir ): void {
+					$sizes    = $this->process_sizes( $metadata, $this->processor->get_mime_type( $file ), trailingslashit( wp_upload_dir()['basedir'] ) . $rel_dir, $rel_dir );
+					$metadata = $this->update_metadata_after_conversion( $metadata, '', '', $sizes['updates'] );
+				}
+			);
+		}
+
+		$metadata = $this->replace_metadata( $attachment_id, $old_metadata, $metadata );
+
+		if ( $this->is_already_optimized( $attachment_id ) ) {
+			$this->refresh_attachment_totals( $attachment_id, $metadata );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Remet l'original conservé à la place des versions optimisées.
+	 *
+	 * @param bool $keep_backup Garder la copie (ré-optimisation depuis
+	 *                          l'original) ou la supprimer (restauration).
+	 */
+	public function restore_original( int $attachment_id, bool $keep_backup = false ): ?\WP_Error {
+		$backup       = $this->get_backup_path( $attachment_id );
+		$old_metadata = wp_get_attachment_metadata( $attachment_id );
+
+		if ( '' === $backup || ! is_array( $old_metadata ) || empty( $old_metadata['file'] ) ) {
+			return new \WP_Error( 'skmt_no_backup', __( 'Aucun original conservé pour ce média.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$target  = trailingslashit( wp_upload_dir()['basedir'] ) . get_post_meta( $attachment_id, '_skmt_backup_file', true );
+		$current = (string) get_attached_file( $attachment_id );
+
+		if ( ! copy( $backup, $target ) ) {
+			return new \WP_Error( 'skmt_restore', __( 'Impossible de recopier l\'original.', 'studio-kyne-mini-tools' ) );
+		}
+
+		if ( wp_normalize_path( $current ) !== wp_normalize_path( $target ) ) {
+			$this->update_attachment_database_refs( $attachment_id, $current, $target );
+		}
+
+		$metadata = $this->generate_metadata( $attachment_id, $target, $old_metadata );
+		if ( null === $metadata ) {
+			return new \WP_Error( 'skmt_regenerate', __( 'La génération des miniatures a échoué.', 'studio-kyne-mini-tools' ) );
+		}
+
+		$this->replace_metadata( $attachment_id, $old_metadata, $metadata );
+
+		$this->unrecord_stats( $attachment_id );
+		foreach ( self::OPTIMIZATION_META as $key ) {
+			delete_post_meta( $attachment_id, $key );
+		}
+
+		if ( ! $keep_backup ) {
+			wp_delete_file( $backup );
+			delete_post_meta( $attachment_id, '_skmt_backup_file' );
+		}
+
+		return null;
+	}
+
+	/**
+	 * Métadonnées WordPress recalculées depuis $file, sans notre traitement.
+	 *
+	 * @param array<string, mixed> $old_metadata
+	 * @return array<string, mixed>|null
+	 */
+	private function generate_metadata( int $attachment_id, string $file, array $old_metadata ): ?array {
+		require_once ABSPATH . 'wp-admin/includes/image.php';
+
+		// Grande image : WordPress tire les miniatures de l'original d'avant
+		// « -scaled » (photo-150x150.jpg), pas du fichier réduit
+		// (photo-scaled-150x150.jpg). On fait de même, sinon chaque miniature
+		// change de nom et toute URL hors base (cache, CDN, e-mail) casse.
+		$original = empty( $old_metadata['original_image'] ) ? '' : path_join( dirname( $file ), $old_metadata['original_image'] );
+		if ( '' !== $original && file_exists( $original ) ) {
+			$metadata          = $old_metadata;
+			$metadata['file']  = _wp_relative_upload_path( $file );
+			$metadata['sizes'] = [];
+			$dimensions        = wp_getimagesize( $file );
+			if ( $dimensions ) {
+				$metadata['width']  = $dimensions[0];
+				$metadata['height'] = $dimensions[1];
+			}
+
+			// phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- filtre du cœur, appliqué comme dans wp_create_image_subsizes().
+			$sizes = apply_filters( 'intermediate_image_sizes_advanced', wp_get_registered_image_subsizes(), $metadata, $attachment_id );
+
+			return _wp_make_subsizes( $sizes, $original, $metadata, $attachment_id );
+		}
+
+		// Sans notre filtre : l'appelant décide de ce qui s'optimise. Sans le
+		// seuil « big image » : le fichier principal est déjà le bon, WordPress
+		// en ferait sinon un « -scaled » de plus.
+		remove_filter( 'wp_generate_attachment_metadata', [ $this, 'optimize_attachment_sizes' ], 10 );
+		add_filter( 'big_image_size_threshold', '__return_false', 999 );
+
+		$metadata = wp_generate_attachment_metadata( $attachment_id, $file );
+
+		remove_filter( 'big_image_size_threshold', '__return_false', 999 );
+		add_filter( 'wp_generate_attachment_metadata', [ $this, 'optimize_attachment_sizes' ], 10, 2 );
+
+		if ( empty( $metadata['file'] ) ) {
+			return null;
+		}
+
+		return $metadata;
+	}
+
+	/**
+	 * Enregistre les nouvelles métadonnées, supprime les fichiers qui n'y
+	 * figurent plus et réécrit les URL des fichiers renommés.
+	 *
+	 * @param array<string, mixed> $old_metadata
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, mixed>
+	 */
+	private function replace_metadata( int $attachment_id, array $old_metadata, array $metadata ): array {
+		$base_path = trailingslashit( wp_upload_dir()['basedir'] );
+		$old_files = $this->metadata_files( $old_metadata );
+		$new_files = $this->metadata_files( $metadata );
+
+		// Même clé (fichier principal, taille « medium »…) : ancien → nouveau.
+		$url_pairs = [];
+		foreach ( $old_files as $key => $rel ) {
+			if ( isset( $new_files[ $key ] ) && $new_files[ $key ] !== $rel ) {
+				$url_pairs[ $rel ] = $new_files[ $key ];
+			}
+		}
+
+		$kept = array_flip( $new_files );
+		foreach ( $old_files as $rel ) {
+			if ( ! isset( $kept[ $rel ] ) ) {
+				wp_delete_file( $base_path . $rel );
+			}
+		}
+
+		if ( $url_pairs ) {
+			( new UrlRewriter() )->rewrite( $url_pairs );
+		}
+
+		$metadata = $this->refresh_metadata_filesizes( $metadata, $base_path );
+		wp_update_attachment_metadata( $attachment_id, $metadata );
+
+		return $metadata;
+	}
+
+	/**
+	 * Fichiers d'un attachment, relatifs au dossier uploads, indexés par rôle
+	 * ('' pour le principal, nom de la taille sinon).
+	 *
+	 * @param array<string, mixed> $metadata
+	 * @return array<string, string>
+	 */
+	private function metadata_files( array $metadata ): array {
+		if ( empty( $metadata['file'] ) ) {
+			return [];
+		}
+
+		$main    = str_replace( '\\', '/', $metadata['file'] );
+		$subdir  = dirname( $main );
+		$rel_dir = '.' === $subdir ? '' : trailingslashit( $subdir );
+		$files   = [ '' => $main ];
+
+		foreach ( $metadata['sizes'] ?? [] as $size => $size_data ) {
+			if ( ! empty( $size_data['file'] ) ) {
+				$files[ (string) $size ] = $rel_dir . $size_data['file'];
+			}
+		}
+
+		return $files;
+	}
+
+	/**
+	 * Recalcule le poids final d'un média optimisé après régénération de ses
+	 * miniatures, et reporte l'écart dans les statistiques globales.
+	 *
+	 * @param array<string, mixed> $metadata
+	 */
+	private function refresh_attachment_totals( int $attachment_id, array $metadata ): void {
+		$after = (int) ( $metadata['filesize'] ?? 0 );
+		foreach ( $metadata['sizes'] ?? [] as $size_data ) {
+			$after += (int) ( $size_data['filesize'] ?? 0 );
+		}
+
+		$original  = (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true );
+		$old_saved = (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true );
+		$new_saved = max( $original - $after, 0 );
+
+		update_post_meta( $attachment_id, '_skmt_optimized_bytes', $after );
+		update_post_meta( $attachment_id, '_skmt_bytes_saved', $new_saved );
+
+		$stats                = $this->get_raw_stats();
+		$stats['bytes_saved'] = max( $stats['bytes_saved'] - $old_saved + $new_saved, 0 );
+		update_option( $this->get_stats_key(), $stats, false );
+	}
+
+	/**
+	 * Retire un média optimisé des statistiques globales, avant de le
+	 * retraiter ou de le restaurer : sinon il compterait deux fois.
+	 */
+	private function unrecord_stats( int $attachment_id ): void {
+		if ( ! $this->is_already_optimized( $attachment_id ) ) {
+			return;
+		}
+
+		$stats                   = $this->get_raw_stats();
+		$stats['optimized']      = max( $stats['optimized'] - 1, 0 );
+		$stats['bytes_saved']    = max( $stats['bytes_saved'] - (int) get_post_meta( $attachment_id, '_skmt_bytes_saved', true ), 0 );
+		$stats['original_bytes'] = max( $stats['original_bytes'] - (int) get_post_meta( $attachment_id, '_skmt_original_bytes', true ), 0 );
+		update_option( $this->get_stats_key(), $stats, false );
 	}
 
 	/* ================================================================
@@ -493,15 +927,23 @@ class Module extends AbstractModule {
 		return $this->get_module_option_key() . self::STATS_SUFFIX;
 	}
 
+	/**
+	 * Compteurs globaux tels qu'enregistrés (sans les capacités serveur).
+	 *
+	 * @return array{optimized: int, bytes_saved: int, original_bytes: int}
+	 */
+	private function get_raw_stats(): array {
+		$stats = (array) get_option( $this->get_stats_key(), [] );
+
+		return [
+			'optimized'      => (int) ( $stats['optimized'] ?? 0 ),
+			'bytes_saved'    => (int) ( $stats['bytes_saved'] ?? 0 ),
+			'original_bytes' => (int) ( $stats['original_bytes'] ?? 0 ),
+		];
+	}
+
 	private function update_stats( int $bytes_saved, int $original_bytes ): void {
-		$stats = wp_parse_args(
-			get_option( $this->get_stats_key(), [] ),
-			[
-				'optimized'      => 0,
-				'bytes_saved'    => 0,
-				'original_bytes' => 0,
-			]
-		);
+		$stats = $this->get_raw_stats();
 
 		++$stats['optimized'];
 		$stats['bytes_saved']    += max( $bytes_saved, 0 );
@@ -514,15 +956,8 @@ class Module extends AbstractModule {
 	 * @return array<string, mixed>
 	 */
 	public function get_stats(): array {
-		$defaults = [
-			'optimized'      => 0,
-			'bytes_saved'    => 0,
-			'original_bytes' => 0,
-		];
-		$stats    = wp_parse_args( get_option( $this->get_stats_key(), [] ), $defaults );
-
 		return array_merge(
-			$stats,
+			$this->get_raw_stats(),
 			[
 				'capabilities' => $this->processor->get_capabilities(),
 			]

@@ -7,7 +7,7 @@
 
   document.addEventListener("DOMContentLoaded", function () {
     initBulkOptimization();
-    initSingleOptimization();
+    initMediaActions();
     initSvgRolesToggle();
   });
 
@@ -277,129 +277,181 @@
     }
   }
 
-  function initSingleOptimization() {
+  /* ================================================================
+   * PANNEAU DE LA FICHE MÉDIA
+   * Chaque action renvoie le panneau rendu côté serveur : on le remplace
+   * tel quel au lieu de recalculer tailles et boutons en JS.
+   * ================================================================ */
+
+  var MODAL_ID = "skmt-io-modal";
+  var FORMAT_LABELS = { webp: "WebP", avif: "AVIF" };
+
+  function initMediaActions() {
     document.addEventListener("click", function (event) {
-      const button = event.target.closest(".skmt-optimize-single");
+      var button = event.target.closest("[data-skmt-io-action]");
       if (!button || typeof skmtAdmin === "undefined") return;
 
-      const wrapper = button.closest(".skmt-media-optimizer");
-      const attachmentId = button.getAttribute("data-attachment");
-      const messageEl = wrapper
-        ? wrapper.querySelector(".skmt-media-optimizer__message")
-        : null;
+      var panel = button.closest(".skmt-media-optimizer");
+      if (!panel) return;
 
-      if (!attachmentId) return;
+      var action = button.getAttribute("data-skmt-io-action");
+      var i18n = skmtAdmin.i18n || {};
+      var run = function (extra) {
+        runAction(panel, button, action, extra);
+      };
 
-      button.disabled = true;
-      button.textContent = skmtAdmin.i18n.singleRunning || "Optimisation…";
-
-      const formData = new FormData();
-      formData.append("action", "skmt_optimize_single");
-      formData.append("nonce", skmtAdmin.nonce);
-      formData.append("attachment_id", attachmentId);
-
-      fetch(skmtAdmin.ajaxUrl, {
-        method: "POST",
-        credentials: "same-origin",
-        body: formData,
-      })
-        .then(function (response) {
-          return response.json();
-        })
-        .then(function (data) {
-          if (!data.success) {
-            if (messageEl) {
-              messageEl.textContent =
-                data.data || skmtAdmin.i18n.singleError || "Erreur";
-            }
-            button.disabled = false;
-            button.textContent = skmtAdmin.i18n.singleError || "Erreur";
-            return;
-          }
-
-          const result = data.data || {};
-          if (wrapper) {
-            const savedEl = wrapper.querySelector(".skmt-bytes-saved");
-            const finalEl = wrapper.querySelector(".skmt-bytes-final");
-            const estimatedEl = wrapper.querySelector(".skmt-bytes-estimated");
-            const originalEl = wrapper.querySelector(".skmt-bytes-original");
-            const mainSavedEl = wrapper.querySelector(".skmt-main-bytes-saved");
-            const mainFinalEl = wrapper.querySelector(".skmt-main-bytes-final");
-            const mainOriginalEl = wrapper.querySelector(".skmt-main-bytes-original");
-            const potentialBlock = wrapper.querySelector(
-              ".skmt-gain-potential",
-            );
-            const resultBlock = wrapper.querySelector(".skmt-gain-result");
-
-            if (estimatedEl) {
-              estimatedEl.textContent = "—";
-            }
-
-            if (savedEl) {
-              savedEl.textContent =
-                typeof result.bytes_saved === "number"
-                  ? formatBytes(result.bytes_saved)
-                  : savedEl.textContent;
-            }
-
-            if (finalEl) {
-              finalEl.textContent =
-                typeof result.optimized_bytes === "number"
-                  ? formatBytes(result.optimized_bytes)
-                  : finalEl.textContent;
-            }
-
-            if (originalEl) {
-              originalEl.textContent =
-                typeof result.original_bytes === "number"
-                  ? formatBytes(result.original_bytes)
-                  : originalEl.textContent;
-            }
-
-            if (mainSavedEl) {
-              mainSavedEl.textContent =
-                typeof result.main_bytes_saved === "number"
-                  ? formatBytes(result.main_bytes_saved)
-                  : mainSavedEl.textContent;
-            }
-
-            if (mainFinalEl) {
-              mainFinalEl.textContent =
-                typeof result.main_optimized_bytes === "number"
-                  ? formatBytes(result.main_optimized_bytes)
-                  : mainFinalEl.textContent;
-            }
-
-            if (mainOriginalEl) {
-              mainOriginalEl.textContent =
-                typeof result.main_original_bytes === "number"
-                  ? formatBytes(result.main_original_bytes)
-                  : mainOriginalEl.textContent;
-            }
-
-            if (potentialBlock) {
-              potentialBlock.style.display = "none";
-            }
-
-            if (resultBlock) {
-              resultBlock.style.display = "block";
-            }
-          }
-
-          if (messageEl) {
-            messageEl.textContent = skmtAdmin.i18n.singleDone || "Optimisée";
-          }
-
-          button.textContent = skmtAdmin.i18n.singleDone || "Optimisée";
-        })
-        .catch(function (err) {
-          if (messageEl) {
-            messageEl.textContent = err.message || "Erreur réseau";
-          }
-          button.disabled = false;
-          button.textContent = skmtAdmin.i18n.singleError || "Erreur";
+      if (action === "reoptimize") {
+        var hasBackup = button.getAttribute("data-has-backup") === "1";
+        confirmAction({
+          title: i18n.reoptimize.title,
+          message: hasBackup ? i18n.reoptimize.backup : i18n.reoptimize.nobackup,
+          confirm: i18n.reoptimize.confirm,
+          onConfirm: run,
         });
+      } else if (action === "convert") {
+        confirmAction({
+          title: i18n.convert.title,
+          message: i18n.convert.message,
+          confirm: i18n.convert.confirm,
+          formats: (button.getAttribute("data-formats") || "").split(",").filter(Boolean),
+          onConfirm: run,
+        });
+      } else if (action === "restore") {
+        confirmAction({
+          title: i18n.restore.title,
+          message: i18n.restore.message,
+          confirm: i18n.restore.confirm,
+          danger: true,
+          onConfirm: run,
+        });
+      } else {
+        run({});
+      }
     });
+  }
+
+  function runAction(panel, button, action, extra) {
+    var attachmentId = panel.getAttribute("data-attachment");
+    var buttons = panel.querySelectorAll("[data-skmt-io-action]");
+    buttons.forEach(function (b) {
+      b.disabled = true;
+    });
+    var label = button.textContent;
+    button.textContent = skmtAdmin.i18n.mediaRunning || "…";
+
+    var formData = new FormData();
+    formData.append("action", "skmt_image_optimizer_media_" + action);
+    formData.append("nonce", skmtAdmin.nonce);
+    formData.append("attachment_id", attachmentId);
+    Object.keys(extra || {}).forEach(function (key) {
+      formData.append(key, extra[key]);
+    });
+
+    fetch(skmtAdmin.ajaxUrl, {
+      method: "POST",
+      credentials: "same-origin",
+      body: formData,
+    })
+      .then(function (response) {
+        return response.json();
+      })
+      .then(function (data) {
+        if (!data.success) {
+          throw new Error(data.data || skmtAdmin.i18n.mediaError);
+        }
+
+        panel.outerHTML = data.data.html;
+        toast(data.data.message, data.data.type);
+
+        // Grille de la médiathèque : le modèle Backbone garde l'ancienne URL
+        // (et l'ancien panneau) tant qu'on ne le recharge pas.
+        if (window.wp && wp.media && typeof wp.media.attachment === "function") {
+          wp.media.attachment(attachmentId).fetch();
+        }
+      })
+      .catch(function (err) {
+        buttons.forEach(function (b) {
+          b.disabled = false;
+        });
+        button.textContent = label;
+        toast(err.message || skmtAdmin.i18n.mediaError, "error");
+      });
+  }
+
+  // Modale nommée du design system, créée une fois dans <body> : les écrans
+  // de médias n'ont pas le singleton #skmt-modal-overlay des pages du plugin.
+  function confirmAction(options) {
+    var modal = document.getElementById(MODAL_ID);
+    if (!modal) {
+      modal = document.createElement("div");
+      modal.id = MODAL_ID;
+      modal.className = "skmt-modal-overlay";
+      modal.setAttribute("role", "dialog");
+      modal.setAttribute("aria-modal", "true");
+      modal.setAttribute("aria-labelledby", MODAL_ID + "-title");
+      modal.innerHTML =
+        '<div class="skmt-modal">' +
+        '<div class="skmt-modal__header"><h3 id="' + MODAL_ID + '-title" class="skmt-modal__title"></h3></div>' +
+        '<div class="skmt-modal__body">' +
+        '<p class="skmt-io-modal__message"></p>' +
+        '<div class="skmt-form__group skmt-io-modal__format">' +
+        '<label class="skmt-form__label" for="' + MODAL_ID + '-format"></label>' +
+        '<select class="skmt-select" id="' + MODAL_ID + '-format"></select>' +
+        "</div></div>" +
+        '<div class="skmt-modal__footer">' +
+        '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary skmt-modal-close"></button>' +
+        '<button type="button" class="skmt-btn skmt-btn--sm skmt-io-modal__confirm"></button>' +
+        "</div></div>";
+      document.body.appendChild(modal);
+
+      modal.querySelector(".skmt-modal-close").textContent = skmtAdmin.i18n.cancel;
+      modal.querySelector(".skmt-form__label").textContent = skmtAdmin.i18n.format;
+      modal.querySelector(".skmt-io-modal__confirm").addEventListener("click", function () {
+        window.skmtModalClose(MODAL_ID);
+        if (typeof modal.onConfirm === "function") modal.onConfirm();
+      });
+    }
+
+    var formats = options.formats || [];
+    var select = modal.querySelector("select");
+    select.innerHTML = "";
+    formats.forEach(function (format) {
+      var option = document.createElement("option");
+      option.value = format;
+      option.textContent = FORMAT_LABELS[format] || format;
+      select.appendChild(option);
+    });
+    modal.querySelector(".skmt-io-modal__format").style.display = formats.length ? "" : "none";
+
+    modal.querySelector(".skmt-modal__title").textContent = options.title;
+    modal.querySelector(".skmt-io-modal__message").textContent = options.message;
+
+    var confirmBtn = modal.querySelector(".skmt-io-modal__confirm");
+    confirmBtn.textContent = options.confirm;
+    confirmBtn.className =
+      "skmt-btn skmt-btn--sm skmt-io-modal__confirm " +
+      (options.danger ? "skmt-btn--danger" : "skmt-btn--primary");
+
+    modal.onConfirm = function () {
+      options.onConfirm(formats.length ? { format: select.value } : {});
+    };
+
+    window.skmtModalOpen(MODAL_ID);
+    confirmBtn.focus();
+  }
+
+  // Le conteneur de toasts n'existe que sur les pages du plugin.
+  function toast(message, type) {
+    if (typeof window.skmtShowToast !== "function") return;
+    if (!document.getElementById("skmt-toast-container")) {
+      var container = document.createElement("div");
+      container.id = "skmt-toast-container";
+      container.className = "skmt-toast-container";
+      container.setAttribute("role", "region");
+      container.setAttribute("aria-live", "polite");
+      document.body.appendChild(container);
+    }
+    window.skmtShowToast(message, type || "success");
   }
 
   function formatBytes(bytes) {
