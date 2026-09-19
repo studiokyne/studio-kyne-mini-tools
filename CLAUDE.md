@@ -6,7 +6,7 @@ Guide de travail pour Claude Code sur ce dépôt. Les règles ci-dessous sont ab
 
 **Studio Kyne Mini Tools** est une extension WordPress modulaire (PHP 7.4+, WP 6.0+). Pas de build, pas de Composer à l'exécution, pas de npm : du PHP pur avec un autoloader PSR-4 maison (`StudioKyne\MiniTools\` → `includes/`). Aucun test automatisé. Le JS tiers est embarqué tel quel sous `assets/admin/js/vendor/`, jamais bundlé.
 
-Huit modules sous `includes/Modules/` : Security, WhiteLabel, ImageOptimizer, MenuCreator, Login, Files, Media, Database. Chacun étend `AbstractModule`, enregistre ses hooks dans `init()`, assainit lui-même ce qu'il persiste (`save_settings()` — le cœur n'applique rien) et déclare ses clés de désinstallation. Réglages : `skmt_settings` (global + état des modules) et `skmt_module_{id}` (par module), fusionnés **récursivement** sur les défauts.
+Dix modules sous `includes/Modules/` : Security, WhiteLabel, ImageOptimizer, MenuCreator, Login, Files, Media, Database, ActivityLog, Smtp. Chacun étend `AbstractModule`, enregistre ses hooks dans `init()`, assainit lui-même ce qu'il persiste (`save_settings()` — le cœur n'applique rien) et déclare ses clés de désinstallation. Réglages : `skmt_settings` (global + état des modules) et `skmt_module_{id}` (par module), fusionnés **récursivement** sur les défauts.
 
 Cycle : `plugins_loaded` → `Plugin::instance()` → `init` → chargement du textdomain, définition des modules (filtre `skmt_module_definitions`), `Module::init()` sur chaque module actif. `Admin` n'existe que sous `is_admin()`. Tout formulaire poste vers `admin-post.php` avec nonce + `manage_options` ; tout endpoint AJAX (`wp_ajax_skmt_{module}_{action}`) vérifie `skmt_admin_nonce` puis la capacité du module.
 
@@ -15,7 +15,7 @@ Cycle : `plugins_loaded` → `Plugin::instance()` → `init` → chargement du t
 - **Jamais de bump de version manuel.** La CI le fait (`* Version:` et `SKMT_VERSION` dans `studio-kyne-mini-tools.php`, toujours en phase). Push sur `dev` → pré-release automatique ; stable → `workflow_dispatch` sur `main`.
 - **Garde `ABSPATH`** sur tout fichier PHP : `defined( 'ABSPATH' ) || exit;` après `namespace`, sinon après le docbloc.
 - **Jamais de SVG dessiné ou approximé.** Toute icône vient de [Lucide](https://lucide.dev) (lucide-static v1.34.0), fichier officiel récupéré tel quel — en PHP (`Admin::get_icon_paths()`) comme dans le JS des modules.
-- **Composants du design system uniquement** (`components.css` + `admin.js`) : modales, tooltips, toasts, boutons, formulaires. Ne pas recoder d'équivalent. Voir [docs/design-system.md](docs/design-system.md).
+- **Composants du design system uniquement** (`components.css` + `admin.js`) : modales, tooltips, toasts, boutons, formulaires, onglets. Ne pas recoder d'équivalent. Voir [docs/design-system.md](docs/design-system.md).
 - **Ne jamais faire confiance au client** : tout `$_POST`/`$_GET`/`$_FILES` passe par l'assainisseur adapté après `wp_unslash()` ; chemins, identifiants SQL, IP et JSON importé sont validés côté serveur (voir les pages de module).
 - **Pas de baseline PHPCS/PHPStan** : ne jamais en recréer une pour faire passer un constat. Corriger, ou poser un `phpcs:ignore` / `@phpstan-ignore` motivé.
 - **Documenter les pièges dans `docs/`**, pas ici : quand une correction naît d'un comportement contre-intuitif de WordPress ou d'un bug qui a coûté, l'écrire dans la page du module (ce qui cassait, pourquoi cette solution).

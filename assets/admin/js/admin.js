@@ -16,6 +16,7 @@
     initUnsavedWarning();
     initModuleAjaxToggles();
     initTooltips();
+    initTabs();
   });
 
   /* ================================================================
@@ -165,17 +166,16 @@
       ".skmt-form, #skmt-save-settings-form, #skmt-module-form",
     );
 
+    // Seul un champ nommé part à l'enregistrement. Recherche, filtres d'une
+    // liste ou champ de test (journaux, SMTP) n'ont pas de name : les
+    // manipuler ne laisse rien de non sauvegardé.
+    function markDirty(e) {
+      if (e.target && e.target.name) isDirty = true;
+    }
+
     forms.forEach(function (form) {
-      form.addEventListener(
-        "input",
-        function () { isDirty = true; },
-        { passive: true },
-      );
-      form.addEventListener(
-        "change",
-        function () { isDirty = true; },
-        { passive: true },
-      );
+      form.addEventListener("input", markDirty, { passive: true });
+      form.addEventListener("change", markDirty, { passive: true });
       // Soumettre le form reset l'état dirty
       form.addEventListener("submit", function () { isDirty = false; });
     });
@@ -309,6 +309,82 @@
         });
     });
   }
+
+  /* ================================================================
+   * ONGLETS — [data-skmt-tabs] + [data-skmt-tab-panel]
+   * Sous-onglets d'un écran, côté client : tous les panneaux restent
+   * dans le DOM (et dans le formulaire, donc postés à l'enregistrement).
+   * Le dernier onglet ouvert est rappelé par sessionStorage : après un
+   * enregistrement, la redirection ramène sur l'écran, pas sur l'onglet.
+   * ================================================================ */
+
+  function initTabs() {
+    document.querySelectorAll("[data-skmt-tabs]").forEach(function (list) {
+      var group = list.dataset.skmtTabs;
+      var tabs = Array.prototype.slice.call(list.querySelectorAll("[data-skmt-tab]"));
+      var panels = document.querySelectorAll('[data-skmt-tab-panel][data-skmt-tabs-group="' + group + '"]');
+      var key = "skmt-tab:" + group;
+
+      if (!tabs.length) return;
+
+      function activate(name, focus) {
+        var found = tabs.some(function (tab) { return tab.dataset.skmtTab === name; });
+        if (!found) name = tabs[0].dataset.skmtTab;
+
+        tabs.forEach(function (tab) {
+          var on = tab.dataset.skmtTab === name;
+          tab.classList.toggle("is-active", on);
+          tab.setAttribute("aria-selected", on ? "true" : "false");
+          tab.tabIndex = on ? 0 : -1;
+          if (on && focus) tab.focus();
+        });
+        panels.forEach(function (panel) {
+          panel.hidden = panel.dataset.skmtTabPanel !== name;
+        });
+
+        try { sessionStorage.setItem(key, name); } catch (e) { /* stockage indisponible */ }
+
+        list.dispatchEvent(new CustomEvent("skmt:tab", { bubbles: true, detail: { group: group, name: name } }));
+      }
+
+      list.addEventListener("click", function (e) {
+        var tab = e.target.closest("[data-skmt-tab]");
+        if (tab && list.contains(tab)) activate(tab.dataset.skmtTab, false);
+      });
+
+      // Flèches, Début, Fin : motif « tabs » de l'ARIA Authoring Practices.
+      list.addEventListener("keydown", function (e) {
+        var index = tabs.indexOf(document.activeElement);
+        if (index < 0) return;
+        var next = { ArrowRight: index + 1, ArrowLeft: index - 1, Home: 0, End: tabs.length - 1 }[e.key];
+        if (next === undefined) return;
+        e.preventDefault();
+        activate(tabs[(next + tabs.length) % tabs.length].dataset.skmtTab, true);
+      });
+
+      // Un champ invalide dans un panneau masqué : le navigateur refuse de
+      // soumettre sans pouvoir montrer le champ. On ouvre son onglet.
+      panels.forEach(function (panel) {
+        panel.addEventListener("invalid", function () {
+          if (panel.hidden) activate(panel.dataset.skmtTabPanel, false);
+        }, true);
+      });
+
+      var initial = null;
+      try { initial = sessionStorage.getItem(key); } catch (e) { /* stockage indisponible */ }
+      activate(initial || (list.querySelector("[data-skmt-tab].is-active") || tabs[0]).dataset.skmtTab, false);
+
+      list.skmtActivate = activate;
+    });
+  }
+
+  /** Ouvre un onglet par programme : window.skmtTabs.activate('smtp', 'log'). */
+  window.skmtTabs = {
+    activate: function (group, name) {
+      var list = document.querySelector('[data-skmt-tabs="' + group + '"]');
+      if (list && list.skmtActivate) list.skmtActivate(name, false);
+    },
+  };
 
   /* ================================================================
    * UTILITAIRES

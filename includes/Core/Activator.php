@@ -27,6 +27,7 @@ class Activator {
 		'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
 		'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
 		'activity_log'    => \StudioKyne\MiniTools\Modules\ActivityLog\Module::class,
+		'smtp'            => \StudioKyne\MiniTools\Modules\Smtp\Module::class,
 	];
 
 	/**

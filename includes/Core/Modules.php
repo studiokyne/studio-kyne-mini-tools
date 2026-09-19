@@ -112,6 +112,14 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\ActivityLog\\Module',
 				'icon'        => 'history',
 			],
+			'smtp'            => [
+				'name'        => __( 'SMTP', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Envoi des mails par un serveur SMTP authentifié, mail de test et journal des mails.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'SMTP', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Configurer l\'envoi des mails', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Smtp\\Module',
+				'icon'        => 'mail',
+			],
 		];
 
 		/**

@@ -88,6 +88,32 @@ La classe `.skmt-modal-close` et le clic hors-boîte sont gérés automatiquemen
 </label>
 ```
 
+### Champs hors enregistrement
+
+Recherche, filtres de liste, champ d'un mail de test : ces contrôles vivent souvent dans le formulaire de réglages, mais ne doivent **pas avoir d'attribut `name`**. Ils ne partent pas à l'enregistrement, et l'avertissement « modifications non sauvegardées » d'`admin.js` les ignore (il ne compte que les champs nommés). Autre conséquence : ne pas leur donner un `type` que le navigateur valide (`email`, `url`, `required`), parce que la validation native s'applique aussi aux champs sans `name` et bloquerait « Enregistrer ».
+
+## Onglets
+
+**Quand s'en servir** : un écran qui mélange des natures différentes (réglages, outil, liste ou journal), ou plus de trois ou quatre sections longues. Un onglet par nature de contenu, pas un par section : quelques sections courtes restent sur une seule page.
+
+
+Sous-onglets d'un écran, côté client (`components.css` + `initTabs()` dans `admin.js`, aucune initialisation à écrire) :
+
+```html
+<div class="skmt-tabs" role="tablist" data-skmt-tabs="smtp">
+  <button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="settings">Réglages</button>
+  <button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="log">Journal</button>
+</div>
+<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="smtp" data-skmt-tab-panel="settings">…</div>
+<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="smtp" data-skmt-tab-panel="log" hidden>…</div>
+```
+
+- Les panneaux restent dans le DOM : dans un formulaire de réglages, **tous** les champs partent à l'enregistrement, quel que soit l'onglet ouvert.
+- Le dernier onglet est rappelé par `sessionStorage` (`skmt-tab:{groupe}`) : la redirection après enregistrement revient sur l'écran, pas sur l'onglet.
+- Un champ invalide dans un panneau masqué ouvre son onglet : sans ça, le navigateur bloque la soumission sans pouvoir montrer le champ fautif.
+- Chaque changement émet `skmt:tab` (`detail.group`, `detail.name`) sur la barre, qui remonte jusqu'au `document` : un module peut attendre l'ouverture d'un onglet pour charger ses données. `window.skmtTabs.activate(groupe, nom)` ouvre un onglet par programme.
+- Dans un écran de module, la barre se place **dans** le formulaire, avant `.skmt-module-form__scroll`, pour rester fixe pendant le défilement.
+
 ## Boutons
 
 ```html

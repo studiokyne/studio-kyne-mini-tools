@@ -18,5 +18,6 @@ Documentation interne du plugin, exclue des ZIP de release. `CLAUDE.md` à la ra
 | Media | [modules/media.md](modules/media.md) | taxonomie de dossiers, filtrage serveur, capacités, drag & drop |
 | Database | [modules/database.md](modules/database.md) | validation des identifiants, `normalize_sql()`, éditeur SQL, export |
 | ActivityLog | [modules/activity-log.md](modules/activity-log.md) | table dédiée, pièges de journalisation (auto-draft, Gutenberg, Bricks), plafond de force brute, purge, export CSV |
+| Smtp | [modules/smtp.md](modules/smtp.md) | `phpmailer_init` plutôt qu'un `wp_mail()` remplacé, PHPMailer global, expéditeur et Return-Path, mot de passe chiffré hors export, journal, masquage de la transcription |
 
 Chaque page de module documente les **pièges et décisions** (ce qui a cassé, pourquoi la solution est celle-là), pas le code lui-même : le code se lit dans `includes/Modules/<Module>/`.
