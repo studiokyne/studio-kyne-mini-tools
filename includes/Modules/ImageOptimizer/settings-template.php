@@ -15,7 +15,15 @@ $module_settings = $instance->get_settings();
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="image_optimizer" aria-label="<?php esc_attr_e( 'Sections de l\'Image Optimizer', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="settings"><?php esc_html_e( 'Réglages', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="svg"><?php esc_html_e( 'SVG', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="bulk"><?php esc_html_e( 'Optimisation en masse', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="settings">
 
 	<!-- Comportement -->
 	<div class="skmt-section">
@@ -32,10 +40,10 @@ $module_settings = $instance->get_settings();
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
 						<input type="checkbox"
-							   id="skmt_optimize_on_upload"
-							   name="skmt_module_settings[optimize_on_upload]"
-							   value="1"
-							   <?php checked( $module_settings['optimize_on_upload'], true ); ?>>
+								id="skmt_optimize_on_upload"
+								name="skmt_module_settings[optimize_on_upload]"
+								value="1"
+								<?php checked( $module_settings['optimize_on_upload'], true ); ?>>
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
@@ -77,33 +85,33 @@ $module_settings = $instance->get_settings();
 			<div class="skmt-form__group">
 				<label for="skmt_quality" class="skmt-form__label"><?php echo esc_html__( 'Qualité de compression (1-100)', 'studio-kyne-mini-tools' ); ?></label>
 				<input type="number"
-					   id="skmt_quality"
-					   name="skmt_module_settings[quality]"
-					   class="skmt-input skmt-input--sm"
-					   value="<?php echo esc_attr( $module_settings['quality'] ); ?>"
-					   min="1"
-					   max="100">
+						id="skmt_quality"
+						name="skmt_module_settings[quality]"
+						class="skmt-input skmt-input--sm"
+						value="<?php echo esc_attr( $module_settings['quality'] ); ?>"
+						min="1"
+						max="100">
 			</div>
 
 			<div class="skmt-form__row">
 				<div class="skmt-form__group">
 					<label for="skmt_max_width" class="skmt-form__label"><?php echo esc_html__( 'Largeur max (px)', 'studio-kyne-mini-tools' ); ?></label>
 					<input type="number"
-						   id="skmt_max_width"
-						   name="skmt_module_settings[max_width]"
-						   class="skmt-input"
-						   value="<?php echo esc_attr( $module_settings['max_width'] ); ?>"
-						   min="100">
+							id="skmt_max_width"
+							name="skmt_module_settings[max_width]"
+							class="skmt-input"
+							value="<?php echo esc_attr( $module_settings['max_width'] ); ?>"
+							min="100">
 				</div>
 
 				<div class="skmt-form__group">
 					<label for="skmt_max_height" class="skmt-form__label"><?php echo esc_html__( 'Hauteur max (px)', 'studio-kyne-mini-tools' ); ?></label>
 					<input type="number"
-						   id="skmt_max_height"
-						   name="skmt_module_settings[max_height]"
-						   class="skmt-input"
-						   value="<?php echo esc_attr( $module_settings['max_height'] ); ?>"
-						   min="100">
+							id="skmt_max_height"
+							name="skmt_module_settings[max_height]"
+							class="skmt-input"
+							value="<?php echo esc_attr( $module_settings['max_height'] ); ?>"
+							min="100">
 				</div>
 			</div>
 		</div>
@@ -126,10 +134,10 @@ $module_settings = $instance->get_settings();
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
 						<input type="checkbox"
-							   id="skmt_strip_exif"
-							   name="skmt_module_settings[strip_exif]"
-							   value="1"
-							   <?php checked( $module_settings['strip_exif'], true ); ?>>
+								id="skmt_strip_exif"
+								name="skmt_module_settings[strip_exif]"
+								value="1"
+								<?php checked( $module_settings['strip_exif'], true ); ?>>
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
@@ -143,10 +151,10 @@ $module_settings = $instance->get_settings();
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
 						<input type="checkbox"
-							   id="skmt_generate_alt"
-							   name="skmt_module_settings[generate_alt]"
-							   value="1"
-							   <?php checked( $module_settings['generate_alt'], true ); ?>>
+								id="skmt_generate_alt"
+								name="skmt_module_settings[generate_alt]"
+								value="1"
+								<?php checked( $module_settings['generate_alt'], true ); ?>>
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
@@ -155,23 +163,24 @@ $module_settings = $instance->get_settings();
 			<div class="skmt-option">
 				<div class="skmt-option__content">
 					<label for="skmt_keep_original" class="skmt-option__label"><?php echo esc_html__( 'Conserver l\'original', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Double l'espace disque occupé par la médiathèque. À garder tant que la conversion n'a pas été validée sur le site, à couper ensuite.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
-					<p class="skmt-option__desc"><?php echo esc_html__( 'Garde une copie du fichier source en plus du format converti.', 'studio-kyne-mini-tools' ); ?></p>
+					<p class="skmt-option__desc"><?php echo esc_html__( "Garde une copie intacte du fichier source, qui permet de restaurer ou de ré-optimiser l'image sans perte depuis sa fiche.", 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
 						<input type="checkbox"
-							   id="skmt_keep_original"
-							   name="skmt_module_settings[keep_original]"
-							   value="1"
-							   <?php checked( $module_settings['keep_original'], true ); ?>>
+								id="skmt_keep_original"
+								name="skmt_module_settings[keep_original]"
+								value="1"
+								<?php checked( $module_settings['keep_original'], true ); ?>>
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
 			</div>
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="svg" hidden>
 
 	<!-- Téléchargements SVG -->
 	<?php $svg_enabled = ! empty( $module_settings['svg_upload'] ); ?>
@@ -189,11 +198,11 @@ $module_settings = $instance->get_settings();
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
 						<input type="checkbox"
-							   id="skmt_svg_upload"
-							   name="skmt_module_settings[svg_upload]"
-							   value="1"
-							   data-svg-master
-							   <?php checked( $svg_enabled, true ); ?>>
+								id="skmt_svg_upload"
+								name="skmt_module_settings[svg_upload]"
+								value="1"
+								data-svg-master
+								<?php checked( $svg_enabled, true ); ?>>
 						<span class="skmt-toggle__slider"></span>
 					</label>
 				</div>
@@ -210,9 +219,9 @@ $module_settings = $instance->get_settings();
 						<label class="skmt-svg-role">
 							<span class="skmt-toggle">
 								<input type="checkbox"
-									   name="skmt_module_settings[svg_roles][]"
-									   value="<?php echo esc_attr( $role_slug ); ?>"
-									   <?php checked( in_array( $role_slug, $svg_roles, true ), true ); ?>>
+										name="skmt_module_settings[svg_roles][]"
+										value="<?php echo esc_attr( $role_slug ); ?>"
+										<?php checked( in_array( $role_slug, $svg_roles, true ), true ); ?>>
 								<span class="skmt-toggle__slider"></span>
 							</span>
 							<span class="skmt-svg-role__name"><?php echo esc_html( translate_user_role( $role_name ) ); ?></span>
@@ -222,8 +231,9 @@ $module_settings = $instance->get_settings();
 			</div>
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="bulk" hidden>
 
 	<!-- Optimisation en masse -->
 	<div class="skmt-section">
@@ -273,6 +283,7 @@ $module_settings = $instance->get_settings();
 				</div>
 			</div>
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

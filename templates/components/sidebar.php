@@ -5,7 +5,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$tab     = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+$tab     = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 $modules = $this->modules->get_all();
 
 $core_items = [
@@ -32,13 +32,7 @@ $core_items = [
 <aside class="skmt-sidebar">
 	<div class="skmt-sidebar__header">
 		<h2 class="skmt-sidebar__title"><?php echo esc_html__( 'Navigation', 'studio-kyne-mini-tools' ); ?></h2>
-		<div class="skmt-sidebar__actions">
-			<!-- 
-         2 buttons
-         - 1 pour importer la configuration depuis un fichier JSON
-         - 1 pour exporter la configuration actuelle dans un fichier JSON
-         -->
-		</div>
+		<div class="skmt-sidebar__actions"></div>
 	</div>
 
 	<nav class="skmt-sidebar__nav">
@@ -46,7 +40,7 @@ $core_items = [
 			<?php foreach ( $core_items as $item ) : ?>
 				<li class="skmt-sidebar__item">
 					<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=' . $item['id'] ) ); ?>"
-					   class="skmt-sidebar__link <?php echo $item['id'] === $tab ? 'is-active' : ''; ?>">
+						class="skmt-sidebar__link <?php echo $item['id'] === $tab ? 'is-active' : ''; ?>">
 						<div class="skmt-sidebar__icon-wrapper">
 							<?php echo $this->render_icon( $item['icon'], 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 						</div>
@@ -71,7 +65,7 @@ $core_items = [
 						?>
 						<li class="skmt-sidebar__item">
 							<a href="<?php echo esc_url( admin_url( 'admin.php?page=' . $this->get_slug() . '&tab=module_' . $module_id ) ); ?>"
-							   class="skmt-sidebar__link <?php echo 'module_' . $module_id === $tab ? 'is-active' : ''; ?>">
+								class="skmt-sidebar__link <?php echo 'module_' . $module_id === $tab ? 'is-active' : ''; ?>">
 								<div class="skmt-sidebar__icon-wrapper">
 									<?php echo $this->render_icon( $icon, 'sm' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 								</div>

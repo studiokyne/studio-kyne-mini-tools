@@ -42,6 +42,8 @@ class Admin {
 
 	/**
 	 * Données du toast SKMT à afficher (message + type).
+	 *
+	 * @var array<string, string>|null
 	 */
 	private ?array $skmt_toast = null;
 
@@ -54,7 +56,7 @@ class Admin {
 
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
 		add_filter( 'parent_file', [ $this, 'filter_parent_file' ] );
-		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ], 10, 2 );
+		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'admin_post_skmt_save_settings', [ $this, 'handle_save_settings' ] );
 		add_action( 'admin_post_skmt_toggle_module', [ $this, 'handle_toggle_module' ] );
@@ -70,10 +72,11 @@ class Admin {
 		// il doit rester vide même si un module (Marque blanche) le personnalise.
 		add_filter( 'admin_footer_text', [ $this, 'filter_admin_footer_text' ], PHP_INT_MAX );
 		add_filter( 'update_footer', [ $this, 'filter_update_footer' ], PHP_INT_MAX );
-		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_start' ], 0 );
-		add_action( 'admin_notices',         [ $this, 'capture_wp_notices_end' ],   PHP_INT_MAX );
-		add_action( 'admin_bar_menu',        [ $this, 'register_notification_center' ], 999 );
-		add_action( 'admin_footer',          [ $this, 'render_notification_drawer' ] );
+		add_action( 'admin_notices', [ $this, 'capture_wp_notices_start' ], 0 );
+		add_action( 'admin_notices', [ $this, 'capture_wp_notices_end' ], PHP_INT_MAX );
+		add_action( 'admin_bar_menu', [ $this, 'register_noindex_indicator' ], 998 );
+		add_action( 'admin_bar_menu', [ $this, 'register_notification_center' ], 999 );
+		add_action( 'admin_footer', [ $this, 'render_notification_drawer' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_global_notification_assets' ] );
 		add_action( 'wp_ajax_skmt_dismiss_notice', [ $this, 'handle_dismiss_notice' ] );
 	}
@@ -111,7 +114,7 @@ class Admin {
 
 		global $submenu;
 		if ( isset( $submenu[ $this->slug ] ) ) {
-			$submenu[ $this->slug ][] = [ '', 'manage_options', 'skmt-separator', '', 'skmt-menu-separator' ];
+			$submenu[ $this->slug ][] = [ '', 'manage_options', 'skmt-separator', '', 'skmt-menu-separator' ]; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- séparateur visuel : WordPress n'offre aucune API pour en insérer un dans un sous-menu.
 		}
 
 		foreach ( $this->modules->get_all() as $module_id => $module ) {
@@ -169,7 +172,7 @@ class Admin {
 			$filtered[]   = $item;
 		}
 
-		$submenu[ $this->slug ] = $filtered;
+		$submenu[ $this->slug ] = $filtered; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- dédoublonnage du sous-menu : aucune API WordPress pour réécrire une entrée existante.
 	}
 
 	/* ================================================================
@@ -186,12 +189,12 @@ class Admin {
 
 		// tokens.css d'abord : il ne contient que des custom properties, tous les
 		// autres feuilles en dependent.
-		wp_enqueue_style( 'skmt-tokens-css',     SKMT_ASSETS_URL . 'admin/css/tokens.css',     [],                    SKMT_VERSION );
-		wp_enqueue_style( 'skmt-reset-css',      SKMT_ASSETS_URL . 'admin/css/reset.css',      [ 'skmt-tokens-css' ], SKMT_VERSION );
-		wp_enqueue_style( 'skmt-layout-css',     SKMT_ASSETS_URL . 'admin/css/layout.css',     [ 'skmt-reset-css' ],  SKMT_VERSION );
-		wp_enqueue_style( 'skmt-sidebar-css',    SKMT_ASSETS_URL . 'admin/css/sidebar.css',    [ 'skmt-layout-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-tokens-css', SKMT_ASSETS_URL . 'admin/css/tokens.css', [], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-reset-css', SKMT_ASSETS_URL . 'admin/css/reset.css', [ 'skmt-tokens-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-layout-css', SKMT_ASSETS_URL . 'admin/css/layout.css', [ 'skmt-reset-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-sidebar-css', SKMT_ASSETS_URL . 'admin/css/sidebar.css', [ 'skmt-layout-css' ], SKMT_VERSION );
 		wp_enqueue_style( 'skmt-components-css', SKMT_ASSETS_URL . 'admin/css/components.css', [ 'skmt-tokens-css' ], SKMT_VERSION );
-		wp_enqueue_style( 'skmt-buttons-css',    SKMT_ASSETS_URL . 'admin/css/buttons.css',    [ 'skmt-components-css' ], SKMT_VERSION );
+		wp_enqueue_style( 'skmt-buttons-css', SKMT_ASSETS_URL . 'admin/css/buttons.css', [ 'skmt-components-css' ], SKMT_VERSION );
 
 		wp_enqueue_script( 'skmt-admin-js', SKMT_ASSETS_URL . 'admin/js/admin.js', [], SKMT_VERSION, true );
 
@@ -210,14 +213,18 @@ class Admin {
 	 * Localise les données globales pour un script admin (sans i18n spécifiques aux modules).
 	 */
 	private function localize_admin_script( string $handle ): void {
-		wp_localize_script( $handle, 'skmtAdmin', [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-			'i18n'    => [
-				'saveSuccess' => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
-				'saveError'   => __( 'Une erreur est survenue.', 'studio-kyne-mini-tools' ),
-			],
-		] );
+		wp_localize_script(
+			$handle,
+			'skmtAdmin',
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+				'i18n'    => [
+					'saveSuccess' => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
+					'saveError'   => __( 'Une erreur est survenue.', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
 	}
 
 	/**
@@ -225,14 +232,14 @@ class Admin {
 	 */
 	public function enqueue_global_notification_assets(): void {
 		wp_enqueue_style( 'skmt-notifications-css', SKMT_ASSETS_URL . 'admin/css/notifications.css', [], SKMT_VERSION );
-		wp_enqueue_script( 'skmt-notifications-js', SKMT_ASSETS_URL . 'admin/js/notifications.js',   [], SKMT_VERSION, true );
+		wp_enqueue_script( 'skmt-notifications-js', SKMT_ASSETS_URL . 'admin/js/notifications.js', [], SKMT_VERSION, true );
 	}
 
 	/**
 	 * Charge les assets des modules actifs sur leur page de réglages.
 	 */
 	private function enqueue_module_assets(): void {
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 
 		if ( strpos( $tab, 'module_' ) !== 0 ) {
 			return;
@@ -265,7 +272,7 @@ class Admin {
 			}
 
 			$handle = 'skmt-module-' . $module_id . '-js-' . $index;
-			$deps   = array_merge( [ 'skmt-admin-js' ], $instance->get_admin_js_deps() );
+			$deps   = array_values( array_filter( array_merge( [ 'skmt-admin-js' ], $instance->get_admin_js_deps() ) ) );
 			wp_enqueue_script( $handle, $script_url, $deps, SKMT_VERSION, true );
 
 			// Injection des données JS spécifiques au module dans skmtAdmin
@@ -359,16 +366,16 @@ class Admin {
 		$type = isset( $_GET['skmt_notice_type'] ) ? sanitize_key( $_GET['skmt_notice_type'] ) : 'success';
 
 		$messages = [
-			'settings_saved'     => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
-			'module_activated'   => __( 'Module activé.', 'studio-kyne-mini-tools' ),
-			'module_deactivated' => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
-			'modules_updated'    => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
-			'updates_checked'    => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
-			'settings_reset'      => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
-			'settings_imported'   => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
-			'import_error_file'   => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
+			'settings_saved'       => __( 'Réglages enregistrés avec succès.', 'studio-kyne-mini-tools' ),
+			'module_activated'     => __( 'Module activé.', 'studio-kyne-mini-tools' ),
+			'module_deactivated'   => __( 'Module désactivé.', 'studio-kyne-mini-tools' ),
+			'modules_updated'      => __( 'Modules mis à jour.', 'studio-kyne-mini-tools' ),
+			'updates_checked'      => __( 'Vérification des mises à jour effectuée.', 'studio-kyne-mini-tools' ),
+			'settings_reset'       => __( 'Configuration réinitialisée aux valeurs par défaut.', 'studio-kyne-mini-tools' ),
+			'settings_imported'    => __( 'Configuration importée avec succès.', 'studio-kyne-mini-tools' ),
+			'import_error_file'    => __( 'Erreur lors du chargement du fichier.', 'studio-kyne-mini-tools' ),
 			'import_error_invalid' => __( 'Le fichier JSON est invalide ou incompatible.', 'studio-kyne-mini-tools' ),
-			'import_error_size'   => __( 'Le fichier dépasse la taille maximale autorisée (2 Mo).', 'studio-kyne-mini-tools' ),
+			'import_error_size'    => __( 'Le fichier dépasse la taille maximale autorisée (2 Mo).', 'studio-kyne-mini-tools' ),
 		];
 
 		if ( isset( $messages[ $notice ] ) ) {
@@ -391,10 +398,78 @@ class Admin {
 	}
 
 	/**
-	 * Termine la capture et stocke le HTML des notices WP.
+	 * Termine la capture : les notices WP partent dans le tiroir, tout le
+	 * reste est réémis en place.
+	 *
+	 * Certaines extensions impriment sur `admin_notices` autre chose qu'une
+	 * notice (bandeau d'onboarding, modale, script). Avaler tout le tampon
+	 * les faisait disparaître de la page sans jamais atteindre le tiroir,
+	 * qui ne garde que `.notice` / `.updated` / `.error`.
 	 */
 	public function capture_wp_notices_end(): void {
-		$this->captured_wp_notices = ob_get_clean() ?: '';
+		$html  = (string) ob_get_clean();
+		$split = $this->split_captured_notices( $html );
+
+		$this->captured_wp_notices = $split['notices'];
+
+		if ( '' !== $split['passthrough'] ) {
+			echo $split['passthrough']; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- HTML produit par d'autres extensions, réémis tel quel.
+		}
+	}
+
+	/**
+	 * Sépare le tampon `admin_notices` en deux : les nœuds de premier niveau
+	 * qui sont (ou contiennent) une notice WP, et les autres.
+	 *
+	 * @return array{notices: string, passthrough: string}
+	 */
+	private function split_captured_notices( string $html ): array {
+		$result = [
+			'notices'     => $html,
+			'passthrough' => '',
+		];
+
+		if ( '' === trim( $html ) || ! class_exists( '\DOMDocument' ) ) {
+			return $result;
+		}
+
+		$previous = libxml_use_internal_errors( true );
+		$dom      = new \DOMDocument();
+		$loaded   = $dom->loadHTML(
+			'<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div id="skmt-notices-root">' . $html . '</div></body></html>',
+			LIBXML_HTML_NODEFDTD
+		);
+		libxml_clear_errors();
+		libxml_use_internal_errors( $previous );
+
+		$root = $loaded ? $dom->getElementById( 'skmt-notices-root' ) : null;
+		if ( ! $root ) {
+			return $result;
+		}
+
+		$notices     = '';
+		$passthrough = '';
+		$xpath       = new \DOMXPath( $dom );
+		$notice_test = "contains(concat(' ', normalize-space(@class), ' '), ' notice ')"
+			. " or contains(concat(' ', normalize-space(@class), ' '), ' updated ')"
+			. " or contains(concat(' ', normalize-space(@class), ' '), ' error ')";
+
+		foreach ( $root->childNodes as $node ) {
+			$is_notice = false;
+			if ( XML_ELEMENT_NODE === $node->nodeType ) {
+				$is_notice = $xpath->evaluate( "boolean(self::*[{$notice_test}] | descendant::*[{$notice_test}])", $node );
+			}
+			if ( $is_notice ) {
+				$notices .= $dom->saveHTML( $node );
+			} else {
+				$passthrough .= $dom->saveHTML( $node );
+			}
+		}
+
+		return [
+			'notices'     => $notices,
+			'passthrough' => $passthrough,
+		];
 	}
 
 	/**
@@ -407,16 +482,49 @@ class Admin {
 
 		$bell = $this->render_icon( 'bell', 'sm', 'skmt-notif-bell-icon' );
 
-		$wp_admin_bar->add_node( [
-			'id'     => 'skmt-notif-center',
-			'parent' => 'top-secondary',
-			'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
-			'href'   => '#skmt-notif-drawer',
-			'meta'   => [
-				'class' => 'skmt-notif-trigger',
-				'title' => esc_attr__( 'Notifications', 'studio-kyne-mini-tools' ),
-			],
-		] );
+		$wp_admin_bar->add_node(
+			[
+				'id'     => 'skmt-notif-center',
+				'parent' => 'top-secondary',
+				'title'  => '<span class="skmt-notif-btn-wrap">' . $bell . '<span class="skmt-notif-badge" id="skmt-notif-badge" style="display:none"></span></span>',
+				'href'   => '#skmt-notif-drawer',
+				// WP_Admin_Bar échappe lui-même meta.title : un esc_attr__ ici
+				// double-encoderait (« > » rendu « &gt; »).
+				'meta'   => [
+					'class' => 'skmt-notif-trigger',
+					'title' => __( 'Notifications', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
+	}
+
+	/**
+	 * Signale dans la barre d'admin que le site demande aux moteurs de ne pas
+	 * l'indexer (Réglages > Lecture). Un simple repère, pas une alerte : il doit
+	 * se lire d'un coup d'œil à la connexion sans réclamer d'action.
+	 */
+	public function register_noindex_indicator( \WP_Admin_Bar $wp_admin_bar ): void {
+		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+		if ( '0' !== (string) get_option( 'blog_public', '1' ) ) {
+			return;
+		}
+
+		$icon = $this->render_icon( 'eye-off', 'sm', 'skmt-noindex-icon' );
+
+		$wp_admin_bar->add_node(
+			[
+				'id'     => 'skmt-noindex',
+				'parent' => 'top-secondary',
+				'title'  => '<span class="skmt-noindex-wrap">' . $icon . '<span class="skmt-noindex-label">' . esc_html__( 'No-index', 'studio-kyne-mini-tools' ) . '</span></span>',
+				'href'   => admin_url( 'options-reading.php' ),
+				'meta'   => [
+					'class' => 'skmt-noindex-indicator',
+					'title' => __( 'Les moteurs de recherche sont invités à ne pas indexer ce site (Réglages > Lecture).', 'studio-kyne-mini-tools' ),
+				],
+			]
+		);
 	}
 
 	/**
@@ -454,9 +562,9 @@ class Admin {
 	 */
 	public function render_notification_drawer(): void {
 
-		$close_icon    = $this->render_icon( 'x', 'sm' );
-		$notices_json  = wp_json_encode( $this->captured_wp_notices );
-		$toast_json    = wp_json_encode( $this->skmt_toast );
+		$close_icon   = $this->render_icon( 'x', 'sm' );
+		$notices_json = wp_json_encode( $this->captured_wp_notices );
+		$toast_json   = wp_json_encode( $this->skmt_toast );
 
 		$user_id         = get_current_user_id();
 		$raw_notices     = $user_id ? get_user_meta( $user_id, 'skmt_notices', true ) : [];
@@ -470,10 +578,12 @@ class Admin {
 			];
 		}
 		$persistent_json = wp_json_encode( $persistent_list );
-		$notif_data_json = wp_json_encode( [
-			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-			'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
-		] );
+		$notif_data_json = wp_json_encode(
+			[
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'skmt_admin_nonce' ),
+			]
+		);
 		?>
 		<div id="skmt-notif-drawer" class="skmt-notif-drawer" role="dialog" aria-label="<?php esc_attr_e( 'Centre de notifications', 'studio-kyne-mini-tools' ); ?>" aria-hidden="true">
 			<div class="skmt-notif-drawer__header">
@@ -495,11 +605,6 @@ class Admin {
 		<?php
 	}
 
-	/**
-	 * Ajoute une notice persistante (survit aux rechargements).
-	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
-	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
-	 */
 	/**
 	 * Construit un en-tête Content-Disposition sûr pour un nom de fichier.
 	 *
@@ -530,8 +635,15 @@ class Admin {
 		return 'attachment; filename="' . $ascii . '"; filename*=UTF-8\'\'' . rawurlencode( $brut );
 	}
 
+	/**
+	 * Ajoute une notice persistante (survit aux rechargements).
+	 * Sans $user_id, cible l'utilisateur courant ; utile pour cibler un
+	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
+	 */
 	public static function add_persistent_notice( string $id, string $message, string $type = 'info', int $user_id = 0 ): void {
-		$user_id = $user_id ?: get_current_user_id();
+		if ( 0 === $user_id ) {
+			$user_id = get_current_user_id();
+		}
 		if ( ! $user_id ) {
 			return;
 		}
@@ -601,6 +713,19 @@ class Admin {
 				'update_channel' => isset( $_POST['skmt_global']['update_channel'] ) ? sanitize_key( $_POST['skmt_global']['update_channel'] ) : 'stable',
 			];
 			$this->settings->set( 'global', $global );
+
+			// Case décochée = absente du POST. Pas stockée dans skmt_settings :
+			// elle pilote l'option WordPress, donc n'entre ni dans l'export ni
+			// dans la réinitialisation. On n'écrit que si l'utilisateur a changé
+			// la case depuis le chargement de la page : sinon, enregistrer le
+			// seul canal annulerait un réglage fait entre-temps depuis la liste
+			// des extensions ou WP-CLI.
+			$auto_update         = ! empty( $_POST['skmt_global']['auto_update'] );
+			$auto_update_initial = ! empty( $_POST['skmt_global']['auto_update_initial'] );
+
+			if ( $auto_update !== $auto_update_initial && wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' ) ) {
+				$this->set_auto_update( $auto_update );
+			}
 		}
 
 		// Réglages d'un module
@@ -608,17 +733,30 @@ class Admin {
 			$module_id = substr( $tab, 7 );
 			$instance  = $this->modules->get_active_instances()[ $module_id ] ?? null;
 
+			// Même règle que render_page() : un module peut exiger davantage que
+			// manage_options (multisite). Ce test s'AJOUTE au manage_options
+			// vérifié plus haut, il ne le remplace pas — la capacité déclarée
+			// par un module est toujours plus stricte, jamais une alternative.
+			if ( ! current_user_can( $this->module_capability( $module_id ) ) ) {
+				wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
+			}
+
 			if ( $instance && isset( $_POST['skmt_module_settings'] ) && is_array( $_POST['skmt_module_settings'] ) ) {
-				$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) );
+				$instance->save_settings( wp_unslash( $_POST['skmt_module_settings'] ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce et capacité vérifiés plus haut ; chaque module assainit ses réglages dans save_settings() (contrat AbstractModule).
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => $tab,
-			'skmt_notice'      => 'settings_saved',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => $tab,
+					'skmt_notice'      => 'settings_saved',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -651,12 +789,17 @@ class Admin {
 			$notice = 'module_deactivated';
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'modules',
-			'skmt_notice'      => $notice,
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'modules',
+					'skmt_notice'      => $notice,
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -681,24 +824,29 @@ class Admin {
 
 		if ( 'activate' === $action ) {
 			$this->modules->activate( $module_id );
-			$notice      = __( 'Module activé.', 'studio-kyne-mini-tools' );
-			$new_state   = true;
+			$notice    = __( 'Module activé.', 'studio-kyne-mini-tools' );
+			$new_state = true;
 		} else {
 			$this->modules->deactivate( $module_id );
-			$notice      = __( 'Module désactivé.', 'studio-kyne-mini-tools' );
-			$new_state   = false;
+			$notice    = __( 'Module désactivé.', 'studio-kyne-mini-tools' );
+			$new_state = false;
 		}
 
-		$configure_url = add_query_arg( [
-			'page' => $this->slug,
-			'tab'  => 'module_' . $module_id,
-		], admin_url( 'admin.php' ) );
+		$configure_url = add_query_arg(
+			[
+				'page' => $this->slug,
+				'tab'  => 'module_' . $module_id,
+			],
+			admin_url( 'admin.php' )
+		);
 
-		wp_send_json_success( [
-			'notice'        => $notice,
-			'active'        => $new_state,
-			'configure_url' => esc_url( $configure_url ),
-		] );
+		wp_send_json_success(
+			[
+				'notice'        => $notice,
+				'active'        => $new_state,
+				'configure_url' => esc_url( $configure_url ),
+			]
+		);
 	}
 
 	/**
@@ -726,13 +874,40 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'modules',
-			'skmt_notice'      => 'modules_updated',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'modules',
+					'skmt_notice'      => 'modules_updated',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
+	}
+
+	/**
+	 * Active ou coupe la mise à jour automatique du plugin.
+	 *
+	 * Écrit dans `auto_update_plugins`, l'option que WordPress lit pour ses
+	 * mises à jour de fond et qu'il modifie depuis la liste des extensions.
+	 *
+	 * @param bool $enabled État voulu.
+	 */
+	private function set_auto_update( bool $enabled ): void {
+		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
+		$current     = (array) get_site_option( 'auto_update_plugins', [] );
+		$is_enabled  = in_array( $plugin_file, $current, true );
+
+		if ( $enabled === $is_enabled ) {
+			return;
+		}
+
+		$updated = $enabled ? array_merge( $current, [ $plugin_file ] ) : array_diff( $current, [ $plugin_file ] );
+
+		update_site_option( 'auto_update_plugins', array_values( array_unique( $updated ) ) );
 	}
 
 	/**
@@ -752,12 +927,17 @@ class Admin {
 		delete_transient( 'skmt_github_update_dev' );
 		wp_update_plugins();
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'updates_checked',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'updates_checked',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -786,12 +966,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'settings_reset',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'settings_reset',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -848,14 +1033,21 @@ class Admin {
 			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$file = $_FILES['skmt_import_file'] ?? null;
-		if ( ! $file || empty( $file['tmp_name'] ) || $file['error'] !== UPLOAD_ERR_OK ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_file',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+		// Seuls tmp_name et error sont lus : un chemin temporaire et un code d'erreur PHP, jamais réémis.
+		$tmp_name = isset( $_FILES['skmt_import_file']['tmp_name'] ) ? sanitize_text_field( $_FILES['skmt_import_file']['tmp_name'] ) : '';
+		$error    = isset( $_FILES['skmt_import_file']['error'] ) ? (int) $_FILES['skmt_import_file']['error'] : UPLOAD_ERR_NO_FILE;
+		if ( '' === $tmp_name || UPLOAD_ERR_OK !== $error ) {
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_file',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -863,13 +1055,18 @@ class Admin {
 		// seule chose qui atteste que ce chemin désigne bien un fichier déposé
 		// par CETTE requête, et non un chemin arbitraire du serveur glissé dans
 		// la variable. C'est la garde standard avant toute lecture d'un upload.
-		if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_file',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+		if ( ! is_uploaded_file( $tmp_name ) ) {
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_file',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -877,27 +1074,37 @@ class Admin {
 		// deux opérations qui tiennent en mémoire. Un export complet pèse
 		// quelques dizaines de kilo-octets ; 2 Mo laissent une marge confortable
 		// sans exposer la mémoire de PHP à un fichier de plusieurs centaines.
-		if ( filesize( $file['tmp_name'] ) > self::IMPORT_MAX_BYTES ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_size',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+		if ( filesize( $tmp_name ) > self::IMPORT_MAX_BYTES ) {
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_size',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$raw  = file_get_contents( $file['tmp_name'] );
-		$data = json_decode( $raw, true );
+		$raw  = file_get_contents( $tmp_name );
+		$data = json_decode( (string) $raw, true );
 
 		if ( ! is_array( $data ) || ! isset( $data['global'] ) ) {
-			wp_safe_redirect( add_query_arg( [
-				'page'             => $this->slug,
-				'tab'              => 'settings',
-				'skmt_notice'      => 'import_error_invalid',
-				'skmt_notice_type' => 'error',
-			], admin_url( 'admin.php' ) ) );
+			wp_safe_redirect(
+				add_query_arg(
+					[
+						'page'             => $this->slug,
+						'tab'              => 'settings',
+						'skmt_notice'      => 'import_error_invalid',
+						'skmt_notice_type' => 'error',
+					],
+					admin_url( 'admin.php' )
+				)
+			);
 			exit;
 		}
 
@@ -923,12 +1130,17 @@ class Admin {
 			}
 		}
 
-		wp_safe_redirect( add_query_arg( [
-			'page'             => $this->slug,
-			'tab'              => 'settings',
-			'skmt_notice'      => 'settings_imported',
-			'skmt_notice_type' => 'success',
-		], admin_url( 'admin.php' ) ) );
+		wp_safe_redirect(
+			add_query_arg(
+				[
+					'page'             => $this->slug,
+					'tab'              => 'settings',
+					'skmt_notice'      => 'settings_imported',
+					'skmt_notice_type' => 'success',
+				],
+				admin_url( 'admin.php' )
+			)
+		);
 		exit;
 	}
 
@@ -955,6 +1167,7 @@ class Admin {
 	 * survivent, et l'état d'activation se limite aux modules enregistrés.
 	 *
 	 * @param mixed $raw Valeur importée.
+	 * @return array<string, mixed>
 	 */
 	private function sanitize_imported_globals( $raw ): array {
 		$raw     = is_array( $raw ) ? $raw : [];
@@ -974,12 +1187,8 @@ class Admin {
 		];
 
 		if ( array_key_exists( 'update_channel', $global ) ) {
-			$channel = sanitize_key( (string) $global['update_channel'] );
+			$channel                           = sanitize_key( (string) $global['update_channel'] );
 			$clean['global']['update_channel'] = in_array( $channel, [ 'stable', 'dev' ], true ) ? $channel : 'stable';
-		}
-
-		if ( array_key_exists( 'auto_updates', $global ) ) {
-			$clean['global']['auto_updates'] = ! empty( $global['auto_updates'] );
 		}
 
 		// Seuls les modules réellement enregistrés peuvent voir leur état changer.
@@ -1031,7 +1240,8 @@ class Admin {
 	 * « false » : sans cette normalisation, un réglage désactivé à l'export
 	 * reviendrait activé à l'import.
 	 *
-	 * @param array $data Charge utile à normaliser.
+	 * @param array<string, mixed> $data Charge utile à normaliser.
+	 * @return array<string, mixed>
 	 */
 	private static function drop_false_values( array $data ): array {
 		$clean = [];
@@ -1043,7 +1253,7 @@ class Admin {
 
 			// Les listes (rôles, IP…) sont transmises telles quelles : leur
 			// sémantique est positionnelle, pas déclarative.
-			$clean[ $key ] = is_array( $value ) && $value !== array_values( $value )
+			$clean[ $key ] = is_array( $value ) && array_values( $value ) !== $value
 				? self::drop_false_values( $value )
 				: $value;
 		}
@@ -1056,7 +1266,7 @@ class Admin {
 	 * ================================================================ */
 
 	public function filter_parent_file( ?string $parent_file ): string {
-		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 			return $parent_file ?? '';
 		}
 
@@ -1069,8 +1279,8 @@ class Admin {
 		return $parent_file ?? '';
 	}
 
-	public function filter_submenu_file( ?string $submenu_file, ?string $parent_file ): string {
-		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) {
+	public function filter_submenu_file( ?string $submenu_file ): string {
+		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 			return $submenu_file ?? '';
 		}
 
@@ -1092,7 +1302,7 @@ class Admin {
 	}
 
 	public function output_menu_separator_css(): void {
-		echo '<style>' . $this->get_menu_separator_css() . '</style>';
+		echo '<style>' . $this->get_menu_separator_css() . '</style>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- CSS littérale, sans aucune donnée variable.
 	}
 
 	/* ================================================================
@@ -1131,6 +1341,9 @@ class Admin {
 			. '</button>';
 	}
 
+	/**
+	 * @return array<string, string> Nom Lucide => contenu SVG interne.
+	 */
 	private function get_icon_paths(): array {
 		return [
 			'layout-dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
@@ -1144,11 +1357,14 @@ class Admin {
 			'x'                => '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>',
 			'log-in'           => '<path d="m10 17 5-5-5-5"/><path d="M15 12H3"/><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>',
 			'folder'           => '<path d="m6 14 1.5-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.94 2.5l-1.54 6a2 2 0 0 1-1.95 1.5H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3.9a2 2 0 0 1 1.69.9l.81 1.2a2 2 0 0 0 1.67.9H18a2 2 0 0 1 2 2v2"/>',
-		'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
-		'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
-		'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
-		'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
-		'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
+			'chevron-down'     => '<path d="m6 9 6 6 6-6"/>',
+			'palette'          => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
+			'menu'             => '<path d="M8 5h13"/><path d="M13 12h8"/><path d="M13 19h8"/><path d="M3 10a2 2 0 0 0 2 2h3"/><path d="M3 5v12a2 2 0 0 0 2 2h3"/>',
+			'database'         => '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+			'eye-off'          => '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
+			'mail'             => '<path d="m22 7-8.991 5.727a2 2 0 0 1-2.009 0L2 7"/><rect x="2" y="4" width="20" height="16" rx="2"/>',
+			'history'          => '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+			'folder-tree'      => '<path d="M20 10a1 1 0 0 0 1-1V6a1 1 0 0 0-1-1h-2.5a1 1 0 0 1-.8-.4l-.9-1.2A1 1 0 0 0 15 3h-2a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M20 21a1 1 0 0 0 1-1v-3a1 1 0 0 0-1-1h-2.9a1 1 0 0 1-.88-.55l-.42-.85a1 1 0 0 0-.92-.6H13a1 1 0 0 0-1 1v5a1 1 0 0 0 1 1Z"/><path d="M3 5a2 2 0 0 0 2 2h3"/><path d="M3 3v13a2 2 0 0 0 2 2h3"/>',
 		];
 	}
 
@@ -1157,16 +1373,7 @@ class Admin {
 	 * ================================================================ */
 
 	private function get_current_tab(): string {
-		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
-	}
-
-	/**
-	 * Vérifie si la page courante est une page du plugin (via $_GET['page']).
-	 * Utilisable tôt dans le cycle de vie WP, avant que get_current_screen() soit disponible.
-	 */
-	private function is_skmt_page(): bool {
-		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		return isset( $_GET['page'] ) && sanitize_key( $_GET['page'] ) === $this->slug;
+		return isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 	}
 
 	private function is_plugin_screen(): bool {

@@ -5,12 +5,12 @@
 
 defined( 'ABSPATH' ) || exit;
 
-$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard';
+$tab = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : 'dashboard'; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 ?>
 <div class="skmt-admin-wrap">
 	<div class="skmt-admin-container">
 		<!-- Sidebar -->
-		<?php include SKMT_TEMPLATES_DIR . 'components/sidebar.php'; ?>
+		<?php require SKMT_TEMPLATES_DIR . 'components/sidebar.php'; ?>
 
 		<!-- Contenu principal -->
 		<main class="skmt-admin-main">

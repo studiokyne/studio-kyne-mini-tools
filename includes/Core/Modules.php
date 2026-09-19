@@ -11,7 +11,7 @@ class Modules {
 	/**
 	 * Liste des modules enregistrés.
 	 *
-	 * @var array<string, array>
+	 * @var array<string, array<string, mixed>>
 	 */
 	private array $registered = [];
 
@@ -104,6 +104,22 @@ class Modules {
 				'class'       => 'StudioKyne\\MiniTools\\Modules\\Media\\Module',
 				'icon'        => 'folder-tree',
 			],
+			'activity_log'    => [
+				'name'        => __( 'Journal d\'activité', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Qui a modifié quoi, et quand : connexions, contenus, extensions, utilisateurs et réglages.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'Journal d\'activité', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Consulter l\'historique', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\ActivityLog\\Module',
+				'icon'        => 'history',
+			],
+			'smtp'            => [
+				'name'        => __( 'SMTP', 'studio-kyne-mini-tools' ),
+				'description' => __( 'Envoi des mails par un serveur SMTP authentifié ou l\'API Brevo, mail de test et journal des mails.', 'studio-kyne-mini-tools' ),
+				'menu_label'  => __( 'SMTP', 'studio-kyne-mini-tools' ),
+				'menu_desc'   => __( 'Configurer l\'envoi des mails', 'studio-kyne-mini-tools' ),
+				'class'       => 'StudioKyne\\MiniTools\\Modules\\Smtp\\Module',
+				'icon'        => 'mail',
+			],
 		];
 
 		/**
@@ -142,16 +158,22 @@ class Modules {
 
 	/**
 	 * Normalise une définition de module.
+	 *
+	 * @param array<string, mixed> $args
+	 * @return array<string, mixed>
 	 */
 	private function normalize_definition( array $args ): array {
-		$normalized = wp_parse_args( $args, [
-			'name'        => '',
-			'description' => '',
-			'menu_label'  => '',
-			'menu_desc'   => '',
-			'class'       => '',
-			'icon'        => 'package',
-		] );
+		$normalized = wp_parse_args(
+			$args,
+			[
+				'name'        => '',
+				'description' => '',
+				'menu_label'  => '',
+				'menu_desc'   => '',
+				'class'       => '',
+				'icon'        => 'package',
+			]
+		);
 
 		$normalized['name']        = is_string( $normalized['name'] ) ? $normalized['name'] : '';
 		$normalized['description'] = is_string( $normalized['description'] ) ? $normalized['description'] : '';
@@ -165,20 +187,27 @@ class Modules {
 
 	/**
 	 * Enregistre un module.
+	 *
+	 * @param array<string, mixed> $args
 	 */
 	public function register( string $id, array $args ): void {
-		$this->registered[ $id ] = wp_parse_args( $args, [
-			'name'        => '',
-			'description' => '',
-			'menu_label'  => '',
-			'menu_desc'   => '',
-			'class'       => '',
-			'icon'        => 'package',
-		] );
+		$this->registered[ $id ] = wp_parse_args(
+			$args,
+			[
+				'name'        => '',
+				'description' => '',
+				'menu_label'  => '',
+				'menu_desc'   => '',
+				'class'       => '',
+				'icon'        => 'package',
+			]
+		);
 	}
 
 	/**
 	 * Retourne tous les modules enregistrés.
+	 *
+	 * @return array<string, array<string, mixed>>
 	 */
 	public function get_all(): array {
 		return $this->registered;
@@ -186,6 +215,8 @@ class Modules {
 
 	/**
 	 * Retourne un module spécifique.
+	 *
+	 * @return array<string, mixed>|null
 	 */
 	public function get( string $id ): ?array {
 		return $this->registered[ $id ] ?? null;
@@ -276,6 +307,8 @@ class Modules {
 
 	/**
 	 * Retourne les instances des modules actifs.
+	 *
+	 * @return array<string, ModuleInterface>
 	 */
 	public function get_active_instances(): array {
 		return $this->active;

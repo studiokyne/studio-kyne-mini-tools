@@ -11,6 +11,18 @@ defined( 'ABSPATH' ) || exit;
  */
 class LoginUrlHandler {
 
+	/**
+	 * Actions de wp-login.php qui ne présentent aucun formulaire de connexion
+	 * et doivent rester servies à leur adresse d'origine.
+	 *
+	 * `postpass` : le formulaire des contenus protégés par mot de passe poste
+	 * sur `wp-login.php?action=postpass`, et filter_site_url() laisse cette
+	 * URL intacte à dessein. La bloquer avec le reste rendait 404 à tout
+	 * visiteur qui déverrouille un article protégé.
+	 * `confirmaction` : confirmation des demandes de données personnelles.
+	 */
+	private const PASSTHROUGH_ACTIONS = [ 'postpass', 'confirmaction' ];
+
 	private string $custom_login_url;
 
 	/**
@@ -80,6 +92,11 @@ class LoginUrlHandler {
 		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 		$request     = wp_parse_url( rawurldecode( $request_uri ) );
 		$path        = $request['path'] ?? '';
+		$action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- routage de wp-login.php, l'action est rejouée par WordPress qui vérifie ses propres nonces.
+
+		if ( in_array( $action, self::PASSTHROUGH_ACTIONS, true ) ) {
+			return;
+		}
 
 		// Bloquer l'accès direct à wp-login.php : remplacer l'URI par une URL
 		// inexistante et laisser WordPress générer un vrai 404 via son template.
@@ -89,7 +106,7 @@ class LoginUrlHandler {
 		// suffisait à faire répondre 404 à des pages parfaitement légitimes.
 		if ( 'wp-login.php' === basename( $path ) && ! is_admin() ) {
 			global $pagenow;
-			$pagenow = 'index.php';
+			$pagenow = 'index.php'; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- voulu : WordPress doit traiter la requête comme le front pour servir son 404.
 
 			if ( ! defined( 'WP_USE_THEMES' ) ) {
 				define( 'WP_USE_THEMES', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
@@ -107,8 +124,6 @@ class LoginUrlHandler {
 			return;
 		}
 
-		$action = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
-
 		if ( is_user_logged_in() && 'logout' !== $action ) {
 			$user        = wp_get_current_user();
 			$redirect_to = apply_filters( 'skmt_custom_login_redirect', admin_url(), $user );
@@ -116,9 +131,11 @@ class LoginUrlHandler {
 			die();
 		}
 
+		// wp-login.php lit ces globales sans les initialiser : on les pose comme
+		// le ferait un accès direct, sinon notices « undefined variable ».
 		global $error, $user_login;
-		$error      = '';
-		$user_login = '';
+		$error      = ''; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- initialisation attendue par wp-login.php.
+		$user_login = ''; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- initialisation attendue par wp-login.php.
 
 		require_once ABSPATH . 'wp-login.php';
 		die;
@@ -159,11 +176,9 @@ class LoginUrlHandler {
 	 * Filtre les URLs de connexion pour pointer vers l'URL personnalisée.
 	 *
 	 * @param string $login_url
-	 * @param string $redirect
-	 * @param bool   $force_reauth
 	 * @return string
 	 */
-	public function filter_login_url( string $login_url, string $redirect = '', bool $force_reauth = false ): string {
+	public function filter_login_url( string $login_url ): string {
 		return $this->filter_site_url( $login_url );
 	}
 }

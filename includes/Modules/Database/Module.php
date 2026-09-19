@@ -14,6 +14,14 @@ class Module extends AbstractModule {
 	/** Nb de lignes maximum renvoyées par une requête SELECT libre sans LIMIT explicite. */
 	const QUERY_ROW_CAP = 1000;
 
+	/**
+	 * Au-delà de cette estimation, on ne compte plus exactement dans la liste
+	 * des tables : un COUNT(*) sur un postmeta ou un journal de plusieurs
+	 * millions de lignes bloquait l'ouverture de l'onglet plusieurs secondes.
+	 * Le compte exact arrive de toute façon quand la table est ouverte.
+	 */
+	const EXACT_COUNT_THRESHOLD = 100000;
+
 	/** Mots-clés interdits dans l'éditeur SQL libre (opérations hors périmètre / destructrices au niveau serveur). */
 	const FORBIDDEN_KEYWORDS = [
 		'DROP DATABASE',
@@ -33,25 +41,56 @@ class Module extends AbstractModule {
 		'INTO DUMPFILE',
 		'LOAD DATA',
 		'LOAD_FILE',
+		// Instructions qui touchent le SERVEUR MySQL, pas ce site : variables
+		// globales (general_log_file écrit où on veut), chargement de code
+		// (UDF via SONAME, plugins), arrêt de connexions.
+		'SET GLOBAL',
+		'SET PERSIST',
+		'INSTALL PLUGIN',
+		'INSTALL COMPONENT',
+		'SONAME',
+		'KILL',
+		'ALTER DATABASE',
+		'ALTER SCHEMA',
+		'CREATE FUNCTION',
 	];
 
 	public function init(): void {
-		add_action( 'wp_ajax_skmt_db_get_tables',    [ $this, 'ajax_get_tables' ] );
-		add_action( 'wp_ajax_skmt_db_get_rows',      [ $this, 'ajax_get_rows' ] );
+		add_action( 'wp_ajax_skmt_db_get_tables', [ $this, 'ajax_get_tables' ] );
+		add_action( 'wp_ajax_skmt_db_get_rows', [ $this, 'ajax_get_rows' ] );
 		add_action( 'wp_ajax_skmt_db_get_structure', [ $this, 'ajax_get_structure' ] );
-		add_action( 'wp_ajax_skmt_db_update_row',    [ $this, 'ajax_update_row' ] );
-		add_action( 'wp_ajax_skmt_db_delete_row',    [ $this, 'ajax_delete_row' ] );
-		add_action( 'wp_ajax_skmt_db_insert_row',    [ $this, 'ajax_insert_row' ] );
-		add_action( 'wp_ajax_skmt_db_truncate',      [ $this, 'ajax_truncate_table' ] );
-		add_action( 'wp_ajax_skmt_db_drop_table',    [ $this, 'ajax_drop_table' ] );
-		add_action( 'wp_ajax_skmt_db_export_sql',    [ $this, 'ajax_export_sql' ] );
-		add_action( 'wp_ajax_skmt_db_run_query',     [ $this, 'ajax_run_query' ] );
+		add_action( 'wp_ajax_skmt_db_update_row', [ $this, 'ajax_update_row' ] );
+		add_action( 'wp_ajax_skmt_db_delete_row', [ $this, 'ajax_delete_row' ] );
+		add_action( 'wp_ajax_skmt_db_insert_row', [ $this, 'ajax_insert_row' ] );
+		add_action( 'wp_ajax_skmt_db_truncate', [ $this, 'ajax_truncate_table' ] );
+		add_action( 'wp_ajax_skmt_db_drop_table', [ $this, 'ajax_drop_table' ] );
+		add_action( 'wp_ajax_skmt_db_export_sql', [ $this, 'ajax_export_sql' ] );
+		add_action( 'wp_ajax_skmt_db_run_query', [ $this, 'ajax_run_query' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_scan', [ $this, 'ajax_cleanup_scan' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_run', [ $this, 'ajax_cleanup_run' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_optimize', [ $this, 'ajax_cleanup_optimize' ] );
 	}
 
-	public function get_settings(): array { return []; }
-	public function save_settings( array $s ): bool { return false; }
-	public static function get_defaults(): array { return []; }
-	public static function get_uninstall_keys(): array { return [ 'options' => [], 'meta' => [] ]; }
+	/**
+	 * @return array<string, mixed>
+	 */
+	public function get_settings(): array {
+		return []; }
+	/**
+	 * @param array<string, mixed> $s
+	 */
+	public function save_settings( array $s ): bool {
+		return false; }
+	/**
+	 * @return array<string, mixed>
+	 */
+	public static function get_defaults(): array {
+		return []; }
+	public static function get_uninstall_keys(): array {
+		return [
+			'options' => [],
+			'meta'    => [],
+		]; }
 
 	public function get_admin_css(): array {
 		return [ SKMT_ASSETS_URL . 'admin/css/modules/database.css' ];
@@ -61,40 +100,79 @@ class Module extends AbstractModule {
 		return [ SKMT_ASSETS_URL . 'admin/js/modules/database.js' ];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [
 			'i18n' => [
-				'confirmDelete'    => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
-				'confirmTruncate'  => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
-				'queryWarning'     => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
-				'confirmWrite'     => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
+				'confirmDelete'     => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
+				'confirmTruncate'   => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
+				'queryWarning'      => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
+				'confirmWrite'      => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
 				// Actions génériques
-				'confirm'          => __( 'Confirmer', 'studio-kyne-mini-tools' ),
-				'cancel'           => __( 'Annuler', 'studio-kyne-mini-tools' ),
-				'delete'           => __( 'Supprimer', 'studio-kyne-mini-tools' ),
-				'execute'          => __( 'Exécuter', 'studio-kyne-mini-tools' ),
+				'confirm'           => __( 'Confirmer', 'studio-kyne-mini-tools' ),
+				'cancel'            => __( 'Annuler', 'studio-kyne-mini-tools' ),
+				'delete'            => __( 'Supprimer', 'studio-kyne-mini-tools' ),
+				'execute'           => __( 'Exécuter', 'studio-kyne-mini-tools' ),
 				// États / feedback
-				'loading'          => __( 'Chargement…', 'studio-kyne-mini-tools' ),
-				'executing'        => __( 'Exécution…', 'studio-kyne-mini-tools' ),
-				'inserting'        => __( 'Insertion…', 'studio-kyne-mini-tools' ),
-				'rowAdded'         => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
-				'rowUpdated'       => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
-				'rowDeleted'       => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
-				'tableTruncated'   => __( 'Table vidée', 'studio-kyne-mini-tools' ),
-				'tableDropped'     => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
-				'error'            => __( 'Erreur', 'studio-kyne-mini-tools' ),
-				'networkError'     => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
+				'loading'           => __( 'Chargement…', 'studio-kyne-mini-tools' ),
+				'executing'         => __( 'Exécution…', 'studio-kyne-mini-tools' ),
+				'inserting'         => __( 'Insertion…', 'studio-kyne-mini-tools' ),
+				'rowAdded'          => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
+				'rowUpdated'        => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
+				'rowDeleted'        => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
+				'tableTruncated'    => __( 'Table vidée', 'studio-kyne-mini-tools' ),
+				'tableDropped'      => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
+				'error'             => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				'networkError'      => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
 				// Libellés de tableau / recherche
-				'noTables'         => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
-				'noRows'           => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
-				'noColumn'         => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
-				'noHistory'        => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
-				'clearHistory'     => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
-				'searchInTable'    => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
-				'rowsLabel'        => __( 'lignes', 'studio-kyne-mini-tools' ),
-				'perPageLabel'     => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
-				'setNull'          => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
-				'queryTruncated'   => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
+				'noTables'          => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
+				'noRows'            => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
+				'noColumn'          => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
+				'noHistory'         => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
+				'clearHistory'      => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
+				'searchInTable'     => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
+				'rowsLabel'         => __( 'lignes', 'studio-kyne-mini-tools' ),
+				'perPageLabel'      => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
+				'setNull'           => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
+				// Nettoyage
+				'cleanupTitle'      => __( 'Nettoyage', 'studio-kyne-mini-tools' ),
+				'cleanupIntro'      => __( 'Chaque élément est d\'abord compté ; rien n\'est supprimé sans votre confirmation. Faites une sauvegarde de la base avant un gros nettoyage.', 'studio-kyne-mini-tools' ),
+				'cleanupItems'      => __( 'Données superflues', 'studio-kyne-mini-tools' ),
+				'cleanupClean'      => __( 'Nettoyer', 'studio-kyne-mini-tools' ),
+				'cleanupAll'        => __( 'Tout nettoyer', 'studio-kyne-mini-tools' ),
+				'cleanupRescan'     => __( 'Recompter', 'studio-kyne-mini-tools' ),
+				'cleanupRunning'    => __( 'Nettoyage…', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre d'éléments, 2: libellé de l'élément. */
+				'cleanupConfirm'    => __( 'Supprimer définitivement %1$s élément(s) : %2$s ?', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre total d'éléments. */
+				'cleanupConfirmAll' => __( 'Supprimer définitivement %s élément(s), toutes catégories confondues ?', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre d'éléments supprimés, 2: libellé de l'élément. */
+				'cleanupDone'       => __( '%1$s élément(s) supprimé(s) : %2$s', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre total d'éléments supprimés. */
+				'cleanupDoneTotal'  => __( '%s élément(s) supprimé(s)', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre d'éléments restants. */
+				'cleanupLeft'       => __( '%s élément(s) n\'ont pas pu être supprimés.', 'studio-kyne-mini-tools' ),
+				'optimizeTitle'     => __( 'Optimisation des tables', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre de tables, 2: taille récupérable. */
+				'optimizeSummary'   => __( '%1$s table(s) fragmentée(s), %2$s récupérables.', 'studio-kyne-mini-tools' ),
+				'optimizeNone'      => __( 'Aucune table fragmentée.', 'studio-kyne-mini-tools' ),
+				'optimizeBtn'       => __( 'Optimiser', 'studio-kyne-mini-tools' ),
+				'optimizeConfirm'   => __( 'OPTIMIZE TABLE reconstruit chaque table et peut la verrouiller quelques secondes. Lancer l\'optimisation ?', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre de tables optimisées. */
+				'optimizeDone'      => __( '%s table(s) optimisée(s)', 'studio-kyne-mini-tools' ),
+				'foreignTitle'      => __( 'Tables d\'extensions', 'studio-kyne-mini-tools' ),
+				'foreignIntro'      => __( 'Tables hors cœur WordPress. L\'extension propriétaire est devinée d\'après le nom de la table : vérifiez avant de supprimer. Aucune table n\'est supprimée automatiquement.', 'studio-kyne-mini-tools' ),
+				'foreignNone'       => __( 'Aucune table d\'extension.', 'studio-kyne-mini-tools' ),
+				'foreignUnknown'    => __( 'Aucune extension correspondante', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nom(s) d'extension. */
+				'foreignInactive'   => __( 'Extension inactive : %s', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nom(s) d'extension. */
+				'foreignActive'     => __( 'Extension active : %s', 'studio-kyne-mini-tools' ),
+				'open'              => __( 'Ouvrir', 'studio-kyne-mini-tools' ),
+				/* translators: %d: nombre maximal de lignes affichées. */
+				'queryTruncated'    => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
 			],
 		];
 	}
@@ -138,18 +216,28 @@ class Module extends AbstractModule {
 
 		$tables = [];
 		foreach ( (array) $tables_raw as $t ) {
-			$name  = $t['Name'];
-			$is_wp = str_starts_with( $name, $prefix );
+			$name     = $t['Name'];
+			$is_wp    = str_starts_with( $name, $prefix );
+			$estimate = (int) $t['Rows'];
+			$approx   = false;
 
 			// `SHOW TABLE STATUS`.Rows est une estimation pour InnoDB (souvent 0 ou
-			// très approximative). On récupère un compte exact via COUNT(*). Le nom
-			// provient de SHOW TABLE STATUS, donc sûr à échapper en backticks.
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
-			$count = $wpdb->get_var( 'SELECT COUNT(*) FROM `' . str_replace( '`', '``', $name ) . '`' );
+			// très approximative). On la corrige par un COUNT(*) tant qu'elle reste
+			// raisonnable ; au-delà du seuil on garde l'estimation et on le dit.
+			// Le nom provient de SHOW TABLE STATUS, donc sûr à échapper en backticks.
+			if ( $estimate <= self::EXACT_COUNT_THRESHOLD ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
+				$count = $wpdb->get_var( 'SELECT COUNT(*) FROM `' . str_replace( '`', '``', $name ) . '`' );
+				$rows  = null === $count ? $estimate : (int) $count;
+			} else {
+				$rows   = $estimate;
+				$approx = true;
+			}
 
 			$tables[] = [
 				'name'         => $name,
-				'rows'         => null === $count ? (int) $t['Rows'] : (int) $count,
+				'rows'         => $rows,
+				'approx'       => $approx,
 				'size'         => ( (int) $t['Data_length'] + (int) $t['Index_length'] ),
 				'engine'       => $t['Engine'],
 				'is_wp_prefix' => $is_wp,
@@ -158,11 +246,16 @@ class Module extends AbstractModule {
 			];
 		}
 
-		wp_send_json_success( [ 'tables' => $tables, 'prefix' => $prefix ] );
+		wp_send_json_success(
+			[
+				'tables' => $tables,
+				'prefix' => $prefix,
+			]
+		);
 	}
 
 	/* ================================================================
-	 * AJAX — À IMPLÉMENTER (prompts 1-07 / 1-08)
+	 * VALIDATION DES IDENTIFIANTS
 	 * ================================================================ */
 
 	/**
@@ -175,10 +268,12 @@ class Module extends AbstractModule {
 		}
 		global $wpdb;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$exists = $wpdb->get_var( $wpdb->prepare(
-			'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s',
-			$table
-		) );
+		$exists = $wpdb->get_var(
+			$wpdb->prepare(
+				'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = %s',
+				$table
+			)
+		);
 		return $exists ? $table : null;
 	}
 
@@ -189,13 +284,13 @@ class Module extends AbstractModule {
 	 * La validation contre information_schema garantit que les backticks sont sûrs.
 	 */
 	private function read_table(): ?string {
-		$table = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : '';
+		$table = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- appelé uniquement après guard().
 		return $this->validate_table( $table );
 	}
 
 	/**
 	 * Récupère les colonnes réelles d'une table indexées par nom (whitelist + typage).
-	 * @return array<string,array> Field => ligne SHOW COLUMNS.
+	 * @return array<string, array<string, mixed>> Field => ligne SHOW COLUMNS.
 	 */
 	private function get_columns_map( string $table ): array {
 		global $wpdb;
@@ -208,7 +303,11 @@ class Module extends AbstractModule {
 		return $map;
 	}
 
-	/** Détermine le placeholder $wpdb (%d/%f/%s) adapté au type SQL d'une colonne. */
+	/**
+	 * Détermine le placeholder $wpdb (%d/%f/%s) adapté au type SQL d'une colonne.
+	 *
+	 * @param array<string, mixed> $col Ligne SHOW COLUMNS.
+	 */
 	private function column_format( array $col ): string {
 		$type = strtolower( $col['Type'] ?? '' );
 		if ( preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|bit|year)\b/', $type ) ) {
@@ -244,11 +343,13 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
-		$page      = max( 1, (int) ( $_POST['page'] ?? 1 ) );
-		$per_page  = min( 200, max( 10, (int) ( $_POST['per_page'] ?? 50 ) ) );
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard() en tête de handler.
+		$page      = max( 1, isset( $_POST['page'] ) ? (int) $_POST['page'] : 1 );
+		$per_page  = min( 200, max( 10, isset( $_POST['per_page'] ) ? (int) $_POST['per_page'] : 50 ) );
 		$search    = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		$order_col = isset( $_POST['order_col'] ) ? sanitize_text_field( wp_unslash( $_POST['order_col'] ) ) : '';
 		$order_dir = strtoupper( isset( $_POST['order_dir'] ) ? sanitize_text_field( wp_unslash( $_POST['order_dir'] ) ) : 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$table = $this->read_table();
 		if ( null === $table ) {
@@ -261,7 +362,9 @@ class Module extends AbstractModule {
 		$col_names = array_column( $columns, 'Field' );
 		$primary   = '';
 		foreach ( $columns as $col ) {
-			if ( 'PRI' === $col['Key'] ) { $primary = $col['Field']; break; }
+			if ( 'PRI' === $col['Key'] ) {
+				$primary = $col['Field'];
+				break; }
 		}
 
 		// Recherche : WHERE sur toutes les colonnes de type texte (LIKE).
@@ -289,15 +392,17 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$rows = $wpdb->get_results( 'SELECT * FROM `' . $table . '`' . $where . $order . ' LIMIT ' . $per_page . ' OFFSET ' . $offset, ARRAY_A );
 
-		wp_send_json_success( [
-			'columns'  => $col_names,
-			'primary'  => $primary,
-			'rows'     => $rows,
-			'total'    => $total,
-			'page'     => $page,
-			'per_page' => $per_page,
-			'pages'    => (int) ceil( $total / $per_page ),
-		] );
+		wp_send_json_success(
+			[
+				'columns'  => $col_names,
+				'primary'  => $primary,
+				'rows'     => $rows,
+				'total'    => $total,
+				'page'     => $page,
+				'per_page' => $per_page,
+				'pages'    => (int) ceil( $total / $per_page ),
+			]
+		);
 	}
 
 	public function ajax_get_structure(): void {
@@ -314,18 +419,25 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$indexes = $wpdb->get_results( 'SHOW INDEX FROM `' . $table . '`', ARRAY_A );
 
-		wp_send_json_success( [ 'columns' => $columns, 'indexes' => $indexes ] );
+		wp_send_json_success(
+			[
+				'columns' => $columns,
+				'indexes' => $indexes,
+			]
+		);
 	}
 
 	public function ajax_update_row(): void {
 		$this->guard();
 
 		global $wpdb;
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; valeur et clé primaire brutes, passées à $wpdb->update() qui échappe.
 		$primary_col = isset( $_POST['primary_col'] ) ? sanitize_text_field( wp_unslash( $_POST['primary_col'] ) ) : '';
 		$primary_val = isset( $_POST['primary_val'] ) ? wp_unslash( $_POST['primary_val'] ) : '';
 		$col         = isset( $_POST['col'] ) ? sanitize_text_field( wp_unslash( $_POST['col'] ) ) : '';
 		$value       = isset( $_POST['value'] ) ? wp_unslash( $_POST['value'] ) : '';
 		$set_null    = ! empty( $_POST['set_null'] );
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		$table = $this->read_table();
 		if ( null === $table || ! $primary_col || ! $col ) {
@@ -362,8 +474,10 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; clé primaire passée à $wpdb->delete() qui échappe.
 		$primary_col = isset( $_POST['primary_col'] ) ? sanitize_text_field( wp_unslash( $_POST['primary_col'] ) ) : '';
 		$primary_val = isset( $_POST['primary_val'] ) ? wp_unslash( $_POST['primary_val'] ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		$table = $this->read_table();
 		if ( null === $table || ! $primary_col ) {
@@ -394,8 +508,10 @@ class Module extends AbstractModule {
 		global $wpdb;
 
 		// Champs soumis (col => valeur brute) + colonnes explicitement NULL.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; valeurs brutes typées plus bas contre les colonnes réelles, écrites via $wpdb->insert() qui échappe.
 		$fields = isset( $_POST['fields'] ) && is_array( $_POST['fields'] ) ? wp_unslash( $_POST['fields'] ) : [];
 		$nulls  = isset( $_POST['nulls'] ) && is_array( $_POST['nulls'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['nulls'] ) ) : [];
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		// Colonnes réelles de la table (whitelist + typage).
 		$columns = $this->get_columns_map( $table );
@@ -408,6 +524,7 @@ class Module extends AbstractModule {
 			// Colonne explicitement NULL → valeur null typée (refusée si NOT NULL sans défaut).
 			if ( in_array( $field, $nulls, true ) ) {
 				if ( 'YES' !== ( $col['Null'] ?? 'NO' ) ) {
+					/* translators: %s: nom de la colonne. */
 					wp_send_json_error( [ 'message' => sprintf( __( 'La colonne « %s » n\'accepte pas NULL.', 'studio-kyne-mini-tools' ), $field ) ] );
 				}
 				$data[ $field ] = null;
@@ -466,6 +583,74 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$result = $wpdb->query( 'DROP TABLE `' . $table . '`' );
 		if ( false === $result ) {
+			wp_send_json_error( [ 'message' => $wpdb->last_error ] );
+		}
+		wp_send_json_success();
+	}
+
+	/* ================================================================
+	 * AJAX — NETTOYAGE (endpoints typés, jamais via ajax_run_query)
+	 * ================================================================ */
+
+	public function ajax_cleanup_scan(): void {
+		$this->guard();
+
+		$cleanup = new Cleanup();
+		$items   = [];
+		foreach ( Cleanup::items() as $key => $item ) {
+			$items[] = [
+				'key'         => $key,
+				'label'       => $item['label'],
+				'description' => $item['description'],
+				'count'       => $cleanup->count( $key ),
+			];
+		}
+
+		wp_send_json_success(
+			[
+				'items'      => $items,
+				'fragmented' => $cleanup->fragmented_tables(),
+				'foreign'    => $cleanup->foreign_tables(),
+			]
+		);
+	}
+
+	/**
+	 * Purge un lot d'un élément. Le client rappelle tant que `deleted` et
+	 * `remaining` sont non nuls.
+	 */
+	public function ajax_cleanup_run(): void {
+		$this->guard();
+
+		$item = isset( $_POST['item'] ) ? sanitize_key( wp_unslash( $_POST['item'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par guard().
+		if ( ! array_key_exists( $item, Cleanup::items() ) ) {
+			wp_send_json_error( [ 'message' => __( 'Élément inconnu.', 'studio-kyne-mini-tools' ) ] );
+		}
+
+		$cleanup = new Cleanup();
+		$deleted = $cleanup->run( $item );
+		wp_send_json_success(
+			[
+				'deleted'   => $deleted,
+				'remaining' => $cleanup->count( $item ),
+			]
+		);
+	}
+
+	/**
+	 * Optimise UNE table du site : `OPTIMIZE TABLE` reconstruit une table
+	 * InnoDB entière, un appel par table évite le dépassement de délai.
+	 */
+	public function ajax_cleanup_optimize(): void {
+		$this->guard();
+
+		$table   = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par guard().
+		$cleanup = new Cleanup();
+		if ( ! $cleanup->is_site_table( $table ) ) {
+			wp_send_json_error( [ 'message' => __( 'Table introuvable.', 'studio-kyne-mini-tools' ) ] );
+		}
+		if ( ! $cleanup->optimize( $table ) ) {
+			global $wpdb;
 			wp_send_json_error( [ 'message' => $wpdb->last_error ] );
 		}
 		wp_send_json_success();
@@ -538,7 +723,7 @@ class Module extends AbstractModule {
 			' ',
 			$out
 		);
-		$out = ( null === $sans_commentaires ) ? $out : $sans_commentaires;
+		$out               = ( null === $sans_commentaires ) ? $out : $sans_commentaires;
 
 		$compacte = preg_replace( '/\s+/', ' ', $out );
 		$out      = ( null === $compacte ) ? $out : $compacte;
@@ -587,7 +772,7 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
-		$sql = isset( $_POST['sql'] ) ? trim( (string) wp_unslash( $_POST['sql'] ) ) : '';
+		$sql = isset( $_POST['sql'] ) ? trim( (string) wp_unslash( $_POST['sql'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; SQL saisi par l'administrateur, filtré par find_forbidden_keyword() et confirmé côté client pour toute écriture.
 		if ( '' === $sql ) {
 			wp_send_json_error( [ 'message' => __( 'Requête vide.', 'studio-kyne-mini-tools' ) ] );
 		}
@@ -595,6 +780,7 @@ class Module extends AbstractModule {
 		// Garde-fou 1 : opérations interdites (gestion des bases/utilisateurs, arrêt serveur…).
 		$forbidden = $this->find_forbidden_keyword( $sql );
 		if ( null !== $forbidden ) {
+			/* translators: %s: mot-clé SQL interdit. */
 			wp_send_json_error( [ 'message' => sprintf( __( 'Opération interdite dans cet éditeur : %s.', 'studio-kyne-mini-tools' ), $forbidden ) ] );
 		}
 
@@ -604,20 +790,22 @@ class Module extends AbstractModule {
 		$is_select  = $this->is_read_query( $normalized );
 
 		// Garde-fou 2 : toute requête d'écriture exige une confirmation explicite côté client.
-		if ( ! $is_select && empty( $_POST['confirm'] ) ) {
-			wp_send_json_error( [
-				'message'      => __( 'Cette requête modifie la base. Confirmation requise.', 'studio-kyne-mini-tools' ),
-				'needs_confirm' => true,
-			] );
+		if ( ! $is_select && empty( $_POST['confirm'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard() en tête de handler.
+			wp_send_json_error(
+				[
+					'message'       => __( 'Cette requête modifie la base. Confirmation requise.', 'studio-kyne-mini-tools' ),
+					'needs_confirm' => true,
+				]
+			);
 		}
 
 		$wpdb->flush();
 
 		if ( $is_select ) {
 			// Garde-fou 3 : borne mémoire — on plafonne les SELECT sans LIMIT explicite.
-			$capped = $sql;
+			$capped    = $sql;
 			$truncated = false;
-			$bare = rtrim( $sql, "; \t\n\r" );
+			$bare      = rtrim( $sql, "; \t\n\r" );
 			// Seuls SELECT et WITH peuvent ramener un volume non borné. SHOW,
 			// DESCRIBE et EXPLAIN rendent un jeu déjà fini — et n'acceptent pas
 			// de LIMIT : le plafond transformait « SHOW CREATE TABLE x » en
@@ -638,13 +826,15 @@ class Module extends AbstractModule {
 				wp_send_json_error( [ 'message' => $wpdb->last_error ] );
 			}
 			$count = count( (array) $results );
-			wp_send_json_success( [
-				'type'      => 'select',
-				'columns'   => ! empty( $results ) ? array_keys( $results[0] ) : [],
-				'rows'      => $results,
-				'total'     => $count,
-				'truncated' => $truncated && $count >= self::QUERY_ROW_CAP ? self::QUERY_ROW_CAP : 0,
-			] );
+			wp_send_json_success(
+				[
+					'type'      => 'select',
+					'columns'   => ! empty( $results ) ? array_keys( $results[0] ) : [],
+					'rows'      => $results,
+					'total'     => $count,
+					'truncated' => $truncated && $count >= self::QUERY_ROW_CAP ? self::QUERY_ROW_CAP : 0,
+				]
+			);
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
@@ -652,11 +842,13 @@ class Module extends AbstractModule {
 		if ( false === $result ) {
 			wp_send_json_error( [ 'message' => $this->friendly_db_error( $wpdb->last_error, __( 'Requête échouée.', 'studio-kyne-mini-tools' ) ) ] );
 		}
-		wp_send_json_success( [
-			'type'      => 'write',
-			'affected'  => $result,
-			'insert_id' => $wpdb->insert_id,
-		] );
+		wp_send_json_success(
+			[
+				'type'      => 'write',
+				'affected'  => $result,
+				'insert_id' => $wpdb->insert_id,
+			]
+		);
 	}
 
 	public function ajax_export_sql(): void {
@@ -683,8 +875,8 @@ class Module extends AbstractModule {
 		$is_num    = [];
 		$is_binary = [];
 		foreach ( $columns as $field => $col ) {
-			$type              = strtolower( $col['Type'] ?? '' );
-			$is_num[ $field ]  = (bool) preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|decimal|dec|numeric|float|double|real|bit|year)\b/', $type );
+			$type                = strtolower( $col['Type'] ?? '' );
+			$is_num[ $field ]    = (bool) preg_match( '/^(tinyint|smallint|mediumint|int|integer|bigint|decimal|dec|numeric|float|double|real|bit|year)\b/', $type );
 			$is_binary[ $field ] = (bool) preg_match( '/(blob|binary)\b/', $type );
 		}
 		// Liste de colonnes échappées pour un INSERT explicite (réimportable même si l'ordre/nombre change).
@@ -694,6 +886,10 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$create = $wpdb->get_row( 'SHOW CREATE TABLE `' . $table . '`', ARRAY_N );
 
+		// Sortie SQL brute téléchargée en application/octet-stream, jamais rendue
+		// en HTML : un échappement HTML corromprait le dump. La table sort de
+		// read_table() (liste blanche SHOW TABLES), les valeurs de esc_sql().
+		// phpcs:disable WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo "-- Studio Kyne Mini Tools - Export SQL\n";
 		echo '-- Table: ' . $table . "\n";
 		echo '-- Date: ' . gmdate( 'Y-m-d H:i:s' ) . " UTC\n\n";
@@ -721,13 +917,18 @@ class Module extends AbstractModule {
 					} elseif ( ! empty( $is_num[ $field ] ) && is_numeric( $v ) ) {
 						$values[] = $v; // numérique → non quoté.
 					} else {
-						$values[] = "'" . esc_sql( $v ) . "'";
+						// esc_sql() remplace chaque « % » par un jeton de hachage destiné à
+						// $wpdb->prepare() : hors prepare(), il faut le retirer, sinon le
+						// dump contient ce jeton à la place des « % » d'origine.
+						$values[] = "'" . $wpdb->remove_placeholder_escape( esc_sql( (string) $v ) ) . "'";
 					}
 				}
 				echo 'INSERT INTO `' . $table . '` (' . $col_list . ') VALUES (' . implode( ', ', $values ) . ");\n";
 			}
 			$offset += $batch;
-		} while ( count( $rows ) === $batch );
+			$fetched = count( $rows );
+		} while ( $fetched === $batch );
+		// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		exit;
 	}

@@ -15,18 +15,24 @@ class RateLimiter {
 	private const DEFAULT_LOCKOUT  = 1800;  // 30 min
 	private const TRANSIENT_TTL    = 86400; // 24 h max de vie
 
-	private int    $max_attempts;
-	private int    $window;
-	private int    $lockout;
-	private array  $whitelist;
+	private int $max_attempts;
+	private int $window;
+	private int $lockout;
+	/**
+	 * @var string[]
+	 */
+	private array $whitelist;
 	private string $ip_source;
 
+	/**
+	 * @param string[] $whitelist
+	 */
 	public function __construct( array $whitelist = [], int $max_attempts = self::DEFAULT_ATTEMPTS, int $window = self::DEFAULT_WINDOW, int $lockout = self::DEFAULT_LOCKOUT, string $ip_source = ClientIp::SOURCE_REMOTE_ADDR ) {
-		$this->whitelist     = $whitelist;
-		$this->max_attempts  = max( 1, $max_attempts );
-		$this->window        = max( 60, $window );
-		$this->lockout       = max( 60, $lockout );
-		$this->ip_source     = ClientIp::sanitize_source( $ip_source );
+		$this->whitelist    = $whitelist;
+		$this->max_attempts = max( 1, $max_attempts );
+		$this->window       = max( 60, $window );
+		$this->lockout      = max( 60, $lockout );
+		$this->ip_source    = ClientIp::sanitize_source( $ip_source );
 	}
 
 	/**
@@ -48,15 +54,22 @@ class RateLimiter {
 		return self::TRANSIENT_PREFIX . md5( $ip );
 	}
 
+	/**
+	 * @return array<string, int>
+	 */
 	private function get_attempt_data( string $ip ): array {
 		$data = get_transient( $this->get_transient_key( $ip ) );
 		if ( ! is_array( $data ) ) {
-			return [ 'count' => 0, 'last_attempt' => 0, 'locked_until' => 0 ];
+			return [
+				'count'        => 0,
+				'last_attempt' => 0,
+				'locked_until' => 0,
+			];
 		}
 		return [
-			'count'        => $data['count']        ?? 0,
-			'last_attempt' => $data['last_attempt']  ?? 0,
-			'locked_until' => $data['locked_until']  ?? 0,
+			'count'        => $data['count'] ?? 0,
+			'last_attempt' => $data['last_attempt'] ?? 0,
+			'locked_until' => $data['locked_until'] ?? 0,
 		];
 	}
 
@@ -72,16 +85,24 @@ class RateLimiter {
 
 		// Fenêtre expirée → reset le compteur
 		if ( $data['last_attempt'] > 0 && ( $now - $data['last_attempt'] ) > $this->window ) {
-			$data = [ 'count' => 0, 'last_attempt' => 0, 'locked_until' => 0 ];
+			$data = [
+				'count'        => 0,
+				'last_attempt' => 0,
+				'locked_until' => 0,
+			];
 		}
 
-		$data['count']++;
+		++$data['count'];
 		$data['last_attempt'] = $now;
 		$data['locked_until'] = ( $data['count'] >= $this->max_attempts ) ? $now + $this->lockout : 0;
 
 		set_transient( $key, $data, self::TRANSIENT_TTL );
 	}
 
+	/**
+	 * @param null|\WP_User|\WP_Error $user
+	 * @return null|\WP_User|\WP_Error
+	 */
 	public function maybe_block_login( $user ) {
 		if ( $this->is_whitelisted() ) {
 			return $user;
@@ -96,6 +117,7 @@ class RateLimiter {
 			return new \WP_Error(
 				'too_many_attempts',
 				sprintf(
+					/* translators: %d: minutes restantes avant déblocage. */
 					__( '<b>Accès bloqué :</b> Trop de tentatives de connexion. Réessayez dans %d minute(s).', 'studio-kyne-mini-tools' ),
 					$remaining_minutes
 				)
@@ -128,16 +150,5 @@ class RateLimiter {
 
 	public function log_successful_login( string $ip ): void {
 		$this->record_attempt( $ip, true );
-	}
-
-	public function get_attempt_state( string $ip ): array {
-		return $this->get_attempt_data( $ip );
-	}
-
-	/**
-	 * Les transients expirent automatiquement — méthode conservée pour compatibilité.
-	 */
-	public function cleanup_expired(): int {
-		return 0;
 	}
 }

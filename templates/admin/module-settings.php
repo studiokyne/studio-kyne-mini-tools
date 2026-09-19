@@ -55,10 +55,10 @@ $module_settings = $instance->get_settings();
 							</div>
 							<label class="skmt-toggle">
 								<input type="checkbox"
-									   id="skmt_<?php echo esc_attr( $key ); ?>"
-									   name="skmt_module_settings[<?php echo esc_attr( $key ); ?>]"
-									   value="1"
-									   <?php checked( $value, true ); ?>>
+										id="skmt_<?php echo esc_attr( $key ); ?>"
+										name="skmt_module_settings[<?php echo esc_attr( $key ); ?>]"
+										value="1"
+										<?php checked( $value, true ); ?>>
 								<span class="skmt-toggle__slider"></span>
 							</label>
 						</div>

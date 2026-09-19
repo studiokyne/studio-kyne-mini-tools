@@ -144,6 +144,9 @@
 .skmt-input,
 input[type="text"].skmt-input,
 input[type="number"].skmt-input,
+input[type="email"].skmt-input,
+input[type="password"].skmt-input,
+input[type="date"].skmt-input,
 textarea.skmt-input {
   width: 100%;
   padding: 10px 16px;
@@ -162,10 +165,32 @@ textarea.skmt-input {
 .skmt-input:focus,
 input[type="text"].skmt-input:focus,
 input[type="number"].skmt-input:focus,
+input[type="email"].skmt-input:focus,
+input[type="password"].skmt-input:focus,
+input[type="date"].skmt-input:focus,
 textarea.skmt-input:focus {
   outline: none;
   border-color: var(--skmt-accent);
   box-shadow: 0 0 0 3px oklch(0.7 0.15 275 / 0.12);
+}
+
+/* Les sous-champs natifs de Chromium gonflent la hauteur (≈ 50px) : on la fige. */
+input[type="date"].skmt-input {
+  height: 42px;
+}
+
+/* Icône Lucide « calendar » à la place de l'indicateur natif (Chromium, Safari). */
+input[type="date"].skmt-input::-webkit-calendar-picker-indicator {
+  width: 16px;
+  height: 16px;
+  margin-left: 8px;
+  padding: 0;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%23646970' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M8 2v3'/%3E%3Cpath d='M16 2v3'/%3E%3Crect x='3' y='3' width='18' height='18' rx='2'/%3E%3Cpath d='M3 9h18'/%3E%3C/svg%3E") no-repeat center / 16px;
+  cursor: pointer;
+}
+
+input[type="date"].skmt-input::-webkit-datetime-edit {
+  padding: 0;
 }
 
 .skmt-input::placeholder {
@@ -326,6 +351,12 @@ textarea.skmt-input:focus {
 .skmt-card__label {
   font-size: 13px;
   color: var(--skmt-text-secondary);
+}
+
+/* La colonne flex étire ses enfants : un badge garderait toute la largeur. */
+.skmt-card__content .skmt-badge {
+  align-self: flex-start;
+  margin-top: 4px;
 }
 
 .skmt-card__header {
@@ -978,4 +1009,56 @@ details[open] .skmt-section__chevron {
     transition: none;
     transform: none;
   }
+}
+
+/* ================================================================
+ * ONGLETS (sous-onglets d'un écran) — voir admin.js initTabs()
+ * ================================================================ */
+
+.skmt-tabs {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+  padding: 0 28px;
+  /* Filet en ombre interne plutôt qu'en bordure : le soulignement de
+     l'onglet actif se peint par-dessus sans marge négative, qui ferait
+     apparaître un ascenseur vertical avec overflow-x (l'axe y passe alors
+     lui aussi en auto). */
+  box-shadow: inset 0 -1px 0 var(--skmt-border);
+  overflow-x: auto;
+}
+
+.skmt-tabs__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--skmt-text-secondary);
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: color var(--skmt-transition), border-color var(--skmt-transition);
+}
+
+.skmt-tabs__tab:hover {
+  color: var(--skmt-text);
+}
+
+.skmt-tabs__tab:focus-visible {
+  outline: 2px solid var(--skmt-accent);
+  outline-offset: -2px;
+}
+
+.skmt-tabs__tab.is-active {
+  font-weight: 500;
+  color: var(--skmt-accent);
+  border-bottom-color: var(--skmt-accent);
+}
+
+.skmt-tabs__panel[hidden] {
+  display: none;
 }

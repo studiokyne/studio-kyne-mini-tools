@@ -15,15 +15,20 @@ class Settings {
 
 	/**
 	 * Cache des settings.
+	 *
+	 * @var array<string, mixed>|null
 	 */
 	private ?array $settings = null;
 
 	/**
 	 * Récupère tous les settings.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_all(): array {
 		if ( null === $this->settings ) {
-			$this->settings = get_option( $this->option_key, [] );
+			$stored         = get_option( $this->option_key, [] );
+			$this->settings = is_array( $stored ) ? $stored : [];
 		}
 		return $this->settings;
 	}
@@ -32,18 +37,19 @@ class Settings {
 	 * Récupère une valeur de setting.
 	 *
 	 * @param string $key     Clé du setting (peut être imbriquée avec des points).
-	 * @param mixed  $default Valeur par défaut.
+	 * @param mixed  $fallback Valeur par défaut.
+	 * @return mixed
 	 */
-	public function get( string $key, $default = null ) {
+	public function get( string $key, $fallback = null ) {
 		$settings = $this->get_all();
 
 		// Support des clés imbriquées (ex: "modules.image_optimizer")
-		$keys = explode( '.', $key );
+		$keys  = explode( '.', $key );
 		$value = $settings;
 
 		foreach ( $keys as $k ) {
 			if ( ! is_array( $value ) || ! array_key_exists( $k, $value ) ) {
-				return $default;
+				return $fallback;
 			}
 			$value = $value[ $k ];
 		}
@@ -74,7 +80,7 @@ class Settings {
 			$target = &$target[ $k ];
 		}
 
-		$target = $value;
+		$target         = $value;
 		$this->settings = $settings;
 
 		return update_option( $this->option_key, $settings );
@@ -83,11 +89,11 @@ class Settings {
 	/**
 	 * Met à jour plusieurs settings en une fois.
 	 *
-	 * @param array $data Tableau de settings.
+	 * @param array<string, mixed> $data Tableau de settings.
 	 */
 	public function update( array $data ): bool {
-		$settings = $this->get_all();
-		$settings = $this->merge_recursive( $settings, $data );
+		$settings       = $this->get_all();
+		$settings       = $this->merge_recursive( $settings, $data );
 		$this->settings = $settings;
 
 		return update_option( $this->option_key, $settings );
@@ -95,6 +101,10 @@ class Settings {
 
 	/**
 	 * Fusionne deux tableaux récursivement en remplaçant les valeurs.
+	 *
+	 * @param array<string, mixed> $base
+	 * @param array<string, mixed> $updates
+	 * @return array<string, mixed>
 	 */
 	private function merge_recursive( array $base, array $updates ): array {
 		foreach ( $updates as $key => $value ) {

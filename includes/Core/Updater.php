@@ -47,6 +47,9 @@ class Updater {
 	/** Sentinelle stockée dans le transient pour mémoriser un échec. */
 	private const FAILURE_MARKER = 'skmt_update_check_failed';
 
+	/** Nombre maximal de notes de version conservées (canal dev). */
+	private const MAX_NOTES = 10;
+
 	/**
 	 * Initialise l'updater.
 	 */
@@ -70,7 +73,7 @@ class Updater {
 	 * Vide les caches de mise à jour après l'installation d'une nouvelle version.
 	 *
 	 * @param object $upgrader Instance de l'upgrader (non utilisée).
-	 * @param array  $options  Contexte de l'opération.
+	 * @param array<string, mixed>  $options  Contexte de l'opération.
 	 */
 	public function purge_cache_after_update( $upgrader, array $options ): void {
 		if ( ( $options['action'] ?? '' ) !== 'update' || ( $options['type'] ?? '' ) !== 'plugin' ) {
@@ -92,7 +95,9 @@ class Updater {
 	/**
 	 * Vérifie les mises à jour disponibles.
 	 *
-	 * @param object $transient Données du transient.
+	 * @param \stdClass $transient Données du transient.
+	 *
+	 * @return \stdClass
 	 */
 	public function check_update( $transient ) {
 		if ( empty( $transient->checked ) ) {
@@ -118,8 +123,9 @@ class Updater {
 			'package'      => $remote['download_url'],
 			'icons'        => [],
 			'banners'      => [],
-			'tested'       => get_bloginfo( 'version' ),
-			'requires'     => '5.8',
+			// Pas de champ `tested` : le renseigner avec la version courante du
+			// site déclarait le plugin testé sur n'importe quelle version.
+			'requires'     => '6.0',
 			'requires_php' => '7.4',
 		];
 
@@ -147,9 +153,9 @@ class Updater {
 		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $remote_version, $remote_match );
 		preg_match( '/^(\d+\.\d+\.\d+)(?:-(.+))?$/', $installed_version, $installed_match );
 
-		$remote_base    = $remote_match[1] ?? $remote_version;
-		$remote_suffix  = $remote_match[2] ?? '';
-		$installed_base = $installed_match[1] ?? $installed_version;
+		$remote_base      = $remote_match[1] ?? $remote_version;
+		$remote_suffix    = $remote_match[2] ?? '';
+		$installed_base   = $installed_match[1] ?? $installed_version;
 		$installed_suffix = $installed_match[2] ?? '';
 
 		// Comparer les versions de base
@@ -188,9 +194,10 @@ class Updater {
 	/**
 	 * Fournit les informations du plugin pour l'écran de détails.
 	 *
-	 * @param false|object|array $result Valeur par défaut.
+	 * @param false|object|array<string, mixed> $result Valeur par défaut.
 	 * @param string             $action Action demandée.
 	 * @param object             $args   Arguments.
+	 * @return false|object|array<string, mixed>
 	 */
 	public function plugin_info( $result, string $action, object $args ) {
 		if ( 'plugin_information' !== $action ) {
@@ -199,7 +206,7 @@ class Updater {
 
 		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
 
-		if ( dirname( $plugin_file ) !== $args->slug ) {
+		if ( dirname( $plugin_file ) !== ( $args->slug ?? '' ) ) {
 			return $result;
 		}
 
@@ -210,30 +217,88 @@ class Updater {
 		}
 
 		return (object) [
-			'name'          => 'Studio Kyne Mini Tools',
-			'slug'          => dirname( $plugin_file ),
-			'author'        => '<a href="https://studiokyne.com">Studio Kyne</a>',
-			'author_profile'=> 'https://studiokyne.com',
-			'homepage'      => $remote['url'],
-			'download_link' => $remote['download_url'],
-			'version'       => $remote['version'],
-			'requires'      => '5.8',
-			'requires_php'  => '7.4',
-			'last_updated'  => $remote['published_at'],
-			'sections'      => [
+			'name'           => 'Studio Kyne Mini Tools',
+			'slug'           => dirname( $plugin_file ),
+			'author'         => '<a href="https://studiokyne.com">Studio Kyne</a>',
+			'author_profile' => 'https://studiokyne.com',
+			'homepage'       => $remote['url'],
+			'download_link'  => $remote['download_url'],
+			'version'        => $remote['version'],
+			'requires'       => '6.0',
+			'requires_php'   => '7.4',
+			'last_updated'   => $remote['published_at'],
+			'sections'       => [
 				'description' => __( 'Suite d\'outils modulaires pour optimiser et améliorer votre site WordPress.', 'studio-kyne-mini-tools' ),
+				'changelog'   => $this->render_changelog( $remote['notes'] ?? [] ),
 			],
+		];
+	}
+
+	/**
+	 * Construit l'onglet « Journal des modifications » de la modale de détails.
+	 *
+	 * Sur le canal dev, une mise à jour peut sauter plusieurs pré-versions :
+	 * on affiche toutes les notes postérieures à la version installée. Si le
+	 * site est à jour, on retombe sur les notes de la dernière version.
+	 *
+	 * @param mixed $notes Notes normalisées (version, date, html).
+	 */
+	private function render_changelog( $notes ): string {
+		if ( ! is_array( $notes ) || [] === $notes ) {
+			return '<p>' . esc_html__( 'Aucune note de version disponible.', 'studio-kyne-mini-tools' ) . '</p>';
+		}
+
+		$newer = array_filter(
+			$notes,
+			function ( $note ) {
+				return version_compare( SKMT_VERSION, $note['version'], '<' );
+			}
+		);
+
+		if ( [] === $newer ) {
+			$newer = [ reset( $notes ) ];
+		}
+
+		$html = '';
+
+		foreach ( $newer as $note ) {
+			$date  = '' !== $note['date'] ? (string) mysql2date( (string) get_option( 'date_format' ), $note['date'] ) : '';
+			$html .= '<h4>' . esc_html( 'v' . $note['version'] ) . ( '' !== $date ? ' — ' . esc_html( $date ) : '' ) . '</h4>';
+			// HTML rendu par GitHub : filtré ici, puis de nouveau par WordPress
+			// à l'affichage de la modale.
+			$html .= wp_kses_post( $note['html'] );
+		}
+
+		return $html;
+	}
+
+	/**
+	 * État connu de la mise à jour, sans appel réseau.
+	 *
+	 * Lit uniquement le cache : le tableau de bord ne doit jamais déclencher un
+	 * appel HTTP de 10 s. Cache vide ou échec récent → `remote` à null.
+	 *
+	 * @return array{channel: string, remote: ?string, has_update: bool}
+	 */
+	public function get_status(): array {
+		$cached = get_transient( $this->transient_key . '_' . $this->channel );
+		$remote = is_array( $cached ) && ! empty( $cached['version'] ) ? (string) $cached['version'] : null;
+
+		return [
+			'channel'    => $this->channel,
+			'remote'     => $remote,
+			'has_update' => null !== $remote && $this->compare_versions( SKMT_VERSION, $remote ),
 		];
 	}
 
 	/**
 	 * Récupère la dernière version depuis GitHub.
 	 *
-	 * @return array|false Données de la release ou false en cas d'erreur.
+	 * @return array<string, mixed>|false Données de la release ou false en cas d'erreur.
 	 */
 	private function get_remote_version() {
 		$cache_key = $this->transient_key . '_' . $this->channel;
-		$cached = get_transient( $cache_key );
+		$cached    = get_transient( $cache_key );
 
 		// Un échec récent est mémorisé comme tel : on ne réinterroge pas GitHub
 		// avant l'expiration du cache négatif.
@@ -247,13 +312,18 @@ class Updater {
 
 		$api_url = $this->get_api_url();
 
-		$response = wp_remote_get( $api_url, [
-			'timeout' => 10,
-			'headers' => [
-				'Accept' => 'application/vnd.github.v3+json',
-				'User-Agent' => 'StudioKyneMiniTools',
-			],
-		] );
+		$response = wp_remote_get(
+			$api_url,
+			[
+				'timeout' => 10,
+				'headers' => [
+					// Variante « html » : GitHub renvoie les notes déjà rendues
+					// (`body_html`), ce qui évite d'embarquer un parseur Markdown.
+					'Accept'     => 'application/vnd.github.html+json',
+					'User-Agent' => 'StudioKyneMiniTools',
+				],
+			]
+		);
 
 		if ( is_wp_error( $response ) || 200 !== wp_remote_retrieve_response_code( $response ) ) {
 			return $this->remember_failure( $cache_key );
@@ -296,6 +366,9 @@ class Updater {
 
 	/**
 	 * Normalise les donnees de release selon le canal.
+	 *
+	 * @param mixed $body Corps JSON décodé de l'API GitHub.
+	 * @return array<string, mixed>|false
 	 */
 	private function normalize_release_data( $body ) {
 		if ( 'dev' === $this->channel ) {
@@ -304,22 +377,33 @@ class Updater {
 			}
 
 			// Trier par version décroissante pour garantir la plus récente (indépendamment de l'ordre de l'API)
-			usort( $body, function ( $a, $b ) {
-				return version_compare(
-					ltrim( $b['tag_name'] ?? '', 'v' ),
-					ltrim( $a['tag_name'] ?? '', 'v' )
-				);
-			} );
-
-			foreach ( $body as $release ) {
-				if ( empty( $release['prerelease'] ) ) {
-					continue;
+			usort(
+				$body,
+				function ( $a, $b ) {
+					return version_compare(
+						ltrim( $b['tag_name'] ?? '', 'v' ),
+						ltrim( $a['tag_name'] ?? '', 'v' )
+					);
 				}
+			);
 
-				return $this->format_release_payload( $release );
+			$prereleases = array_values(
+				array_filter(
+					$body,
+					function ( $release ) {
+						return is_array( $release ) && ! empty( $release['prerelease'] ) && ! empty( $release['tag_name'] );
+					}
+				)
+			);
+
+			if ( [] === $prereleases ) {
+				return false;
 			}
 
-			return false;
+			$payload          = $this->format_release_payload( $prereleases[0] );
+			$payload['notes'] = array_map( [ $this, 'format_release_note' ], array_slice( $prereleases, 0, self::MAX_NOTES ) );
+
+			return $payload;
 		}
 
 		if ( empty( $body['tag_name'] ) ) {
@@ -331,6 +415,9 @@ class Updater {
 
 	/**
 	 * Convertit une release GitHub en payload updater.
+	 *
+	 * @param array<string, mixed> $release
+	 * @return array<string, mixed>
 	 */
 	private function format_release_payload( array $release ): array {
 		$download_url = $this->find_asset_download_url( $release );
@@ -338,13 +425,30 @@ class Updater {
 		return [
 			'version'      => ltrim( $release['tag_name'] ?? '', 'v' ),
 			'url'          => $release['html_url'] ?? '',
-			'download_url' => $download_url ?: ( $release['zipball_url'] ?? '' ),
+			'download_url' => '' !== $download_url ? $download_url : ( $release['zipball_url'] ?? '' ),
 			'published_at' => $release['published_at'] ?? '',
+			'notes'        => [ $this->format_release_note( $release ) ],
+		];
+	}
+
+	/**
+	 * Extrait la note d'une release (version, date, HTML rendu par GitHub).
+	 *
+	 * @param array<string, mixed> $release
+	 * @return array{version: string, date: string, html: string}
+	 */
+	private function format_release_note( array $release ): array {
+		return [
+			'version' => ltrim( (string) ( $release['tag_name'] ?? '' ), 'v' ),
+			'date'    => (string) ( $release['published_at'] ?? '' ),
+			'html'    => (string) ( $release['body_html'] ?? '' ),
 		];
 	}
 
 	/**
 	 * Recupere l'asset zip si disponible.
+	 *
+	 * @param array<string, mixed> $release
 	 */
 	private function find_asset_download_url( array $release ): string {
 		if ( empty( $release['assets'] ) || ! is_array( $release['assets'] ) ) {

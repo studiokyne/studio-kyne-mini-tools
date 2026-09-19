@@ -45,7 +45,8 @@ abstract class AbstractModule implements ModuleInterface {
 	 * rouvert l'écran et re-sauvegardé — un nouveau réglage dont le défaut vaut
 	 * true arriverait silencieusement à false chez tout le monde.
 	 *
-	 * @param array $defaults Valeurs par défaut à appliquer.
+	 * @param array<string, mixed> $defaults Valeurs par défaut à appliquer.
+	 * @return array<string, mixed>
 	 */
 	protected function get_module_settings( array $defaults = [] ): array {
 		$stored = get_option( $this->get_module_option_key(), [] );
@@ -65,8 +66,9 @@ abstract class AbstractModule implements ModuleInterface {
 	 * index par index — sinon retirer une entrée serait impossible, la valeur
 	 * par défaut ressurgissant à sa position.
 	 *
-	 * @param array $defaults Valeurs de référence.
-	 * @param array $stored   Valeurs lues en base.
+	 * @param array<string, mixed> $defaults Valeurs de référence.
+	 * @param array<string, mixed> $stored   Valeurs lues en base.
+	 * @return array<string, mixed>
 	 */
 	protected static function merge_defaults( array $defaults, array $stored ): array {
 		$merged = $defaults;
@@ -82,13 +84,19 @@ abstract class AbstractModule implements ModuleInterface {
 		return $merged;
 	}
 
-	/** Vrai pour un tableau à clés numériques consécutives (ou vide). */
+	/**
+	 * Vrai pour un tableau à clés numériques consécutives (ou vide).
+	 *
+	 * @param array<mixed> $value
+	 */
 	private static function is_list( array $value ): bool {
 		return [] === $value || array_keys( $value ) === range( 0, count( $value ) - 1 );
 	}
 
 	/**
 	 * Sauvegarde les réglages du module en base.
+	 *
+	 * @param array<string, mixed> $data
 	 */
 	protected function save_module_settings( array $data ): bool {
 		return update_option( $this->get_module_option_key(), $data );
@@ -106,7 +114,8 @@ abstract class AbstractModule implements ModuleInterface {
 	 * Sert à l'import de configuration : un fichier importé doit emprunter
 	 * exactement le chemin d'assainissement du formulaire, jamais un second.
 	 *
-	 * @param array $stored Réglages tels qu'ils sont en base.
+	 * @param array<string, mixed> $stored Réglages tels qu'ils sont en base.
+	 * @return array<string, mixed>
 	 */
 	public function to_form_payload( array $stored ): array {
 		return $stored;
@@ -165,6 +174,9 @@ abstract class AbstractModule implements ModuleInterface {
 		return [];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [];
 	}
@@ -214,6 +226,8 @@ abstract class AbstractModule implements ModuleInterface {
 	/**
 	 * Valeurs par défaut des options du module (créées à l'activation du plugin).
 	 * Retourner [] si les defaults sont gérés à la volée dans get_settings().
+	 *
+	 * @return array<string, mixed>
 	 */
 	public static function get_defaults(): array {
 		return [];
@@ -226,7 +240,13 @@ abstract class AbstractModule implements ModuleInterface {
 	 * ce sont deux tables distinctes, une clé rangée dans la mauvaise n'est
 	 * jamais supprimée.
 	 *
-	 * @return array{options: string[], meta: string[], user_meta: string[]}
+	 * Toutes les clés sont optionnelles : uninstall.php lit chacune avec `?? []`.
+	 * `post_type` et `taxonomy` déclenchent la suppression des contenus et des
+	 * termes correspondants. `tables` liste des tables propres au module, SANS
+	 * préfixe (supprimées par DROP TABLE), `cron` des hooks de tâches
+	 * planifiées — aussi désinscrits à la désactivation de l'extension.
+	 *
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[], tables?: string[], cron?: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [

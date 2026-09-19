@@ -36,11 +36,18 @@ $ip_sources = [
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="security" aria-label="<?php esc_attr_e( 'Sections du module Sécurité', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="auth"><?php esc_html_e( 'Authentification', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="hardening"><?php esc_html_e( 'Hardening', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
 
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="security" data-skmt-tab-panel="auth">
+
 	<!-- ============================================================
-		 AUTHENTIFICATION
-		 ============================================================ -->
+		AUTHENTIFICATION
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Authentification', 'studio-kyne-mini-tools' ); ?></h2>
@@ -146,7 +153,7 @@ $ip_sources = [
 
 				<div class="skmt-form__group">
 					<label for="skmt_ip_source" class="skmt-form__label">
-						<?php esc_html_e( "Origine de l’adresse IP", 'studio-kyne-mini-tools' ); ?>
+						<?php esc_html_e( 'Origine de l’adresse IP', 'studio-kyne-mini-tools' ); ?>
 					</label>
 					<select id="skmt_ip_source" name="skmt_module_settings[ip_source]" class="skmt-select">
 						<?php foreach ( $ip_sources as $value => $label ) : ?>
@@ -156,13 +163,13 @@ $ip_sources = [
 						<?php endforeach; ?>
 					</select>
 					<p class="skmt-form__help">
-						<?php esc_html_e( "Comment identifier un visiteur pour compter ses tentatives. Les en-têtes de proxy sont envoyés par le client : ne les activez que si le site est réellement derrière ce proxy, sinon le blocage se contourne en changeant simplement d’en-tête.", 'studio-kyne-mini-tools' ); ?>
+						<?php esc_html_e( 'Comment identifier un visiteur pour compter ses tentatives. Les en-têtes de proxy sont envoyés par le client : ne les activez que si le site est réellement derrière ce proxy, sinon le blocage se contourne en changeant simplement d’en-tête.', 'studio-kyne-mini-tools' ); ?>
 					</p>
 					<?php if ( $detected_headers ) : ?>
 						<p class="skmt-form__help">
 							<strong><?php esc_html_e( 'Détecté sur cette requête :', 'studio-kyne-mini-tools' ); ?></strong>
 							<?php echo esc_html( implode( ', ', array_keys( $detected_headers ) ) ); ?>.
-							<?php esc_html_e( "Leur présence ne prouve pas qu’un proxy les a posés.", 'studio-kyne-mini-tools' ); ?>
+							<?php esc_html_e( 'Leur présence ne prouve pas qu’un proxy les a posés.', 'studio-kyne-mini-tools' ); ?>
 						</p>
 					<?php endif; ?>
 				</div>
@@ -224,7 +231,7 @@ $ip_sources = [
 					</p>
 					<?php if ( \StudioKyne\MiniTools\Modules\Security\Module::login_url_disabled() ) : ?>
 						<p class="skmt-form__help">
-							<strong><?php esc_html_e( "Actuellement neutralisee par la constante SKMT_DISABLE_LOGIN_URL : wp-login.php reste accessible.", 'studio-kyne-mini-tools' ); ?></strong>
+							<strong><?php esc_html_e( 'Actuellement neutralisee par la constante SKMT_DISABLE_LOGIN_URL : wp-login.php reste accessible.', 'studio-kyne-mini-tools' ); ?></strong>
 						</p>
 					<?php endif; ?>
 				</div>
@@ -232,12 +239,13 @@ $ip_sources = [
 
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="security" data-skmt-tab-panel="hardening" hidden>
 
 	<!-- ============================================================
-		 HARDENING
-		 ============================================================ -->
+		HARDENING
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Hardening', 'studio-kyne-mini-tools' ); ?></h2>
@@ -302,7 +310,7 @@ $ip_sources = [
 				<div class="skmt-option__content">
 					<label for="skmt_hide_wp_version" class="skmt-option__label">
 						<?php esc_html_e( 'Masquer la version WordPress', 'studio-kyne-mini-tools' ); ?>
-						<?php echo $this->render_help_tip( __( "Cosmétique : la version reste déductible des fichiers du cœur et des scripts versionnés. Utile contre les scans automatisés les plus simples, pas contre un examen manuel.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
+						<?php echo $this->render_help_tip( __( 'Cosmétique : la version reste déductible des fichiers du cœur et des scripts versionnés. Utile contre les scans automatisés les plus simples, pas contre un examen manuel.', 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?>
 					</label>
 					<p class="skmt-option__desc">
 						<?php esc_html_e( 'Retire la version WordPress des headers HTTP et du meta generator.', 'studio-kyne-mini-tools' ); ?>
@@ -324,6 +332,7 @@ $ip_sources = [
 			</div>
 
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

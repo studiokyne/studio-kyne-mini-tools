@@ -25,11 +25,20 @@ $avatars = $module_settings['avatars'] ?? [];
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="white_label" aria-label="<?php esc_attr_e( 'Sections de la marque blanche', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="adminbar"><?php esc_html_e( 'Barre d\'administration', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="avatars"><?php esc_html_e( 'Avatars', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="profile"><?php esc_html_e( 'Page de profil', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="footer"><?php esc_html_e( 'Pied de page', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
 
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="white_label" data-skmt-tab-panel="adminbar">
+
 	<!-- ============================================================
-		 BARRE D'ADMINISTRATION
-		 ============================================================ -->
+		BARRE D'ADMINISTRATION
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Barre d\'administration', 'studio-kyne-mini-tools' ); ?></h2>
@@ -189,10 +198,13 @@ $avatars = $module_settings['avatars'] ?? [];
 
 		</div>
 	</div>
+	</div>
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="white_label" data-skmt-tab-panel="avatars" hidden>
 
 	<!-- ============================================================
-		 AVATARS
-		 ============================================================ -->
+		AVATARS
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Avatars', 'studio-kyne-mini-tools' ); ?></h2>
@@ -217,10 +229,13 @@ $avatars = $module_settings['avatars'] ?? [];
 
 		</div>
 	</div>
+	</div>
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="white_label" data-skmt-tab-panel="profile" hidden>
 
 	<!-- ============================================================
-		 PAGE DE PROFIL
-		 ============================================================ -->
+		PAGE DE PROFIL
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Page de profil', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Masquage visuel uniquement : chaque fonctionnalité reste active côté serveur. Ces cases épurent l'écran, elles ne retirent aucun droit.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></h2>
@@ -350,10 +365,13 @@ $avatars = $module_settings['avatars'] ?? [];
 
 		</div>
 	</div>
+	</div>
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="white_label" data-skmt-tab-panel="footer" hidden>
 
 	<!-- ============================================================
-		 PIED DE PAGE
-		 ============================================================ -->
+		PIED DE PAGE
+		============================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php esc_html_e( 'Pied de page', 'studio-kyne-mini-tools' ); ?></h2>
@@ -391,6 +409,7 @@ $avatars = $module_settings['avatars'] ?? [];
 			</div>
 
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

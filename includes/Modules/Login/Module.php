@@ -16,25 +16,18 @@ class Module extends AbstractModule {
 	private array $settings = [];
 
 	/**
-	 * Constructeur.
-	 */
-	public function __construct( string $id ) {
-		parent::__construct( $id );
-	}
-
-	/**
 	 * Initialise les hooks WordPress.
 	 */
 	public function init(): void {
 		$this->settings = $this->get_settings();
 
-		add_action( 'login_enqueue_scripts',        [ $this, 'enqueue_login_assets' ] );
-		add_action( 'login_head',                   [ $this, 'inject_css_variables' ] );
-		add_filter( 'login_headerurl',              [ $this, 'filter_logo_url' ] );
-		add_filter( 'login_headertext',             [ $this, 'filter_logo_text' ] );
-		add_filter( 'login_body_class',             [ $this, 'add_body_class' ] );
-		add_action( 'login_footer',                 [ $this, 'render_side_panel' ] );
-		add_action( 'login_footer',                 [ $this, 'render_login_dom_tweaks' ], 20 );
+		add_action( 'login_enqueue_scripts', [ $this, 'enqueue_login_assets' ] );
+		add_action( 'login_head', [ $this, 'inject_css_variables' ] );
+		add_filter( 'login_headerurl', [ $this, 'filter_logo_url' ] );
+		add_filter( 'login_headertext', [ $this, 'filter_logo_text' ] );
+		add_filter( 'login_body_class', [ $this, 'add_body_class' ] );
+		add_action( 'login_footer', [ $this, 'render_side_panel' ] );
+		add_action( 'login_footer', [ $this, 'render_login_dom_tweaks' ], 20 );
 
 		if ( ! empty( $this->settings['form']['hide_language_switcher'] ) ) {
 			add_filter( 'login_display_language_dropdown', '__return_false' );
@@ -74,12 +67,12 @@ class Module extends AbstractModule {
 	public function inject_css_variables(): void {
 		$s = $this->settings;
 
-		$bg_color       = $this->sanitize_color( $s['form']['bg_color']       ?? '#f7f7f7' );
-		$panel_bg       = $this->sanitize_color( $s['layout']['panel_bg_color'] ?? '#eaeaea' );
-		$btn_bg         = $this->sanitize_color( $s['form']['btn_bg_color']    ?? '#615FFF' );
-		$btn_color      = $this->sanitize_color( $s['form']['btn_text_color']  ?? '#ffffff' );
-		$link_color     = $this->sanitize_color( $s['form']['link_color']      ?? '#615FFF' );
-		$logo_width     = absint( $s['branding']['logo_width'] ?? 150 );
+		$bg_color   = $this->sanitize_color( $s['form']['bg_color'] ?? '#f7f7f7' );
+		$panel_bg   = $this->sanitize_color( $s['layout']['panel_bg_color'] ?? '#eaeaea' );
+		$btn_bg     = $this->sanitize_color( $s['form']['btn_bg_color'] ?? '#615FFF' );
+		$btn_color  = $this->sanitize_color( $s['form']['btn_text_color'] ?? '#ffffff' );
+		$link_color = $this->sanitize_color( $s['form']['link_color'] ?? '#615FFF' );
+		$logo_width = absint( $s['branding']['logo_width'] ?? 150 );
 
 		// Image du panneau
 		$panel_img_url = '';
@@ -174,7 +167,7 @@ class Module extends AbstractModule {
 	 */
 	public function add_body_class( array $classes ): array {
 		$classes[] = 'skmt-login-split';
-		$logo_id = absint( $this->settings['branding']['logo_id'] ?? 0 );
+		$logo_id   = absint( $this->settings['branding']['logo_id'] ?? 0 );
 		if ( $logo_id > 0 ) {
 			$classes[] = 'skmt-has-logo';
 		}
@@ -253,12 +246,17 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return $this->get_module_settings( static::get_defaults() );
 	}
 
 	/**
 	 * Valide et sauvegarde les settings.
+	 *
+	 * @param array<string, mixed> $settings
 	 */
 	public function save_settings( array $settings ): bool {
 		$current = $this->get_module_settings( static::get_defaults() );
@@ -266,7 +264,7 @@ class Module extends AbstractModule {
 		// Layout
 		if ( isset( $settings['layout'] ) && is_array( $settings['layout'] ) ) {
 			$current['layout']['panel_image_id'] = absint( $settings['layout']['panel_image_id'] ?? 0 );
-			$current['layout']['panel_bg_color']  = $this->sanitize_color( $settings['layout']['panel_bg_color'] ?? '', '#16213e' );
+			$current['layout']['panel_bg_color'] = $this->sanitize_color( $settings['layout']['panel_bg_color'] ?? '', '#16213e' );
 		}
 
 		// Branding
@@ -281,10 +279,10 @@ class Module extends AbstractModule {
 			$current['form']['hide_lost_password']     = ! empty( $settings['form']['hide_lost_password'] );
 			$current['form']['hide_back_to_blog']      = ! empty( $settings['form']['hide_back_to_blog'] );
 			$current['form']['hide_privacy_policy']    = ! empty( $settings['form']['hide_privacy_policy'] );
-			$current['form']['bg_color']               = $this->sanitize_color( $settings['form']['bg_color']      ?? '', '#f7f7f7' );
-			$current['form']['btn_bg_color']           = $this->sanitize_color( $settings['form']['btn_bg_color']  ?? '', '#615FFF' );
+			$current['form']['bg_color']               = $this->sanitize_color( $settings['form']['bg_color'] ?? '', '#f7f7f7' );
+			$current['form']['btn_bg_color']           = $this->sanitize_color( $settings['form']['btn_bg_color'] ?? '', '#615FFF' );
 			$current['form']['btn_text_color']         = $this->sanitize_color( $settings['form']['btn_text_color'] ?? '', '#ffffff' );
-			$current['form']['link_color']             = $this->sanitize_color( $settings['form']['link_color']    ?? '', '#615FFF' );
+			$current['form']['link_color']             = $this->sanitize_color( $settings['form']['link_color'] ?? '', '#615FFF' );
 		}
 
 		$this->settings = $current;
@@ -293,10 +291,12 @@ class Module extends AbstractModule {
 
 	/**
 	 * Valeurs par défaut des settings.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public static function get_defaults(): array {
 		return [
-			'layout'  => [
+			'layout'   => [
 				'panel_image_id' => 0,
 				'panel_bg_color' => '#eaeaea',
 			],
@@ -304,7 +304,7 @@ class Module extends AbstractModule {
 				'logo_id'    => 0,
 				'logo_width' => 150,
 			],
-			'form' => [
+			'form'     => [
 				'hide_language_switcher' => true,
 				'hide_lost_password'     => false,
 				'hide_back_to_blog'      => true,
@@ -348,8 +348,8 @@ class Module extends AbstractModule {
 	/**
 	 * Valide une couleur hex. Retourne la valeur par défaut si invalide.
 	 */
-	private function sanitize_color( string $color, string $default = '' ): string {
+	private function sanitize_color( string $color, string $fallback = '' ): string {
 		$color = sanitize_hex_color( trim( $color ) );
-		return $color ?: $default;
+		return is_string( $color ) && '' !== $color ? $color : $fallback;
 	}
 }

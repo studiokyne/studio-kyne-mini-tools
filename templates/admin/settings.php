@@ -10,32 +10,19 @@ global $wpdb;
 $global         = $this->settings->get( 'global', [] );
 $update_channel = $global['update_channel'] ?? 'stable';
 
-// Image processing capabilities (résultat mis en cache 24h pour éviter un appel Imagick coûteux)
-$has_imagick = extension_loaded( 'imagick' );
-$has_gd      = extension_loaded( 'gd' );
+// Mise à jour automatique : la source de vérité reste l'option WordPress
+// `auto_update_plugins`, partagée avec la liste des extensions.
+$can_auto_update = wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' );
+$auto_update_on  = in_array( plugin_basename( SKMT_PLUGIN_FILE ), (array) get_site_option( 'auto_update_plugins', [] ), true );
 
-$image_caps = get_transient( 'skmt_image_caps' );
-if ( false === $image_caps ) {
-	$can_avif = false;
-	$can_webp = false;
-
-	if ( $has_imagick ) {
-		$formats  = \Imagick::queryFormats();
-		$can_avif = in_array( 'AVIF', $formats, true );
-		$can_webp = in_array( 'WEBP', $formats, true );
-	}
-	if ( $has_gd ) {
-		$gd_info  = gd_info();
-		$can_avif = $can_avif || ( $gd_info['AVIF Support'] ?? false );
-		$can_webp = $can_webp || ( $gd_info['WebP Support'] ?? false );
-	}
-	$image_caps = [ 'avif' => $can_avif, 'webp' => $can_webp ];
-	set_transient( 'skmt_image_caps', $image_caps, DAY_IN_SECONDS );
-}
-
-$can_avif = $image_caps['avif'];
-$can_webp = $image_caps['webp'];
-$editor   = $has_imagick ? 'Imagick' : ( $has_gd ? 'GD' : __( 'Aucun', 'studio-kyne-mini-tools' ) );
+// Capacités image : la même détection que le module Image Optimizer (vrai
+// encodage d'essai, mis en cache), et non queryFormats()/gd_info() qui
+// annoncent parfois un format sans délégué d'encodage réel.
+$image_caps = ( new \StudioKyne\MiniTools\Modules\ImageOptimizer\ImageProcessor( [] ) )->get_capabilities();
+$can_avif   = ! empty( $image_caps['avif'] );
+$can_webp   = ! empty( $image_caps['webp'] );
+$has_editor = 'none' !== $image_caps['editor'];
+$editor     = $has_editor ? ucfirst( $image_caps['editor'] ) : __( 'Aucun', 'studio-kyne-mini-tools' );
 
 // Server info
 $php_version     = PHP_VERSION;
@@ -69,8 +56,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-page__scroll">
 
 	<!-- ================================================================
-	     MISES À JOUR
-	     ================================================================ -->
+		MISES À JOUR
+		================================================================ -->
 	<form id="skmt-save-settings-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 		<?php wp_nonce_field( 'skmt_save_settings', 'skmt_nonce' ); ?>
 		<input type="hidden" name="action" value="skmt_save_settings">
@@ -111,21 +98,23 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 
 				<div class="skmt-option">
 					<div class="skmt-option__content">
-						<span class="skmt-option__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></span>
+						<label for="skmt_auto_update" class="skmt-option__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></label>
 						<p class="skmt-option__desc">
 							<?php
-							printf(
-								/* translators: %s: lien vers l'écran des extensions WordPress. */
-								esc_html__( 'Gérées par WordPress. Activez « Mises à jour auto » depuis la %s.', 'studio-kyne-mini-tools' ),
-								'<a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">' . esc_html__( 'liste des extensions', 'studio-kyne-mini-tools' ) . '</a>'
+							echo esc_html(
+								$can_auto_update
+									? __( 'Installe les nouvelles versions du canal choisi sans intervention. Même réglage que la colonne « Mises à jour auto » de la liste des extensions.', 'studio-kyne-mini-tools' )
+									: __( 'Les mises à jour automatiques des extensions sont désactivées sur ce site, ou votre compte ne peut pas les gérer.', 'studio-kyne-mini-tools' )
 							);
 							?>
 						</p>
 					</div>
 					<div class="skmt-option__control">
-						<a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>" class="skmt-btn skmt-btn--secondary skmt-btn--sm">
-							<?php echo esc_html__( 'Ouvrir les extensions', 'studio-kyne-mini-tools' ); ?>
-						</a>
+						<input type="hidden" name="skmt_global[auto_update_initial]" value="<?php echo $auto_update_on ? '1' : '0'; ?>">
+						<label class="skmt-toggle">
+							<input type="checkbox" id="skmt_auto_update" name="skmt_global[auto_update]" value="1" <?php checked( $auto_update_on ); ?> <?php disabled( ! $can_auto_update ); ?>>
+							<span class="skmt-toggle__slider"></span>
+						</label>
 					</div>
 				</div>
 
@@ -137,8 +126,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-divider"></div>
 
 	<!-- ================================================================
-	     CONFIGURATION — export / import / reset
-	     ================================================================ -->
+		CONFIGURATION — export / import / reset
+		================================================================ -->
 	<div class="skmt-section">
 		<div class="skmt-section__header">
 			<h2 class="skmt-section__title"><?php echo esc_html__( 'Configuration', 'studio-kyne-mini-tools' ); ?></h2>
@@ -175,8 +164,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 							<?php wp_nonce_field( 'skmt_import_settings', 'skmt_import_nonce' ); ?>
 							<input type="hidden" name="action" value="skmt_import_settings">
 							<input type="file" name="skmt_import_file" id="skmt_import_file" accept=".json"
-								   style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
-								   onchange="document.getElementById('skmt-import-form').submit()">
+									style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0,0,0,0)"
+									onchange="document.getElementById('skmt-import-form').submit()">
 							<label for="skmt_import_file" class="skmt-btn skmt-btn--secondary skmt-btn--sm" style="width:100%;cursor:pointer;">
 								<?php echo esc_html__( 'Importer', 'studio-kyne-mini-tools' ); ?>
 							</label>
@@ -213,8 +202,8 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 	<div class="skmt-divider"></div>
 
 	<!-- ================================================================
-	     INFORMATIONS SERVEUR — tableau collapsible
-	     ================================================================ -->
+		INFORMATIONS SERVEUR — tableau collapsible
+		================================================================ -->
 	<details class="skmt-section skmt-section--collapsible">
 		<summary class="skmt-section__header skmt-section__header--summary">
 			<div>
@@ -266,7 +255,7 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 					</tr>
 					<tr>
 						<td class="skmt-server-table__label"><?php echo esc_html__( 'Éditeur image', 'studio-kyne-mini-tools' ); ?></td>
-						<td><span class="skmt-badge <?php echo 'Aucun' !== $editor ? 'skmt-badge--success' : 'skmt-badge--danger'; ?>"><?php echo esc_html( $editor ); ?></span></td>
+						<td><span class="skmt-badge <?php echo $has_editor ? 'skmt-badge--success' : 'skmt-badge--danger'; ?>"><?php echo esc_html( $editor ); ?></span></td>
 					</tr>
 					<tr>
 						<td class="skmt-server-table__label"><?php echo esc_html__( 'AVIF', 'studio-kyne-mini-tools' ); ?></td>

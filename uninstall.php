@@ -3,7 +3,7 @@
  * Nettoyage des données lors de la désinstallation.
  *
  * Chaque module déclare les clés à supprimer via ::get_uninstall_keys().
- * Pour ajouter un module : déclarer sa classe dans $module_classes ci-dessous.
+ * La liste des modules vit dans Activator::MODULE_CLASSES.
  */
 
 if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
@@ -14,22 +14,7 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/Autoloader.php';
 \StudioKyne\MiniTools\Core\Autoloader::register();
 
-/**
- * Classes des modules intégrés.
- * À mettre à jour lorsqu'un nouveau module est ajouté.
- *
- * @var array<string, class-string>
- */
-$module_classes = [
-	'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
-	'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
-	'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
-	'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
-	'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
-	'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
-	'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
-	'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
-];
+$module_classes = \StudioKyne\MiniTools\Core\Activator::MODULE_CLASSES;
 
 // Suppression de l'option globale.
 delete_option( 'skmt_settings' );
@@ -56,6 +41,22 @@ foreach ( $module_classes as $id => $class ) {
 		delete_post_meta_by_key( $meta_key );
 	}
 
+	// Tables propres à un module, déclarées sans préfixe. Le nom ne vient que
+	// du code du module, jamais d'une saisie : on le restreint quand même aux
+	// caractères d'un identifiant avant de l'interpoler.
+	foreach ( $keys['tables'] ?? [] as $table ) {
+		if ( ! preg_match( '/^[a-z0-9_]+$/', $table ) ) {
+			continue;
+		}
+		$table = $GLOBALS['wpdb']->prefix . $table;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.DirectDatabaseQuery.SchemaChange, WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- nom de table validé ci-dessus.
+		$GLOBALS['wpdb']->query( "DROP TABLE IF EXISTS `{$table}`" );
+	}
+
+	foreach ( $keys['cron'] ?? [] as $hook ) {
+		wp_clear_scheduled_hook( $hook );
+	}
+
 	// Métadonnées d'utilisateur : delete_post_meta_by_key() ne les touche pas,
 	// elles vivent dans une autre table.
 	foreach ( $keys['user_meta'] ?? [] as $meta_key ) {
@@ -65,11 +66,13 @@ foreach ( $module_classes as $id => $class ) {
 	// Suppression des post types custom
 	foreach ( $keys['post_type'] ?? [] as $post_type ) {
 		// Récupérer tous les posts du type custom
-		$posts = get_posts( [
-			'post_type'      => $post_type,
-			'numberposts'    => -1,
-			'posts_per_page' => -1,
-		] );
+		$posts = get_posts(
+			[
+				'post_type'      => $post_type,
+				'numberposts'    => -1,
+				'posts_per_page' => -1,
+			]
+		);
 
 		foreach ( $posts as $post ) {
 			wp_delete_post( $post->ID, true ); // true = hard delete
@@ -79,20 +82,25 @@ foreach ( $module_classes as $id => $class ) {
 	// Suppression des taxonomies custom (tous les termes).
 	// Le plugin n'étant pas booté ici, la taxonomie n'est pas enregistrée : on
 	// l'enregistre à la volée pour que get_terms()/wp_delete_term() fonctionnent.
-	foreach ( $keys['taxonomy'] ?? [] as $taxonomy ) {
-		if ( ! taxonomy_exists( $taxonomy ) ) {
-			register_taxonomy( $taxonomy, 'attachment', [ 'public' => false ] );
+	foreach ( $keys['taxonomy'] ?? [] as $tax_name ) {
+		if ( '' === $tax_name ) {
+			continue;
+		}
+		if ( ! taxonomy_exists( $tax_name ) ) {
+			register_taxonomy( $tax_name, 'attachment', [ 'public' => false ] );
 		}
 
-		$terms = get_terms( [
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'fields'     => 'ids',
-		] );
+		$terms = get_terms(
+			[
+				'taxonomy'   => $tax_name,
+				'hide_empty' => false,
+				'fields'     => 'ids',
+			]
+		);
 
 		if ( ! is_wp_error( $terms ) ) {
 			foreach ( $terms as $term_id ) {
-				wp_delete_term( $term_id, $taxonomy );
+				wp_delete_term( $term_id, $tax_name );
 			}
 		}
 	}

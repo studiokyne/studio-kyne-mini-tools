@@ -118,7 +118,18 @@ jobs:
             --exclude='dist' \
             --exclude='.claude' \
             --exclude='.mcp.json' \
-            --exclude='.gitignore'
+            --exclude='.gitignore' \
+            --exclude='vendor' \
+            --exclude='composer.json' \
+            --exclude='composer.lock' \
+            --exclude='phpcs.xml.dist' \
+            --exclude='phpstan.neon.dist' \
+            --exclude='phpstan-baseline.neon' \
+            --exclude='phpcs.baseline.xml' \
+            --exclude='.phpcs.cache' \
+            --exclude='tools' \
+            --exclude='CLAUDE.md' \
+            --exclude='docs'
           cd dist/package
           zip -r "../studio-kyne-mini-tools-${VERSION}.zip" studio-kyne-mini-tools
 

@@ -1,0 +1,35 @@
+{
+    "name": "studiokyne/studio-kyne-mini-tools",
+    "description": "Suite d'outils modulaires pour WordPress. Composer sert uniquement à l'outillage de développement : aucune dépendance d'exécution, le dossier vendor/ n'est jamais distribué.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "homepage": "https://github.com/studiokyne/studio-kyne-mini-tools",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0",
+        "phpcompatibility/phpcompatibility-wp": "^2.1",
+        "phpstan/extension-installer": "^1.4",
+        "phpstan/phpstan": "^2.1",
+        "szepeviktor/phpstan-wordpress": "^2.0",
+        "wp-coding-standards/wpcs": "^3.1"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true,
+            "phpstan/extension-installer": true
+        },
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
+    "scripts": {
+        "lint": "phpcs",
+        "lint:fix": "phpcbf",
+        "analyse": "phpstan analyse --memory-limit=2G",
+        "check": [
+            "@lint",
+            "@analyse"
+        ]
+    }
+}

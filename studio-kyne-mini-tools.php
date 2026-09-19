@@ -4,14 +4,14 @@
  * Plugin URI:  https://github.com/studiokyne/studio-kyne-mini-tools
  * Update URI:  https://github.com/studiokyne/studio-kyne-mini-tools
  * Description: Suite d'outils modulaires pour optimiser et améliorer votre site WordPress.
- * Version:     1.0.13
+ * Version:     1.0.13-dev.19
  * Author:      Studio Kyne
  * Author URI:  https://studiokyne.com
  * License:     GPL-2.0+
  * License URI: http://www.gnu.org/licenses/gpl-2.0.txt
  * Text Domain: studio-kyne-mini-tools
  * Domain Path: /languages
- * Requires at least: 5.8
+ * Requires at least: 6.0
  * Requires PHP: 7.4
  */
 
@@ -21,7 +21,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Constantes de base
-define( 'SKMT_VERSION', '1.0.13' );
+define( 'SKMT_VERSION', '1.0.13-dev.19' );
 define( 'SKMT_PLUGIN_FILE', __FILE__ );
 define( 'SKMT_PLUGIN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'SKMT_PLUGIN_URL', plugin_dir_url( __FILE__ ) );
@@ -34,16 +34,16 @@ require_once SKMT_INCLUDES_DIR . 'Core/Autoloader.php';
 StudioKyne\MiniTools\Core\Autoloader::register();
 
 // Bootstrap
-add_action( 'plugins_loaded', [ 'StudioKyne\MiniTools\Core\Plugin', 'instance' ], 10 );
+add_action(
+	'plugins_loaded',
+	static function (): void {
+		StudioKyne\MiniTools\Core\Plugin::instance();
+	},
+	10
+);
 
 // Activation hook
-register_activation_hook( __FILE__, function () {
-	require_once SKMT_INCLUDES_DIR . 'Core/Activator.php';
-	StudioKyne\MiniTools\Core\Activator::activate();
-} );
+register_activation_hook( __FILE__, [ 'StudioKyne\MiniTools\Core\Activator', 'activate' ] );
 
 // Deactivation hook
-register_deactivation_hook( __FILE__, function () {
-	require_once SKMT_INCLUDES_DIR . 'Core/Deactivator.php';
-	StudioKyne\MiniTools\Core\Deactivator::deactivate();
-} );
+register_deactivation_hook( __FILE__, [ 'StudioKyne\MiniTools\Core\Deactivator', 'deactivate' ] );

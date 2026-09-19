@@ -2,6 +2,15 @@ name: Release Stable Version
 
 on:
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Version increment (patch, minor or major)
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
 
 permissions:
   contents: write
@@ -30,6 +39,8 @@ jobs:
 
       - name: Determine release version
         id: version
+        env:
+          BUMP: ${{ inputs.bump || 'patch' }}
         run: |
           set -euo pipefail
 
@@ -43,10 +54,19 @@ jobs:
 
           current_version="${latest_stable_tag#v}"
           IFS='.' read -r major minor patch <<< "$current_version"
-          target_version="${major}.${minor}.$((patch + 1))"
+          case "$BUMP" in
+            major) target_version="$((major + 1)).0.0" ;;
+            minor) target_version="${major}.$((minor + 1)).0" ;;
+            patch) target_version="${major}.${minor}.$((patch + 1))" ;;
+            *)
+              echo "Unknown bump type: $BUMP"
+              exit 1
+              ;;
+          esac
 
           echo "Latest stable tag: $latest_stable_tag"
           echo "Current version: $current_version"
+          echo "Bump: $BUMP"
           echo "Target version: $target_version"
           echo "version=$target_version" >> "$GITHUB_OUTPUT"
 
@@ -111,7 +131,18 @@ jobs:
             --exclude='dist' \
             --exclude='.claude' \
             --exclude='.mcp.json' \
-            --exclude='.gitignore'
+            --exclude='.gitignore' \
+            --exclude='vendor' \
+            --exclude='composer.json' \
+            --exclude='composer.lock' \
+            --exclude='phpcs.xml.dist' \
+            --exclude='phpstan.neon.dist' \
+            --exclude='phpstan-baseline.neon' \
+            --exclude='phpcs.baseline.xml' \
+            --exclude='.phpcs.cache' \
+            --exclude='tools' \
+            --exclude='CLAUDE.md' \
+            --exclude='docs'
           cd dist/package
           zip -r "../studio-kyne-mini-tools-${VERSION}.zip" studio-kyne-mini-tools
 

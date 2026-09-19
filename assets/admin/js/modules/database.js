@@ -5,6 +5,7 @@
     nonce:        '',
     prefix:       '',
     currentTable: null,
+    dropTarget:   null,
     tables:       [],
   };
 
@@ -22,6 +23,8 @@
     initSearch();
     initTabs();
     initHeaderActions();
+    var cleanupLink = document.getElementById('skmt-db-cleanup-link');
+    if (cleanupLink) cleanupLink.addEventListener('click', openCleanup);
   });
 
   // Raccourci de traduction : lit window.skmtAdmin.i18n avec repli.
@@ -96,7 +99,7 @@
     // toute confusion lors de l'écriture d'une requête SQL. Le préfixe reste indiqué
     // dans le libellé de groupe « WordPress (wp_) ».
     var label = t.name;
-    var rows  = t.rows.toLocaleString();
+    var rows  = (t.approx ? '≈ ' : '') + t.rows.toLocaleString();
     return '<div class="skmt-db__table-item" data-table="' + escHtml(t.name) + '" data-skmt-tip="' + escHtml(t.name) + '" data-skmt-tip-placement="right">' +
            '<span class="skmt-db__table-item-name">' + escHtml(label) + '</span>' +
            '<span class="skmt-db__table-item-rows">' + rows + '</span>' +
@@ -114,7 +117,8 @@
     document.querySelectorAll('.skmt-db__table-item').forEach(function (el) {
       el.classList.toggle('is-active', el.dataset.table === tableName);
     });
-    // Afficher la vue table, masquer l'état vide
+    // Afficher la vue table, masquer l'état vide et le nettoyage
+    setCleanupActive(false);
     document.getElementById('skmt-db-empty').style.display = 'none';
     document.getElementById('skmt-db-table-view').style.display = '';
     // Mettre à jour le nom/meta dans le header
@@ -122,30 +126,26 @@
     if (t) {
       document.getElementById('skmt-db-table-name').textContent = t.name;
       document.getElementById('skmt-db-table-meta').textContent =
-        t.rows.toLocaleString() + ' lignes · ' + formatSize(t.size);
+        (t.approx ? '≈ ' : '') + t.rows.toLocaleString() + ' lignes · ' + formatSize(t.size);
     }
     // Activer l'onglet Données par défaut (implémenté au prompt 1-07)
     switchTab('data');
   }
 
+  // Onglets : composant partagé skmt-tabs (admin.js). On ne fait ici que
+  // charger la vue ouverte. Pas de table choisie (restauration de l'onglet
+  // mémorisé au chargement de la page) : rien à charger.
   function initTabs() {
-    document.addEventListener('click', function (e) {
-      var btn = e.target.closest && e.target.closest('.skmt-db__tab');
-      if (!btn) return;
-      switchTab(btn.dataset.tab);
+    document.addEventListener('skmt:tab', function (e) {
+      if (e.detail.group !== 'database' || !db.currentTable) return;
+      if (e.detail.name === 'data')      loadData(dataState.page);
+      if (e.detail.name === 'structure') loadStructure();
+      if (e.detail.name === 'query')     initQueryTab();
     });
   }
 
   function switchTab(tab) {
-    document.querySelectorAll('.skmt-db__tab').forEach(function (btn) {
-      btn.classList.toggle('is-active', btn.dataset.tab === tab);
-    });
-    document.querySelectorAll('.skmt-db__tab-content').forEach(function (el) {
-      el.style.display = el.id === 'skmt-db-tab-' + tab ? '' : 'none';
-    });
-    if (tab === 'data')      loadData(dataState.page);
-    if (tab === 'structure') loadStructure();
-    if (tab === 'query')     initQueryTab();
+    window.skmtTabs.activate('database', tab);
   }
 
   /* ================================================================
@@ -169,6 +169,19 @@
     }, function (data) {
       dataState.columns = data.columns;
       dataState.primary = data.primary;
+      // Sans recherche, `total` est le compte exact : il remplace l'estimation
+      // affichée pour les grosses tables (liste et en-tête).
+      if (!dataState.search) {
+        var tbl = db.tables.find(function (t) { return t.name === db.currentTable; });
+        if (tbl && (tbl.approx || tbl.rows !== data.total)) {
+          tbl.rows = data.total;
+          tbl.approx = false;
+          document.getElementById('skmt-db-table-meta').textContent =
+            data.total.toLocaleString() + ' lignes · ' + formatSize(tbl.size);
+          var item = document.querySelector('.skmt-db__table-item[data-table="' + db.currentTable + '"] .skmt-db__table-item-rows');
+          if (item) item.textContent = data.total.toLocaleString();
+        }
+      }
       renderDataTable(content, data);
     });
   }
@@ -490,10 +503,10 @@
     var dropConfirm = document.getElementById('skmt-db-drop-confirm-btn');
     if (dropInput && dropConfirm) {
       dropInput.addEventListener('input', function () {
-        dropConfirm.disabled = dropInput.value.trim() !== db.currentTable;
+        dropConfirm.disabled = dropInput.value.trim() !== db.dropTarget;
       });
       dropConfirm.addEventListener('click', function () {
-        if (dropInput.value.trim() !== db.currentTable) return;
+        if (!db.dropTarget || dropInput.value.trim() !== db.dropTarget) return;
         dropTable();
       });
     }
@@ -520,7 +533,7 @@
     if (action === 'export')   { exportTable(); return; }
     if (action === 'query')    { switchTab('query'); return; }
     if (action === 'truncate') { confirmTruncate(); return; }
-    if (action === 'drop')     { openDropModal(); return; }
+    if (action === 'drop')     { openDropModal(db.currentTable); return; }
   }
 
   function exportTable() {
@@ -558,11 +571,15 @@
     });
   }
 
-  function openDropModal() {
+  // La modale sert à la table ouverte comme aux tables d'extensions listées
+  // dans le nettoyage : la cible est donc passée, pas lue dans currentTable.
+  function openDropModal(table) {
+    if (!table) return;
+    db.dropTarget = table;
     var nameEl  = document.getElementById('skmt-db-drop-name');
     var input   = document.getElementById('skmt-db-drop-confirm-input');
     var confirm = document.getElementById('skmt-db-drop-confirm-btn');
-    if (nameEl) nameEl.textContent = db.currentTable;
+    if (nameEl) nameEl.textContent = table;
     if (input) input.value = '';
     if (confirm) confirm.disabled = true;
     if (window.skmtModalOpen) window.skmtModalOpen('skmt-db-drop-modal');
@@ -570,16 +587,254 @@
   }
 
   function dropTable() {
-    var table = db.currentTable;
+    var table = db.dropTarget;
     ajax('skmt_db_drop_table', { table: table }, function () {
       if (window.skmtModalClose) window.skmtModalClose('skmt-db-drop-modal');
       showToast(t('tableDropped', 'Table supprimée'), 'success');
-      // Réinitialiser la vue et recharger la liste
-      db.currentTable = null;
-      document.getElementById('skmt-db-table-view').style.display = 'none';
-      document.getElementById('skmt-db-empty').style.display = '';
+      db.dropTarget = null;
+      // Réinitialiser la vue si la table supprimée était ouverte
+      if (table === db.currentTable) {
+        db.currentTable = null;
+        document.getElementById('skmt-db-table-view').style.display = 'none';
+        document.getElementById('skmt-db-empty').style.display = '';
+      }
+      if (cleanup.open) scanCleanup();
       loadTables();
     });
+  }
+
+  /* ================================================================
+   * NETTOYAGE (issue #16) — vue globale, hors table sélectionnée
+   * ================================================================ */
+
+  var cleanup = { open: false, busy: false, items: [] };
+
+  // sprintf minimal : %s et %1$s, %2$s…
+  function fmt(str) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    var i = 0;
+    return String(str).replace(/%(?:(\d+)\$)?[sd]/g, function (m, n) {
+      var v = n ? args[parseInt(n, 10) - 1] : args[i++];
+      return v === undefined ? m : v;
+    });
+  }
+
+  function num(n) { return Number(n).toLocaleString(); }
+
+  function setCleanupActive(on) {
+    cleanup.open = on;
+    var link = document.getElementById('skmt-db-cleanup-link');
+    var view = document.getElementById('skmt-db-cleanup-view');
+    if (link) link.classList.toggle('is-active', on);
+    if (view) view.style.display = on ? '' : 'none';
+  }
+
+  function openCleanup() {
+    db.currentTable = null;
+    document.querySelectorAll('.skmt-db__table-list .skmt-db__table-item').forEach(function (el) {
+      el.classList.remove('is-active');
+    });
+    document.getElementById('skmt-db-empty').style.display = 'none';
+    document.getElementById('skmt-db-table-view').style.display = 'none';
+    setCleanupActive(true);
+    scanCleanup();
+  }
+
+  function scanCleanup() {
+    var view = document.getElementById('skmt-db-cleanup-view');
+    if (!view) return;
+    view.innerHTML = '<div class="skmt-db__loading">' + escHtml(t('loading', 'Chargement…')) + '</div>';
+    ajax('skmt_db_cleanup_scan', {}, function (data) {
+      cleanup.items = data.items;
+      renderCleanup(view, data);
+    });
+  }
+
+  function renderCleanup(view, data) {
+    var total = data.items.reduce(function (s, it) { return s + it.count; }, 0);
+
+    var html = '<div class="skmt-db__cleanup-inner">' +
+      '<div class="skmt-db__cleanup-head">' +
+        '<div><h2 class="skmt-db__table-name">' + escHtml(t('cleanupTitle', 'Nettoyage')) + '</h2>' +
+        '<p class="skmt-db__cleanup-intro">' + escHtml(t('cleanupIntro', '')) + '</p></div>' +
+        '<div class="skmt-db__table-actions">' +
+          '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" data-cleanup="rescan">' + escHtml(t('cleanupRescan', 'Recompter')) + '</button>' +
+          '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--primary" data-cleanup="all"' + (total ? '' : ' disabled') + '>' +
+            escHtml(t('cleanupAll', 'Tout nettoyer')) + (total ? ' (' + num(total) + ')' : '') + '</button>' +
+        '</div>' +
+      '</div>';
+
+    // Données superflues
+    html += '<section class="skmt-db__cleanup-section"><h3 class="skmt-db__cleanup-title">' + escHtml(t('cleanupItems', 'Données superflues')) + '</h3>' +
+      '<ul class="skmt-db__cleanup-list">';
+    data.items.forEach(function (it) {
+      html += '<li class="skmt-db__cleanup-row" data-item="' + escHtml(it.key) + '">' +
+        '<div class="skmt-db__cleanup-text"><strong>' + escHtml(it.label) + '</strong>' +
+        '<span>' + escHtml(it.description) + '</span></div>' +
+        '<span class="skmt-db__cleanup-count' + (it.count ? '' : ' is-zero') + '">' + num(it.count) + '</span>' +
+        '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" data-cleanup="item"' + (it.count ? '' : ' disabled') + '>' +
+          escHtml(t('cleanupClean', 'Nettoyer')) + '</button>' +
+        '</li>';
+    });
+    html += '</ul></section>';
+
+    // Optimisation
+    var free = data.fragmented.reduce(function (s, tb) { return s + tb.free; }, 0);
+    html += '<section class="skmt-db__cleanup-section"><h3 class="skmt-db__cleanup-title">' + escHtml(t('optimizeTitle', 'Optimisation des tables')) + '</h3>' +
+      '<div class="skmt-db__cleanup-row">' +
+        '<div class="skmt-db__cleanup-text"><span>' + escHtml(data.fragmented.length
+          ? fmt(t('optimizeSummary', '%1$s table(s), %2$s'), num(data.fragmented.length), formatSize(free))
+          : t('optimizeNone', 'Aucune table fragmentée.')) + '</span></div>' +
+        '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" data-cleanup="optimize"' + (data.fragmented.length ? '' : ' disabled') + '>' +
+          escHtml(t('optimizeBtn', 'Optimiser')) + '</button>' +
+      '</div></section>';
+
+    // Tables d'extensions
+    html += '<section class="skmt-db__cleanup-section"><h3 class="skmt-db__cleanup-title">' + escHtml(t('foreignTitle', 'Tables d\'extensions')) + '</h3>' +
+      '<p class="skmt-db__cleanup-intro">' + escHtml(t('foreignIntro', '')) + '</p>';
+    if (!data.foreign.length) {
+      html += '<p class="skmt-db__cleanup-intro">' + escHtml(t('foreignNone', 'Aucune table d\'extension.')) + '</p>';
+    } else {
+      html += '<ul class="skmt-db__cleanup-list">';
+      data.foreign.forEach(function (tb) {
+        var badge;
+        if (tb.status === 'active')        badge = '<span class="skmt-badge skmt-badge--success">' + escHtml(fmt(t('foreignActive', '%s'), tb.owners.join(', '))) + '</span>';
+        else if (tb.status === 'inactive') badge = '<span class="skmt-badge skmt-badge--warning">' + escHtml(fmt(t('foreignInactive', '%s'), tb.owners.join(', '))) + '</span>';
+        else                               badge = '<span class="skmt-badge skmt-badge--danger">' + escHtml(t('foreignUnknown', 'Aucune extension correspondante')) + '</span>';
+        html += '<li class="skmt-db__cleanup-row" data-table="' + escHtml(tb.name) + '">' +
+          '<div class="skmt-db__cleanup-text"><strong><code>' + escHtml(tb.name) + '</code></strong>' +
+          '<span>' + num(tb.rows) + ' ' + escHtml(t('rowsLabel', 'lignes')) + ' · ' + formatSize(tb.size) + '</span></div>' +
+          badge +
+          '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--secondary" data-cleanup="open-table">' + escHtml(t('open', 'Ouvrir')) + '</button>' +
+          '<button type="button" class="skmt-btn skmt-btn--sm skmt-btn--danger" data-cleanup="drop-table">' + escHtml(t('delete', 'Supprimer')) + '</button>' +
+          '</li>';
+      });
+      html += '</ul>';
+    }
+    html += '</section></div>';
+
+    view.innerHTML = html;
+    view.querySelectorAll('[data-cleanup]').forEach(function (btn) {
+      btn.addEventListener('click', function () { onCleanupAction(btn, data); });
+    });
+  }
+
+  function onCleanupAction(btn, data) {
+    if (cleanup.busy) return;
+    var action = btn.dataset.cleanup;
+    var row    = btn.closest('.skmt-db__cleanup-row');
+
+    if (action === 'rescan')     { scanCleanup(); return; }
+    if (action === 'open-table') { selectTable(row.dataset.table); return; }
+    if (action === 'drop-table') { openDropModal(row.dataset.table); return; }
+
+    if (action === 'item') {
+      var it = findItem(row.dataset.item);
+      if (!it) return;
+      confirmThen(fmt(t('cleanupConfirm', '%1$s : %2$s ?'), num(it.count), it.label), function () {
+        runQueue([it]);
+      });
+      return;
+    }
+
+    if (action === 'all') {
+      var todo  = cleanup.items.filter(function (i) { return i.count > 0; });
+      var total = todo.reduce(function (s, i) { return s + i.count; }, 0);
+      confirmThen(fmt(t('cleanupConfirmAll', '%s ?'), num(total)), function () { runQueue(todo); });
+      return;
+    }
+
+    if (action === 'optimize') {
+      confirmThen(t('optimizeConfirm', 'Optimiser ?'), function () {
+        optimizeQueue(data.fragmented.map(function (tb) { return tb.name; }));
+      });
+    }
+  }
+
+  function findItem(key) {
+    for (var i = 0; i < cleanup.items.length; i++) {
+      if (cleanup.items[i].key === key) return cleanup.items[i];
+    }
+    return null;
+  }
+
+  function confirmThen(message, onConfirm) {
+    if (!window.skmtModal) return;
+    window.skmtModal.open({
+      danger: true,
+      title: t('cleanupTitle', 'Nettoyage'),
+      message: message,
+      confirmLabel: t('confirm', 'Confirmer'),
+      cancelLabel: t('cancel', 'Annuler'),
+      onConfirm: onConfirm,
+    });
+  }
+
+  function setBusy(on) {
+    cleanup.busy = on;
+    var view = document.getElementById('skmt-db-cleanup-view');
+    if (view) view.classList.toggle('is-busy', on);
+  }
+
+  function rowEl(key) {
+    return document.querySelector('#skmt-db-cleanup-view .skmt-db__cleanup-row[data-item="' + key + '"]');
+  }
+
+  // Purge les éléments un par un, chacun par lots jusqu'à épuisement.
+  // Un lot qui ne supprime rien arrête l'élément (objet que WordPress refuse
+  // de supprimer) : sans ça, la boucle tournerait indéfiniment.
+  function runQueue(queue) {
+    setBusy(true);
+    var results = [];
+    (function next(i) {
+      if (i >= queue.length) { finish(); return; }
+      var it = queue[i];
+      var el = rowEl(it.key);
+      var countEl = el && el.querySelector('.skmt-db__cleanup-count');
+      if (countEl) countEl.textContent = t('cleanupRunning', 'Nettoyage…');
+      var deleted = 0;
+      (function batch() {
+        ajax('skmt_db_cleanup_run', { item: it.key }, function (d) {
+          deleted += d.deleted;
+          if (countEl) countEl.textContent = num(d.remaining);
+          if (d.deleted > 0 && d.remaining > 0) { batch(); return; }
+          results.push({ it: it, deleted: deleted, remaining: d.remaining });
+          next(i + 1);
+        }, finish);
+      })();
+    })(0);
+
+    function finish() {
+      setBusy(false);
+      var deleted = 0, left = 0;
+      results.forEach(function (r) { deleted += r.deleted; left += r.remaining; });
+      if (results.length === 1) {
+        showToast(fmt(t('cleanupDone', '%1$s : %2$s'), num(deleted), results[0].it.label), 'success');
+      } else if (results.length > 1) {
+        showToast(fmt(t('cleanupDoneTotal', '%s'), num(deleted)), 'success');
+      }
+      if (left > 0) showToast(fmt(t('cleanupLeft', '%s'), num(left)), 'warning');
+      scanCleanup();
+      loadTables();
+    }
+  }
+
+  function optimizeQueue(tables) {
+    setBusy(true);
+    var done = 0;
+    (function next(i) {
+      if (i >= tables.length) { finish(); return; }
+      ajax('skmt_db_cleanup_optimize', { table: tables[i] }, function () {
+        done++;
+        next(i + 1);
+      }, function () { next(i + 1); });
+    })(0);
+
+    function finish() {
+      setBusy(false);
+      showToast(fmt(t('optimizeDone', '%s'), num(done)), 'success');
+      scanCleanup();
+    }
   }
 
   /* ================================================================

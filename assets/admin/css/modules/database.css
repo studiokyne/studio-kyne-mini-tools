@@ -121,13 +121,8 @@
 /* ================================================================
  * TABS
  * ================================================================ */
-.skmt-db__tabs { display: flex; border-bottom: 1px solid var(--skmt-border); padding: 0 16px; gap: 0; flex-shrink: 0; }
-.skmt-db__tab {
-  padding: 10px 16px; background: none; border: none; border-bottom: 2px solid transparent;
-  cursor: pointer; font-size: 13px; color: var(--skmt-text-secondary); margin-bottom: -1px;
-}
-.skmt-db__tab:hover { color: var(--skmt-text); }
-.skmt-db__tab.is-active { color: var(--skmt-accent); border-bottom-color: var(--skmt-accent); font-weight: 500; }
+/* Composant partagé skmt-tabs, resserré sur la marge de l'explorateur. */
+.skmt-db .skmt-tabs { padding: 0 16px; gap: 0; }
 
 /* Chaque tab-content remplit l'espace restant et scrolle en interne */
 .skmt-db__tab-content { flex: 1; min-height: 0; overflow: auto; display: flex; flex-direction: column; }
@@ -300,3 +295,33 @@
   background: var(--skmt-n100); border-radius: var(--skmt-radius-xs);
   font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; color: var(--skmt-danger);
 }
+
+/* ================================================================
+ * NETTOYAGE (issue #16)
+ * ================================================================ */
+/* Entrée de la barre latérale : un <button> qui reprend le look d'une table. */
+.skmt-db__cleanup-link {
+  width: calc(100% - 12px); margin-top: 6px; border: 0; background: none;
+  font: inherit; color: inherit; text-align: left; font-weight: 500;
+}
+.skmt-db__cleanup-link svg { flex-shrink: 0; }
+
+.skmt-db__cleanup { overflow-y: auto; }
+.skmt-db__cleanup.is-busy button { pointer-events: none; opacity: .6; }
+.skmt-db__cleanup-inner { padding: 16px 20px 24px; max-width: 920px; }
+.skmt-db__cleanup-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 8px; }
+.skmt-db__cleanup-intro { margin: 4px 0 0; font-size: 13px; color: var(--skmt-text-secondary); }
+.skmt-db__cleanup-section { margin-top: 24px; }
+.skmt-db__cleanup-title {
+  margin: 0 0 8px; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .06em; color: var(--skmt-text-secondary);
+}
+.skmt-db__cleanup-list { margin: 8px 0 0; padding: 0; list-style: none; border: 1px solid var(--skmt-border); border-radius: var(--skmt-radius-sm); }
+.skmt-db__cleanup-list .skmt-db__cleanup-row + .skmt-db__cleanup-row { border-top: 1px solid var(--skmt-border); }
+.skmt-db__cleanup-section > .skmt-db__cleanup-row { border: 1px solid var(--skmt-border); border-radius: var(--skmt-radius-sm); }
+.skmt-db__cleanup-row { display: flex; align-items: center; gap: 12px; margin: 0; padding: 10px 14px; }
+.skmt-db__cleanup-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.skmt-db__cleanup-text span { color: var(--skmt-text-secondary); font-size: 12px; }
+.skmt-db__cleanup-text code { font-size: 12px; background: none; padding: 0; word-break: break-all; }
+.skmt-db__cleanup-count { min-width: 64px; text-align: right; font-weight: 600; font-variant-numeric: tabular-nums; }
+.skmt-db__cleanup-count.is-zero { color: var(--skmt-text-secondary); font-weight: 400; }

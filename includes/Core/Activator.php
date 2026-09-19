@@ -6,20 +6,28 @@ defined( 'ABSPATH' ) || exit;
 /**
  * Gère l'activation du plugin.
  *
- * La liste des modules est déclarée ici pour bootstrapper les options initiales.
  * Chaque module déclare ses propres defaults via ::get_defaults().
  */
 class Activator {
 
 	/**
-	 * Classes des modules intégrés.
-	 * À mettre à jour lorsqu'un nouveau module est ajouté.
+	 * Classes des modules intégrés : la SEULE liste, partagée avec
+	 * uninstall.php (qui ne boote pas le plugin et ne peut donc pas passer par
+	 * Modules::register_default_modules()). À compléter à chaque nouveau module.
 	 *
 	 * @var array<string, class-string>
 	 */
-	private static array $module_classes = [
+	public const MODULE_CLASSES = [
 		'image_optimizer' => \StudioKyne\MiniTools\Modules\ImageOptimizer\Module::class,
 		'security'        => \StudioKyne\MiniTools\Modules\Security\Module::class,
+		'login'           => \StudioKyne\MiniTools\Modules\Login\Module::class,
+		'files'           => \StudioKyne\MiniTools\Modules\Files\Module::class,
+		'white_label'     => \StudioKyne\MiniTools\Modules\WhiteLabel\Module::class,
+		'menu_creator'    => \StudioKyne\MiniTools\Modules\MenuCreator\Module::class,
+		'database'        => \StudioKyne\MiniTools\Modules\Database\Module::class,
+		'media'           => \StudioKyne\MiniTools\Modules\Media\Module::class,
+		'activity_log'    => \StudioKyne\MiniTools\Modules\ActivityLog\Module::class,
+		'smtp'            => \StudioKyne\MiniTools\Modules\Smtp\Module::class,
 	];
 
 	/**
@@ -28,7 +36,7 @@ class Activator {
 	public static function activate(): void {
 		// Construire les defaults en incluant l'état initial de chaque module (inactif).
 		$modules_defaults = [];
-		foreach ( self::$module_classes as $id => $class ) {
+		foreach ( self::MODULE_CLASSES as $id => $class ) {
 			$modules_defaults[ $id ] = false;
 		}
 
@@ -45,13 +53,13 @@ class Activator {
 		}
 
 		// Laisser chaque module initialiser ses propres options si nécessaire.
-		foreach ( self::$module_classes as $id => $class ) {
+		foreach ( self::MODULE_CLASSES as $id => $class ) {
 			if ( ! class_exists( $class ) ) {
 				continue;
 			}
 
-			$defaults    = $class::get_defaults();
-			$option_key  = 'skmt_module_' . $id;
+			$defaults   = $class::get_defaults();
+			$option_key = 'skmt_module_' . $id;
 
 			if ( ! empty( $defaults ) && false === get_option( $option_key ) ) {
 				add_option( $option_key, $defaults );

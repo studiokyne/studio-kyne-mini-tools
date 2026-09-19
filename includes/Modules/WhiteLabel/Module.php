@@ -21,10 +21,6 @@ class Module extends AbstractModule {
 	 */
 	private array $settings = [];
 
-	public function __construct( string $id ) {
-		parent::__construct( $id );
-	}
-
 	public function init(): void {
 		$s  = $this->get_settings();
 		$ab = $s['admin_bar'];
@@ -54,7 +50,9 @@ class Module extends AbstractModule {
 			add_action( 'admin_head', [ $this, 'hide_screen_options_css' ] );
 		}
 		if ( ! empty( $ab['remove_howdy'] ) ) {
-			add_filter( 'gettext', [ $this, 'remove_howdy' ], 10, 2 );
+			// 9999 : le cœur n'ajoute « Mon compte » qu'à la priorité 9991
+			// (wp_admin_bar_my_account_item), bien après ses autres nœuds.
+			add_action( 'admin_bar_menu', [ $this, 'remove_howdy' ], 9999 );
 		}
 		if ( ! empty( $ab['hide_frontend'] ) ) {
 			add_filter( 'show_admin_bar', [ $this, 'hide_admin_bar_frontend' ] );
@@ -76,17 +74,17 @@ class Module extends AbstractModule {
 		// Avatars locaux : l'avatar téléversé prime, sinon on laisse WordPress
 		// retomber sur Gravatar (comportement par défaut).
 		if ( ! empty( $s['avatars']['local'] ) ) {
-			add_filter( 'get_avatar_data',          [ $this, 'apply_local_avatar' ], 10, 2 );
+			add_filter( 'get_avatar_data', [ $this, 'apply_local_avatar' ], 10, 2 );
 			// personal_options se déclenche en haut du formulaire de profil
 			// (dans « Options personnelles », avant la section « Nom »), sur
 			// profile.php ET user-edit.php.
-			add_action( 'personal_options',         [ $this, 'render_avatar_field' ] );
-			add_action( 'personal_options_update',  [ $this, 'save_avatar_field' ] );
+			add_action( 'personal_options', [ $this, 'render_avatar_field' ] );
+			add_action( 'personal_options_update', [ $this, 'save_avatar_field' ] );
 			add_action( 'edit_user_profile_update', [ $this, 'save_avatar_field' ] );
-			add_action( 'admin_enqueue_scripts',    [ $this, 'enqueue_avatar_media' ] );
+			add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_avatar_media' ] );
 			// Masque l'« Illustration du profil » native (Gravatar) au profit
 			// de l'avatar local.
-			add_action( 'admin_head',               [ $this, 'hide_native_profile_picture' ] );
+			add_action( 'admin_head', [ $this, 'hide_native_profile_picture' ] );
 		}
 	}
 
@@ -127,12 +125,33 @@ class Module extends AbstractModule {
 		echo '<style>#screen-options-link-wrap{display:none!important}</style>';
 	}
 
-	public function remove_howdy( string $translation, string $text ): string {
-		// $text est toujours la chaîne anglaise source, quelle que soit la locale installée.
-		if ( 'Howdy, %s' === $text ) {
-			return '%s';
+	/**
+	 * Retire la salutation du nœud « Mon compte ».
+	 *
+	 * Le cœur construit ce titre comme sprintf( __( 'Howdy, %s' ), <span
+	 * class="display-name">…</span> ) suivi de l'avatar : on retranche le
+	 * préfixe traduit tel qu'il est réellement rendu. Un filtre gettext
+	 * faisait la même chose, mais en s'exécutant pour CHAQUE chaîne traduite
+	 * de chaque page d'admin.
+	 */
+	public function remove_howdy( \WP_Admin_Bar $bar ): void {
+		$node = $bar->get_node( 'my-account' );
+		if ( ! $node || empty( $node->title ) ) {
+			return;
 		}
-		return $translation;
+
+		/* translators: %s: user's display name. */
+		$prefix = sprintf( __( 'Howdy, %s' ), '' ); // phpcs:ignore WordPress.WP.I18n.MissingArgDomain -- chaîne du cœur, à retrouver dans sa traduction.
+		if ( '' === $prefix || 0 !== strpos( $node->title, $prefix ) ) {
+			return;
+		}
+
+		$bar->add_node(
+			[
+				'id'    => 'my-account',
+				'title' => substr( $node->title, strlen( $prefix ) ),
+			]
+		);
 	}
 
 	public function hide_admin_bar_frontend( bool $show ): bool {
@@ -213,6 +232,10 @@ class Module extends AbstractModule {
 	/**
 	 * Remplace l'avatar par l'image locale de l'utilisateur si elle existe.
 	 * Sinon on ne touche à rien : WordPress retombe sur Gravatar.
+	 *
+	 * @param array<string, mixed> $args
+	 * @param mixed $id_or_email
+	 * @return array<string, mixed>
 	 */
 	public function apply_local_avatar( array $args, $id_or_email ): array {
 		// Respecte une demande explicite de l'avatar par défaut.
@@ -261,7 +284,7 @@ class Module extends AbstractModule {
 			if ( ! empty( $id_or_email->user_id ) ) {
 				return (int) $id_or_email->user_id;
 			}
-			$email = $id_or_email->comment_author_email ?? '';
+			$email = (string) $id_or_email->comment_author_email;
 			$user  = $email ? get_user_by( 'email', $email ) : false;
 			return $user ? (int) $user->ID : 0;
 		}
@@ -391,41 +414,47 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		$this->settings = $this->get_module_settings( static::get_defaults() );
 		return $this->settings;
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		$data = [
 			'admin_bar' => [
-				'hide_wp_logo'          => (bool) ( $settings['admin_bar']['hide_wp_logo']          ?? false ),
-				'hide_site_menu'        => (bool) ( $settings['admin_bar']['hide_site_menu']        ?? false ),
-				'hide_command_palette'  => (bool) ( $settings['admin_bar']['hide_command_palette']  ?? false ),
-				'hide_updates_counter'  => (bool) ( $settings['admin_bar']['hide_updates_counter']  ?? false ),
+				'hide_wp_logo'          => (bool) ( $settings['admin_bar']['hide_wp_logo'] ?? false ),
+				'hide_site_menu'        => (bool) ( $settings['admin_bar']['hide_site_menu'] ?? false ),
+				'hide_command_palette'  => (bool) ( $settings['admin_bar']['hide_command_palette'] ?? false ),
+				'hide_updates_counter'  => (bool) ( $settings['admin_bar']['hide_updates_counter'] ?? false ),
 				'hide_comments_counter' => (bool) ( $settings['admin_bar']['hide_comments_counter'] ?? false ),
 				'hide_new_content_menu' => (bool) ( $settings['admin_bar']['hide_new_content_menu'] ?? false ),
-				'hide_help_button'      => (bool) ( $settings['admin_bar']['hide_help_button']      ?? false ),
-				'hide_screen_options'   => (bool) ( $settings['admin_bar']['hide_screen_options']   ?? false ),
-				'remove_howdy'          => (bool) ( $settings['admin_bar']['remove_howdy']          ?? false ),
-				'hide_frontend'         => (bool) ( $settings['admin_bar']['hide_frontend']         ?? false ),
+				'hide_help_button'      => (bool) ( $settings['admin_bar']['hide_help_button'] ?? false ),
+				'hide_screen_options'   => (bool) ( $settings['admin_bar']['hide_screen_options'] ?? false ),
+				'remove_howdy'          => (bool) ( $settings['admin_bar']['remove_howdy'] ?? false ),
+				'hide_frontend'         => (bool) ( $settings['admin_bar']['hide_frontend'] ?? false ),
 			],
-			'footer' => [
-				'left_text'       => wp_kses_post( $settings['footer']['left_text']   ?? '' ),
+			'footer'    => [
+				'left_text'       => wp_kses_post( $settings['footer']['left_text'] ?? '' ),
 				'hide_right_text' => ! empty( $settings['footer']['hide_right_text'] ),
-				'right_text'      => wp_kses_post( $settings['footer']['right_text']  ?? '' ),
+				'right_text'      => wp_kses_post( $settings['footer']['right_text'] ?? '' ),
 			],
-			'profile' => [
-				'hide_color_scheme'       => (bool) ( $settings['profile']['hide_color_scheme']       ?? false ),
+			'profile'   => [
+				'hide_color_scheme'       => (bool) ( $settings['profile']['hide_color_scheme'] ?? false ),
 				'hide_keyboard_shortcuts' => (bool) ( $settings['profile']['hide_keyboard_shortcuts'] ?? false ),
-				'hide_toolbar_toggle'     => (bool) ( $settings['profile']['hide_toolbar_toggle']     ?? false ),
-				'hide_app_passwords'      => (bool) ( $settings['profile']['hide_app_passwords']      ?? false ),
-				'hide_language'           => (bool) ( $settings['profile']['hide_language']           ?? false ),
-				'hide_bio'                => (bool) ( $settings['profile']['hide_bio']                 ?? false ),
-				'hide_sessions'           => (bool) ( $settings['profile']['hide_sessions']           ?? false ),
-				'hide_editor_options'     => (bool) ( $settings['profile']['hide_editor_options']     ?? false ),
+				'hide_toolbar_toggle'     => (bool) ( $settings['profile']['hide_toolbar_toggle'] ?? false ),
+				'hide_app_passwords'      => (bool) ( $settings['profile']['hide_app_passwords'] ?? false ),
+				'hide_language'           => (bool) ( $settings['profile']['hide_language'] ?? false ),
+				'hide_bio'                => (bool) ( $settings['profile']['hide_bio'] ?? false ),
+				'hide_sessions'           => (bool) ( $settings['profile']['hide_sessions'] ?? false ),
+				'hide_editor_options'     => (bool) ( $settings['profile']['hide_editor_options'] ?? false ),
 			],
-			'avatars' => [
+			'avatars'   => [
 				'local' => (bool) ( $settings['avatars']['local'] ?? false ),
 			],
 		];
@@ -433,6 +462,9 @@ class Module extends AbstractModule {
 		return $this->save_module_settings( $data );
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [
 			'admin_bar' => [
@@ -447,12 +479,12 @@ class Module extends AbstractModule {
 				'remove_howdy'          => true,
 				'hide_frontend'         => true,
 			],
-			'footer' => [
+			'footer'    => [
 				'left_text'       => '',
 				'hide_right_text' => false,
 				'right_text'      => '',
 			],
-			'profile' => [
+			'profile'   => [
 				'hide_color_scheme'       => true,
 				'hide_keyboard_shortcuts' => true,
 				'hide_toolbar_toggle'     => true,
@@ -462,7 +494,7 @@ class Module extends AbstractModule {
 				'hide_sessions'           => false,
 				'hide_editor_options'     => false,
 			],
-			'avatars' => [
+			'avatars'   => [
 				'local' => true,
 			],
 		];
@@ -470,8 +502,8 @@ class Module extends AbstractModule {
 
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ 'skmt_module_white_label' ],
-			'meta'    => [],
+			'options'   => [ 'skmt_module_white_label' ],
+			'meta'      => [],
 			// L'avatar local est stocké sur l'UTILISATEUR, pas sur un post :
 			// déclaré en 'meta', il n'était jamais supprimé.
 			'user_meta' => [ self::AVATAR_META ],
@@ -490,6 +522,9 @@ class Module extends AbstractModule {
 		return [];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		return [];
 	}

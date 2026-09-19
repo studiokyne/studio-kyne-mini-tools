@@ -36,16 +36,25 @@ class BulkProcessor {
 	 */
 	private ?\Closure $on_complete_fn;
 
+	/**
+	 * Callable optionnel : appelé après chaque lot, que ses images aient
+	 * réussi ou non. Le module y réécrit les URLs accumulées du lot.
+	 * Signature : function(): void
+	 */
+	private ?\Closure $after_batch_fn;
+
 	public function __construct(
 		string $state_key,
 		\Closure $process_fn,
 		\Closure $get_stats_fn,
-		?\Closure $on_complete_fn = null
+		?\Closure $on_complete_fn = null,
+		?\Closure $after_batch_fn = null
 	) {
 		$this->state_key      = $state_key;
 		$this->process_fn     = $process_fn;
 		$this->get_stats_fn   = $get_stats_fn;
 		$this->on_complete_fn = $on_complete_fn;
+		$this->after_batch_fn = $after_batch_fn;
 	}
 
 	/* ================================================================
@@ -85,14 +94,16 @@ class BulkProcessor {
 
 		$preview = $this->get_preview();
 
-		wp_send_json_success( [
-			'processed'             => $state['processed'],
-			'remaining'             => $state['remaining'],
-			'done'                  => 0 === $state['remaining'] && ! $state['running'],
-			'running'               => $state['running'],
-			'total'                 => $state['total'],
-			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
-		] );
+		wp_send_json_success(
+			[
+				'processed'             => $state['processed'],
+				'remaining'             => $state['remaining'],
+				'done'                  => 0 === $state['remaining'] && ! $state['running'],
+				'running'               => $state['running'],
+				'total'                 => $state['total'],
+				'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
+			]
+		);
 	}
 
 	/**
@@ -108,11 +119,13 @@ class BulkProcessor {
 
 		$preview = $this->get_preview();
 
-		wp_send_json_success( [
-			'remaining'             => (int) ( $preview['remaining'] ?? 0 ),
-			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
-			'avg_saved_per_image'   => (int) ( $preview['avg_saved_per_image'] ?? 0 ),
-		] );
+		wp_send_json_success(
+			[
+				'remaining'             => (int) ( $preview['remaining'] ?? 0 ),
+				'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
+				'avg_saved_per_image'   => (int) ( $preview['avg_saved_per_image'] ?? 0 ),
+			]
+		);
 	}
 
 	/**
@@ -135,14 +148,16 @@ class BulkProcessor {
 
 		$preview = $this->get_preview();
 
-		wp_send_json_success( [
-			'remaining'             => $state['remaining'],
-			'processed'             => $state['processed'],
-			'done'                  => 0 === $state['remaining'] && ! $state['running'],
-			'running'               => $state['running'],
-			'total'                 => $state['total'],
-			'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
-		] );
+		wp_send_json_success(
+			[
+				'remaining'             => $state['remaining'],
+				'processed'             => $state['processed'],
+				'done'                  => 0 === $state['remaining'] && ! $state['running'],
+				'running'               => $state['running'],
+				'total'                 => $state['total'],
+				'estimated_bytes_saved' => (int) ( $preview['estimated_bytes_saved'] ?? 0 ),
+			]
+		);
 	}
 
 	/* ================================================================
@@ -179,14 +194,21 @@ class BulkProcessor {
 			try {
 				( $this->process_fn )( $attachment_id );
 			} catch ( \Throwable $e ) {
-				// Un attachment en erreur ne bloque pas les suivants.
+				// Un attachment en erreur ne bloque pas les suivants, mais on le signale.
+				error_log( sprintf( '[SKMT Image Optimizer] traitement en lot : attachment %d en erreur : %s', $attachment_id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- journal d'erreur volontaire, sans interface pour l'afficher.
 			}
-			$processed_now++;
+			++$processed_now;
 		}
 
-		$state['processed']  += $processed_now;
-		$state['remaining']   = max( $state['remaining'] - $processed_now, 0 );
-		$state['updated_at']  = time();
+		// Toujours, même après une erreur : ce qui a été converti avant doit
+		// voir ses URLs réécrites.
+		if ( $this->after_batch_fn ) {
+			( $this->after_batch_fn )();
+		}
+
+		$state['processed'] += $processed_now;
+		$state['remaining']  = max( $state['remaining'] - $processed_now, 0 );
+		$state['updated_at'] = time();
 
 		if ( 0 === $state['remaining'] ) {
 			$state['running'] = false;
@@ -207,6 +229,8 @@ class BulkProcessor {
 
 	/**
 	 * Retourne l'état courant du bulk avec ses valeurs par défaut.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_state(): array {
 		$stored   = get_option( $this->state_key, [] );
@@ -223,6 +247,8 @@ class BulkProcessor {
 
 	/**
 	 * Calcule une estimation des gains potentiels du bulk.
+	 *
+	 * @return array<string, mixed>
 	 */
 	public function get_preview(): array {
 		$state     = $this->get_state();
@@ -254,40 +280,54 @@ class BulkProcessor {
 	 * Compte les images sans le meta _skmt_optimized (accurate count).
 	 */
 	public function count_unoptimized(): int {
-		$query = new \WP_Query( array_merge(
-			$this->base_query_args(),
-			[
-				'posts_per_page' => 1,
-				'no_found_rows'  => false,
-			]
-		) );
+		$query = new \WP_Query(
+			array_merge(
+				$this->base_query_args(),
+				[
+					'posts_per_page' => 1,
+					'no_found_rows'  => false,
+				]
+			)
+		);
 
 		return (int) $query->found_posts;
 	}
 
 	/**
 	 * Retourne un lot d'IDs non optimisés.
+	 *
+	 * @return int[]
 	 */
 	private function get_unoptimized_ids( int $limit ): array {
-		$query = new \WP_Query( array_merge(
-			$this->base_query_args(),
-			[
-				'posts_per_page'         => $limit,
-				'no_found_rows'          => true,
-				'update_post_term_cache' => false,
-				'update_post_meta_cache' => false,
-			]
-		) );
+		$query = new \WP_Query(
+			array_merge(
+				$this->base_query_args(),
+				[
+					'posts_per_page'         => $limit,
+					'no_found_rows'          => true,
+					'update_post_term_cache' => false,
+					'update_post_meta_cache' => false,
+				]
+			)
+		);
 
-		return array_map( 'intval', $query->posts );
+		// fields => ids : WP_Query renvoie des entiers, mais son type déclaré reste int|WP_Post.
+		return array_map(
+			static fn( $post ): int => $post instanceof \WP_Post ? (int) $post->ID : (int) $post,
+			(array) $query->posts
+		);
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	private function base_query_args(): array {
 		return [
 			'post_type'      => 'attachment',
 			'post_mime_type' => [ 'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif' ],
 			'post_status'    => 'inherit',
 			'fields'         => 'ids',
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_query -- repérer les images non optimisées n'a pas d'alternative sans index dédié.
 			'meta_query'     => [
 				[
 					'key'     => '_skmt_optimized',
@@ -301,6 +341,9 @@ class BulkProcessor {
 	 * PERSISTENCE ET CRON
 	 * ================================================================ */
 
+	/**
+	 * @param array<string, mixed> $state
+	 */
 	private function set_state( array $state ): void {
 		update_option( $this->state_key, $state, false );
 	}

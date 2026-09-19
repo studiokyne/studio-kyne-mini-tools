@@ -61,6 +61,8 @@ class ClientIp {
 
 	/**
 	 * Normalise une source lue depuis un formulaire ou une option.
+	 *
+	 * @param mixed $source
 	 */
 	public static function sanitize_source( $source ): string {
 		$source = is_string( $source ) ? sanitize_key( $source ) : '';
@@ -81,7 +83,10 @@ class ClientIp {
 	public static function detected_headers(): array {
 		$found = [];
 
-		foreach ( [ 'HTTP_CF_CONNECTING_IP' => 'CF-Connecting-IP', 'HTTP_X_FORWARDED_FOR' => 'X-Forwarded-For' ] as $key => $label ) {
+		foreach ( [
+			'HTTP_CF_CONNECTING_IP' => 'CF-Connecting-IP',
+			'HTTP_X_FORWARDED_FOR'  => 'X-Forwarded-For',
+		] as $key => $label ) {
 			$value = self::server( $key );
 			if ( '' !== $value ) {
 				$found[ $label ] = $value;

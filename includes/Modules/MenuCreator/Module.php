@@ -35,23 +35,25 @@ class Module extends AbstractModule {
 
 	public function init(): void {
 		// Moteur d'application des menus personnalisés
-		$has_active = ! empty( array_filter(
-			MenuProfileManager::get_all(),
-			fn( $p ) => ( $p['status'] ?? '' ) === 'active'
-		) );
+		$has_active = ! empty(
+			array_filter(
+				MenuProfileManager::get_all(),
+				fn( $p ) => ( $p['status'] ?? '' ) === 'active'
+			)
+		);
 
 		if ( $has_active ) {
 			// N'active l'ordre custom que si l'utilisateur courant a réellement
 			// un profil actif (sinon on force tout le monde dans le chemin
 			// custom_menu_order pour rien).
 			add_filter( 'custom_menu_order', [ $this, 'maybe_enable_custom_order' ] );
-			add_filter( 'menu_order',  [ $this, 'apply_menu_order' ],      9999 );
-			add_action( 'admin_menu',  [ $this, 'apply_menu_visibility' ], 9999 );
-			add_action( 'admin_head',  [ $this, 'inject_menu_icon_overrides' ] );
-			add_action( 'admin_head',  [ $this, 'inject_custom_link_targets' ] );
+			add_filter( 'menu_order', [ $this, 'apply_menu_order' ], 9999 );
+			add_action( 'admin_menu', [ $this, 'apply_menu_visibility' ], 9999 );
+			add_action( 'admin_head', [ $this, 'inject_menu_icon_overrides' ] );
+			add_action( 'admin_head', [ $this, 'inject_custom_link_targets' ] );
 			// Priorité 1 : refuser la page avant que quoi que ce soit d'autre
 			// (chargement d'écran, traitement de formulaire) ne s'exécute.
-			add_action( 'admin_init',  [ $this, 'enforce_blocked_pages' ], 1 );
+			add_action( 'admin_init', [ $this, 'enforce_blocked_pages' ], 1 );
 		}
 
 		// admin_footer : le script des toasts y est déjà chargé.
@@ -64,12 +66,12 @@ class Module extends AbstractModule {
 		add_action( 'admin_head', [ $this, 'inject_global_icon_opacity_fix' ] );
 
 		// AJAX endpoints
-		add_action( 'wp_ajax_skmt_wl_save_profile',      [ $this, 'ajax_save_profile' ] );
-		add_action( 'wp_ajax_skmt_wl_delete_profile',    [ $this, 'ajax_delete_profile' ] );
+		add_action( 'wp_ajax_skmt_wl_save_profile', [ $this, 'ajax_save_profile' ] );
+		add_action( 'wp_ajax_skmt_wl_delete_profile', [ $this, 'ajax_delete_profile' ] );
 		add_action( 'wp_ajax_skmt_wl_duplicate_profile', [ $this, 'ajax_duplicate_profile' ] );
-		add_action( 'wp_ajax_skmt_wl_search_users',      [ $this, 'ajax_search_users' ] );
-		add_action( 'wp_ajax_skmt_wl_import_profile',    [ $this, 'ajax_import_profile' ] );
-		add_action( 'wp_ajax_skmt_wl_sanitize_svg',      [ $this, 'ajax_sanitize_svg' ] );
+		add_action( 'wp_ajax_skmt_wl_search_users', [ $this, 'ajax_search_users' ] );
+		add_action( 'wp_ajax_skmt_wl_import_profile', [ $this, 'ajax_import_profile' ] );
+		add_action( 'wp_ajax_skmt_wl_sanitize_svg', [ $this, 'ajax_sanitize_svg' ] );
 
 		// Médiathèque WP pour le picker d'icônes
 		add_action( 'admin_enqueue_scripts', [ $this, 'maybe_enqueue_media' ] );
@@ -93,6 +95,10 @@ class Module extends AbstractModule {
 		return (bool) $enabled;
 	}
 
+	/**
+	 * @param string[] $menu_order
+	 * @return string[]
+	 */
 	public function apply_menu_order( array $menu_order ): array {
 		$profile = MenuProfileManager::get_active_for_user( get_current_user_id() );
 		if ( ! $profile || empty( $profile['items'] ) ) {
@@ -154,10 +160,10 @@ class Module extends AbstractModule {
 					// libre plutôt que d'incrémenter en float, qui serait
 					// silencieusement tronqué par PHP (et provoque des collisions).
 					while ( isset( $menu[ $next_position ] ) ) {
-						$next_position++;
+						++$next_position;
 					}
-					$menu[ $next_position ] = [ '', 'read', $slug, '', 'wp-menu-separator' ];
-					$next_position++;
+					$menu[ $next_position ] = [ '', 'read', $slug, '', 'wp-menu-separator' ]; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
+					++$next_position;
 				}
 				continue;
 			}
@@ -186,11 +192,11 @@ class Module extends AbstractModule {
 					if ( ! is_array( $menu_item ) || ( $menu_item[2] ?? '' ) !== $slug ) {
 						continue;
 					}
-					if ( isset( $item['label'] ) && $item['label'] !== null ) {
-						$menu[ $key ][0] = esc_html( $item['label'] );
+					if ( isset( $item['label'] ) ) {
+						$menu[ $key ][0] = esc_html( $item['label'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 					}
-					if ( isset( $item['icon'] ) && $item['icon'] !== null && strpos( $item['icon'], 'dashicons-' ) === 0 ) {
-						$menu[ $key ][6] = esc_attr( $item['icon'] );
+					if ( isset( $item['icon'] ) && strpos( $item['icon'], 'dashicons-' ) === 0 ) {
+						$menu[ $key ][6] = esc_attr( $item['icon'] ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 					}
 					break;
 				}
@@ -253,7 +259,7 @@ class Module extends AbstractModule {
 				continue;
 			}
 			$entry = $existing[ $child_slug ];
-			if ( isset( $child['label'] ) && $child['label'] !== null && '' !== $child['label'] ) {
+			if ( isset( $child['label'] ) && '' !== $child['label'] ) {
 				$entry[0] = esc_html( $child['label'] );
 			}
 			$reordered[] = $entry;
@@ -266,7 +272,7 @@ class Module extends AbstractModule {
 			$reordered[] = $entry;
 		}
 
-		$submenu[ $parent_slug ] = $reordered;
+		$submenu[ $parent_slug ] = $reordered; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- réordonner le menu d'admin est l'objet du module.
 	}
 
 	/* ================================================================
@@ -424,7 +430,18 @@ class Module extends AbstractModule {
 			$file = 'admin.php';
 		}
 
-		return [ 'file' => $file, 'args' => array_map( 'strval', $args ) ];
+		// parse_str() peut produire des tableaux (clé[]=…) : on ne garde que les scalaires.
+		$flat = [];
+		foreach ( $args as $key => $value ) {
+			if ( is_scalar( $value ) ) {
+				$flat[ (string) $key ] = (string) $value;
+			}
+		}
+
+		return [
+			'file' => $file,
+			'args' => $flat,
+		];
 	}
 
 	/**
@@ -723,9 +740,12 @@ class Module extends AbstractModule {
 	 * @return array<int, string>
 	 */
 	private function editor_excluded_slugs(): array {
-		return (array) apply_filters( 'skmt_mc_editor_excluded_slugs', [
-			'link-manager.php',
-		] );
+		return (array) apply_filters(
+			'skmt_mc_editor_excluded_slugs',
+			[
+				'link-manager.php',
+			]
+		);
 	}
 
 	/**
@@ -752,12 +772,12 @@ class Module extends AbstractModule {
 	 */
 	private function resolve_icon_render( string $icon ): ?array {
 		if ( 0 === strpos( $icon, 'svg:' ) ) {
-			$svg_xml = base64_decode( substr( $icon, 4 ), true );
+			$svg_xml = base64_decode( substr( $icon, 4 ), true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- icône SVG assainie, stockée et rendue en data URI.
 			if ( false === $svg_xml ) {
 				return null;
 			}
 			return [
-				'src'  => 'data:image/svg+xml;base64,' . base64_encode( $svg_xml ),
+				'src'  => 'data:image/svg+xml;base64,' . base64_encode( $svg_xml ), // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 				'mask' => self::svg_is_monochrome( $svg_xml ),
 			];
 		}
@@ -894,11 +914,11 @@ class Module extends AbstractModule {
 		}
 		if ( strpos( $icon, 'svg:' ) === 0 ) {
 			$svg_b64 = substr( $icon, 4 );
-			$svg_xml = base64_decode( $svg_b64, true );
+			$svg_xml = base64_decode( $svg_b64, true ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- icône SVG assainie, stockée et rendue en data URI.
 			if ( false === $svg_xml ) {
 				return 'dashicons-admin-links';
 			}
-			return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) );
+			return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $svg_xml ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 		}
 		if ( strpos( $icon, 'http' ) === 0 ) {
 			// Un SVG monochrome servi par URL s'afficherait en noir (currentColor
@@ -906,7 +926,7 @@ class Module extends AbstractModule {
 			// teintant, comme pour la bibliothèque interne.
 			$local = $this->read_local_svg( $icon );
 			if ( null !== $local && false !== stripos( $local, 'currentColor' ) ) {
-				return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $local ) );
+				return 'data:image/svg+xml;base64,' . base64_encode( $this->neutralize_svg_color( $local ) ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 			}
 			return esc_url_raw( $icon );
 		}
@@ -1068,7 +1088,7 @@ class Module extends AbstractModule {
 				continue;
 			}
 			if ( ! empty( $profile['id'] ) && null !== MenuProfileManager::get( (string) $profile['id'] ) ) {
-				$updated++;
+				++$updated;
 			}
 			$sanitized           = $this->sanitize_profile( $profile );
 			$sanitized['status'] = 'draft';
@@ -1083,11 +1103,13 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => __( 'Ce fichier ne contient aucun menu.', 'studio-kyne-mini-tools' ) ] );
 		}
 
-		wp_send_json_success( [
-			'profiles' => $saved,
-			'profile'  => $saved[0],
-			'updated'  => $updated,
-		] );
+		wp_send_json_success(
+			[
+				'profiles' => $saved,
+				'profile'  => $saved[0],
+				'updated'  => $updated,
+			]
+		);
 	}
 
 	/**
@@ -1121,7 +1143,7 @@ class Module extends AbstractModule {
 			wp_send_json_error( [ 'message' => __( 'Ce SVG est invalide ou contient du code non autorisé.', 'studio-kyne-mini-tools' ) ] );
 		}
 
-		wp_send_json_success( [ 'icon' => 'svg:' . base64_encode( $clean ) ] );
+		wp_send_json_success( [ 'icon' => 'svg:' . base64_encode( $clean ) ] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- icône SVG assainie, stockée et rendue en data URI.
 	}
 
 	public function ajax_search_users(): void {
@@ -1130,8 +1152,13 @@ class Module extends AbstractModule {
 			wp_send_json_error();
 		}
 
-		$query = sanitize_text_field( $_GET['q'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$users = get_users( [ 'search' => '*' . $query . '*', 'number' => 20 ] );
+		$query = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$users = get_users(
+			[
+				'search' => '*' . $query . '*',
+				'number' => 20,
+			]
+		);
 
 		$result = array_map(
 			fn( \WP_User $u ) => [
@@ -1147,6 +1174,10 @@ class Module extends AbstractModule {
 	 * HELPERS
 	 * ================================================================ */
 
+	/**
+	 * @param array<string, mixed> $profile
+	 * @return array<string, mixed>
+	 */
 	private function sanitize_profile( array $profile ): array {
 		return [
 			'id'            => ! empty( $profile['id'] ) ? sanitize_text_field( $profile['id'] ) : wp_generate_uuid4(),
@@ -1162,24 +1193,30 @@ class Module extends AbstractModule {
 		];
 	}
 
+	/**
+	 * @param array<int, array<string, mixed>> $items
+	 * @return array<int, array<string, mixed>>
+	 */
 	private function sanitize_menu_items( array $items, int $depth = 0 ): array {
 		// Garde-fou anti-payload : borne le nombre d'entrées persistées par
 		// niveau, pour éviter qu'un profil pathologique ne gonfle l'option.
 		$items     = array_slice( array_values( $items ), 0, self::MAX_ITEMS );
 		$sanitized = [];
 		foreach ( $items as $item ) {
-			if ( ! is_array( $item ) ) continue;
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
 			$type     = in_array( $item['type'] ?? '', [ 'wp_item', 'custom_link', 'separator' ], true )
 				? $item['type'] : 'wp_item';
 			$children = [];
 			if ( 0 === $depth && ! empty( $item['children'] ) ) {
 				$children = $this->sanitize_menu_items( (array) $item['children'], 1 );
 			}
-			$visible = isset( $item['visible'] ) ? (bool) $item['visible'] : true;
+			$visible     = isset( $item['visible'] ) ? (bool) $item['visible'] : true;
 			$sanitized[] = [
 				'type'         => $type,
 				'slug'         => sanitize_text_field( $item['slug'] ?? '' ),
-				'label'        => isset( $item['label'] ) && $item['label'] !== null ? sanitize_text_field( $item['label'] ) : null,
+				'label'        => isset( $item['label'] ) ? sanitize_text_field( $item['label'] ) : null,
 				'icon'         => $this->sanitize_icon_value( $item['icon'] ?? null ),
 				'visible'      => $visible,
 				// N'a de sens que sur un item masqué : un item visible et bloqué
@@ -1205,7 +1242,7 @@ class Module extends AbstractModule {
 	 * @param mixed $icon
 	 */
 	private function sanitize_icon_value( $icon ): ?string {
-		if ( $icon === null || '' === $icon ) {
+		if ( null === $icon || '' === $icon ) {
 			return null;
 		}
 		$icon = (string) $icon;
@@ -1219,21 +1256,30 @@ class Module extends AbstractModule {
 	 * SETTINGS
 	 * ================================================================ */
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_settings(): array {
 		return [];
 	}
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function save_settings( array $settings ): bool {
 		return true;
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public static function get_defaults(): array {
 		return [];
 	}
 
 	public static function get_uninstall_keys(): array {
 		return [
-			'options' => [ MenuProfileManager::OPTION_KEY ],
+			'options' => [ MenuProfileManager::OPTION_KEY, MenuProfileManager::CACHE_GEN_OPTION ],
 			'meta'    => [],
 		];
 	}
@@ -1259,6 +1305,9 @@ class Module extends AbstractModule {
 		return [ 'skmt-sortable-js' ];
 	}
 
+	/**
+	 * @return array<string, mixed>
+	 */
 	public function get_admin_js_data(): array {
 		$tab  = isset( $_GET['tab'] ) ? sanitize_key( $_GET['tab'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$data = [
@@ -1277,13 +1326,17 @@ class Module extends AbstractModule {
 			global $menu, $submenu;
 			// Menu WP d'origine si disponible (capturé avant nos modifications),
 			// sinon le global (déjà pristine quand aucun profil n'est actif).
-			$src_menu    = null !== self::$pristine_menu    ? self::$pristine_menu    : ( is_array( $menu ) ? $menu : [] );
+			$src_menu    = null !== self::$pristine_menu ? self::$pristine_menu : ( is_array( $menu ) ? $menu : [] );
 			$src_submenu = null !== self::$pristine_submenu ? self::$pristine_submenu : ( is_array( $submenu ) ? $submenu : [] );
 			$excluded    = $this->editor_excluded_slugs();
-			$wp_menu = [];
+			$wp_menu     = [];
 			foreach ( $src_menu as $item ) {
-				if ( ! is_array( $item ) ) continue;
-				if ( in_array( $item[2] ?? '', $excluded, true ) ) continue;
+				if ( ! is_array( $item ) ) {
+					continue;
+				}
+				if ( in_array( $item[2] ?? '', $excluded, true ) ) {
+					continue;
+				}
 				$wp_menu[] = [
 					'label' => $this->clean_menu_label( $item[0] ?? '' ),
 					'cap'   => $item[1] ?? 'read',
@@ -1294,10 +1347,14 @@ class Module extends AbstractModule {
 			$wp_submenu = [];
 			if ( is_array( $src_submenu ) ) {
 				foreach ( $src_submenu as $parent => $subs ) {
-					if ( in_array( $parent, $excluded, true ) ) continue;
+					if ( in_array( $parent, $excluded, true ) ) {
+						continue;
+					}
 					$wp_submenu[ $parent ] = [];
 					foreach ( (array) $subs as $item ) {
-						if ( ! is_array( $item ) ) continue;
+						if ( ! is_array( $item ) ) {
+							continue;
+						}
 						$wp_submenu[ $parent ][] = [
 							'label' => $this->clean_menu_label( $item[0] ?? '' ),
 							'cap'   => $item[1] ?? 'read',
@@ -1306,16 +1363,25 @@ class Module extends AbstractModule {
 					}
 				}
 			}
-			$recent_users = get_users( [ 'number' => 30, 'orderby' => 'registered', 'order' => 'DESC' ] );
-			$data['wpMenu']        = $wp_menu;
-			$data['wpSubmenu']     = $wp_submenu;
-			$data['wpRoles']       = wp_roles()->get_names();
-			$data['wpRecentUsers'] = array_map( function ( \WP_User $u ) {
-				return [
-					'id'    => (int) $u->ID,
-					'label' => $u->display_name . ' (' . $u->user_login . ')',
-				];
-			}, $recent_users );
+			$recent_users           = get_users(
+				[
+					'number'  => 30,
+					'orderby' => 'registered',
+					'order'   => 'DESC',
+				]
+			);
+			$data['wpMenu']         = $wp_menu;
+			$data['wpSubmenu']      = $wp_submenu;
+			$data['wpRoles']        = wp_roles()->get_names();
+			$data['wpRecentUsers']  = array_map(
+				function ( \WP_User $u ) {
+					return [
+						'id'    => (int) $u->ID,
+						'label' => $u->display_name . ' (' . $u->user_login . ')',
+					];
+				},
+				$recent_users
+			);
 			$data['iconLibrary']    = $this->get_lucide_icons();
 			$data['iconCategories'] = $this->get_icon_categories();
 			$data['iconAliases']    = $this->get_icon_aliases();
@@ -1335,7 +1401,7 @@ class Module extends AbstractModule {
 	 */
 	private function get_icon_library(): array {
 		return [
-			'general' => [
+			'general'  => [
 				'label' => __( 'Général', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'layout-dashboard' => '<rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/>',
@@ -1365,7 +1431,7 @@ class Module extends AbstractModule {
 					'eye-off'          => '<path d="M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49"/><path d="M14.084 14.158a3 3 0 0 1-4.242-4.242"/><path d="M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143"/><path d="m2 2 20 20"/>',
 				],
 			],
-			'content' => [
+			'content'  => [
 				'label' => __( 'Contenu', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'file'           => '<path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"/><path d="M14 2v5a1 1 0 0 0 1 1h5"/>',
@@ -1395,7 +1461,7 @@ class Module extends AbstractModule {
 					'trash-2'        => '<path d="M10 11v6"/><path d="M14 11v6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>',
 				],
 			],
-			'media' => [
+			'media'    => [
 				'label' => __( 'Médias', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'image'                  => '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
@@ -1438,7 +1504,7 @@ class Module extends AbstractModule {
 					'boxes'         => '<path d="M2.97 12.92A2 2 0 0 0 2 14.63v3.24a2 2 0 0 0 .97 1.71l3 1.8a2 2 0 0 0 2.06 0L12 19v-5.5l-5-3-4.03 2.42Z"/><path d="m7 16.5-4.74-2.85"/><path d="m7 16.5 5-3"/><path d="M7 16.5v5.17"/><path d="M12 13.5V19l3.97 2.38a2 2 0 0 0 2.06 0l3-1.8a2 2 0 0 0 .97-1.71v-3.24a2 2 0 0 0-.97-1.71L17 10.5l-5 3Z"/><path d="m17 16.5-5-3"/><path d="m17 16.5 4.74-2.85"/><path d="M17 16.5v5.17"/><path d="M7.97 4.42A2 2 0 0 0 7 6.13v4.37l5 3 5-3V6.13a2 2 0 0 0-.97-1.71l-3-1.8a2 2 0 0 0-2.06 0l-3 1.8Z"/><path d="M12 8 7.26 5.15"/><path d="m12 8 4.74-2.85"/><path d="M12 13.5V8"/>',
 				],
 			],
-			'users' => [
+			'users'    => [
 				'label' => __( 'Utilisateurs', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'user-round'       => '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
@@ -1456,7 +1522,7 @@ class Module extends AbstractModule {
 					'user-round-check' => '<path d="M2 21a8 8 0 0 1 13.292-6"/><circle cx="10" cy="8" r="5"/><path d="m16 19 2 2 4-4"/>',
 				],
 			],
-			'data' => [
+			'data'     => [
 				'label' => __( 'Données', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'chart-column' => '<path d="M3 3v16a2 2 0 0 0 2 2h16"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/>',
@@ -1470,7 +1536,7 @@ class Module extends AbstractModule {
 					'table'        => '<path d="M12 3v18"/><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/>',
 				],
 			],
-			'design' => [
+			'design'   => [
 				'label' => __( 'Apparence', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'palette'            => '<path d="M12 22a1 1 0 0 1 0-20 10 9 0 0 1 10 9 5 5 0 0 1-5 5h-2.25a1.75 1.75 0 0 0-1.4 2.8l.3.4a1.75 1.75 0 0 1-1.4 2.8z"/><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/>',
@@ -1490,7 +1556,7 @@ class Module extends AbstractModule {
 					'layout-template'    => '<rect width="18" height="7" x="3" y="3" rx="1"/><rect width="9" height="7" x="3" y="14" rx="1"/><rect width="5" height="7" x="16" y="14" rx="1"/>',
 				],
 			],
-			'system' => [
+			'system'   => [
 				'label' => __( 'Système', 'studio-kyne-mini-tools' ),
 				'icons' => [
 					'settings'      => '<path d="M9.671 4.136a2.34 2.34 0 0 1 4.659 0 2.34 2.34 0 0 0 3.319 1.915 2.34 2.34 0 0 1 2.33 4.033 2.34 2.34 0 0 0 0 3.831 2.34 2.34 0 0 1-2.33 4.033 2.34 2.34 0 0 0-3.319 1.915 2.34 2.34 0 0 1-4.659 0 2.34 2.34 0 0 0-3.32-1.915 2.34 2.34 0 0 1-2.33-4.033 2.34 2.34 0 0 0 0-3.831A2.34 2.34 0 0 1 6.35 6.051a2.34 2.34 0 0 0 3.319-1.915"/><circle cx="12" cy="12" r="3"/>',
@@ -1542,58 +1608,58 @@ class Module extends AbstractModule {
 	private function get_icon_aliases(): array {
 		return [
 			// Général.
-			'layout-dashboard' => 'tableau de bord accueil dashboard widgets',
-			'house'            => 'maison accueil home site',
-			'gauge'            => 'jauge compteur performance vitesse',
-			'compass'          => 'boussole exploration navigation découvrir',
-			'panels-top-left'  => 'panneaux mise en page layout colonnes',
-			'panel-left'       => 'panneau latéral barre sidebar colonne',
-			'grid-2x2'         => 'grille cases quadrillage vignettes',
-			'list'             => 'liste éléments lignes énumération',
-			'menu'             => 'menu navigation burger hamburger lignes',
-			'star'             => 'étoile favori note avis mise en avant',
-			'heart'            => 'coeur favori aimé souhaits like',
-			'bookmark'         => 'signet marque-page favori enregistré',
-			'flag'             => 'drapeau signalement langue pays repère',
-			'bell'             => 'cloche notification alerte rappel',
-			'search'           => 'recherche loupe trouver chercher',
-			'funnel'           => 'filtre entonnoir trier affiner',
-			'sparkles'         => 'étincelles magie ia nouveau brillant',
-			'zap'              => 'éclair rapide performance foudre cache',
-			'rocket'           => 'fusée lancement démarrage rapide déploiement',
-			'circle-help'      => 'aide question support faq assistance',
-			'info'             => 'information détail à propos renseignement',
-			'badge-check'      => 'badge vérifié validé certifié approuvé',
-			'circle-alert'     => 'alerte attention avertissement erreur',
-			'eye'              => 'oeil voir visible aperçu prévisualiser',
-			'eye-off'          => 'oeil barré masqué caché invisible',
+			'layout-dashboard'       => 'tableau de bord accueil dashboard widgets',
+			'house'                  => 'maison accueil home site',
+			'gauge'                  => 'jauge compteur performance vitesse',
+			'compass'                => 'boussole exploration navigation découvrir',
+			'panels-top-left'        => 'panneaux mise en page layout colonnes',
+			'panel-left'             => 'panneau latéral barre sidebar colonne',
+			'grid-2x2'               => 'grille cases quadrillage vignettes',
+			'list'                   => 'liste éléments lignes énumération',
+			'menu'                   => 'menu navigation burger hamburger lignes',
+			'star'                   => 'étoile favori note avis mise en avant',
+			'heart'                  => 'coeur favori aimé souhaits like',
+			'bookmark'               => 'signet marque-page favori enregistré',
+			'flag'                   => 'drapeau signalement langue pays repère',
+			'bell'                   => 'cloche notification alerte rappel',
+			'search'                 => 'recherche loupe trouver chercher',
+			'funnel'                 => 'filtre entonnoir trier affiner',
+			'sparkles'               => 'étincelles magie ia nouveau brillant',
+			'zap'                    => 'éclair rapide performance foudre cache',
+			'rocket'                 => 'fusée lancement démarrage rapide déploiement',
+			'circle-help'            => 'aide question support faq assistance',
+			'info'                   => 'information détail à propos renseignement',
+			'badge-check'            => 'badge vérifié validé certifié approuvé',
+			'circle-alert'           => 'alerte attention avertissement erreur',
+			'eye'                    => 'oeil voir visible aperçu prévisualiser',
+			'eye-off'                => 'oeil barré masqué caché invisible',
 
 			// Contenu.
-			'file'             => 'fichier document page vide',
-			'file-text'        => 'fichier texte document article page',
-			'files'            => 'fichiers documents copies multiples',
-			'folder'           => 'dossier répertoire classement',
-			'folder-open'      => 'dossier ouvert répertoire parcourir',
-			'book'             => 'livre documentation manuel guide',
-			'book-open'        => 'livre ouvert lecture documentation guide',
-			'notebook-pen'     => 'carnet notes rédaction journal',
-			'newspaper'        => 'journal actualités articles presse blog news',
-			'pen-line'         => 'stylo écrire éditer rédiger modifier',
-			'pencil'           => 'crayon éditer modifier écrire',
-			'square-pen'       => 'éditer modifier crayon rédiger',
-			'type'             => 'typographie police texte caractère',
-			'quote'            => 'citation guillemets témoignage',
-			'list-checks'      => 'liste de tâches cases à cocher todo checklist',
-			'clipboard-list'   => 'presse-papiers liste tâches formulaire',
-			'calendar'         => 'calendrier date agenda événement planning',
-			'calendar-days'    => 'calendrier jours agenda planning dates',
-			'clock'            => 'horloge heure temps historique planification',
-			'tag'              => 'étiquette mot-clé label tarif',
-			'tags'             => 'étiquettes mots-clés labels taxonomie',
-			'link'             => 'lien url hyperlien chaîne permalien',
-			'paperclip'        => 'trombone pièce jointe fichier attaché',
-			'archive'          => 'archive boîte rangement sauvegarde stockage',
-			'trash-2'          => 'corbeille supprimer poubelle effacer',
+			'file'                   => 'fichier document page vide',
+			'file-text'              => 'fichier texte document article page',
+			'files'                  => 'fichiers documents copies multiples',
+			'folder'                 => 'dossier répertoire classement',
+			'folder-open'            => 'dossier ouvert répertoire parcourir',
+			'book'                   => 'livre documentation manuel guide',
+			'book-open'              => 'livre ouvert lecture documentation guide',
+			'notebook-pen'           => 'carnet notes rédaction journal',
+			'newspaper'              => 'journal actualités articles presse blog news',
+			'pen-line'               => 'stylo écrire éditer rédiger modifier',
+			'pencil'                 => 'crayon éditer modifier écrire',
+			'square-pen'             => 'éditer modifier crayon rédiger',
+			'type'                   => 'typographie police texte caractère',
+			'quote'                  => 'citation guillemets témoignage',
+			'list-checks'            => 'liste de tâches cases à cocher todo checklist',
+			'clipboard-list'         => 'presse-papiers liste tâches formulaire',
+			'calendar'               => 'calendrier date agenda événement planning',
+			'calendar-days'          => 'calendrier jours agenda planning dates',
+			'clock'                  => 'horloge heure temps historique planification',
+			'tag'                    => 'étiquette mot-clé label tarif',
+			'tags'                   => 'étiquettes mots-clés labels taxonomie',
+			'link'                   => 'lien url hyperlien chaîne permalien',
+			'paperclip'              => 'trombone pièce jointe fichier attaché',
+			'archive'                => 'archive boîte rangement sauvegarde stockage',
+			'trash-2'                => 'corbeille supprimer poubelle effacer',
 
 			// Médias.
 			'image'                  => 'image photo illustration visuel média',
@@ -1614,97 +1680,97 @@ class Module extends AbstractModule {
 			'cloud-upload'           => 'nuage téléverser sauvegarde distant cloud',
 
 			// Commerce.
-			'shopping-bag'  => 'sac achat boutique commande shopping',
-			'shopping-cart' => 'panier caddie achat commande boutique',
-			'store'         => 'boutique magasin commerce vitrine',
-			'package'       => 'colis paquet produit livraison module extension',
-			'package-2'     => 'colis paquet produit stock livraison',
-			'package-open'  => 'colis ouvert déballage produit livraison',
-			'truck'         => 'camion livraison expédition transport',
-			'receipt'       => 'reçu facture ticket note commande',
-			'credit-card'   => 'carte bancaire paiement carte de crédit règlement',
-			'banknote'      => 'billet argent monnaie paiement espèces',
-			'dollar-sign'   => 'dollar devise prix argent tarif',
-			'euro'          => 'euro devise prix argent tarif',
-			'percent'       => 'pourcentage remise promotion solde taux',
-			'gift'          => 'cadeau offre bon promotion récompense',
-			'wallet'        => 'portefeuille solde paiement porte-monnaie',
-			'ticket'        => 'billet coupon code promo ticket réduction',
-			'boxes'         => 'stock inventaire cartons entrepôt produits',
+			'shopping-bag'           => 'sac achat boutique commande shopping',
+			'shopping-cart'          => 'panier caddie achat commande boutique',
+			'store'                  => 'boutique magasin commerce vitrine',
+			'package'                => 'colis paquet produit livraison module extension',
+			'package-2'              => 'colis paquet produit stock livraison',
+			'package-open'           => 'colis ouvert déballage produit livraison',
+			'truck'                  => 'camion livraison expédition transport',
+			'receipt'                => 'reçu facture ticket note commande',
+			'credit-card'            => 'carte bancaire paiement carte de crédit règlement',
+			'banknote'               => 'billet argent monnaie paiement espèces',
+			'dollar-sign'            => 'dollar devise prix argent tarif',
+			'euro'                   => 'euro devise prix argent tarif',
+			'percent'                => 'pourcentage remise promotion solde taux',
+			'gift'                   => 'cadeau offre bon promotion récompense',
+			'wallet'                 => 'portefeuille solde paiement porte-monnaie',
+			'ticket'                 => 'billet coupon code promo ticket réduction',
+			'boxes'                  => 'stock inventaire cartons entrepôt produits',
 
 			// Utilisateurs.
-			'user-round'       => 'utilisateur compte profil personne membre',
-			'users-round'      => 'utilisateurs comptes membres équipe groupe rôles',
-			'user-round-plus'  => 'ajouter un utilisateur nouveau compte inscription membre',
-			'user-round-cog'   => 'réglages du compte profil permissions rôle utilisateur',
-			'contact-round'    => 'contact carnet répertoire fiche personne',
-			'id-card'          => 'carte identité badge profil fiche',
-			'mail'             => 'e-mail courriel message enveloppe contact',
-			'message-circle'   => 'message discussion commentaire chat bulle',
-			'message-square'   => 'message commentaire discussion chat avis',
-			'phone'            => 'téléphone appel contact numéro',
-			'at-sign'          => 'arobase e-mail mention identifiant courriel',
-			'handshake'        => 'poignée de main partenariat accord affiliation',
-			'user-round-check' => 'utilisateur validé compte vérifié approuvé membre',
+			'user-round'             => 'utilisateur compte profil personne membre',
+			'users-round'            => 'utilisateurs comptes membres équipe groupe rôles',
+			'user-round-plus'        => 'ajouter un utilisateur nouveau compte inscription membre',
+			'user-round-cog'         => 'réglages du compte profil permissions rôle utilisateur',
+			'contact-round'          => 'contact carnet répertoire fiche personne',
+			'id-card'                => 'carte identité badge profil fiche',
+			'mail'                   => 'e-mail courriel message enveloppe contact',
+			'message-circle'         => 'message discussion commentaire chat bulle',
+			'message-square'         => 'message commentaire discussion chat avis',
+			'phone'                  => 'téléphone appel contact numéro',
+			'at-sign'                => 'arobase e-mail mention identifiant courriel',
+			'handshake'              => 'poignée de main partenariat accord affiliation',
+			'user-round-check'       => 'utilisateur validé compte vérifié approuvé membre',
 
 			// Données.
-			'chart-column' => 'graphique barres statistiques rapport histogramme',
-			'chart-line'   => 'graphique courbe statistiques évolution tendance',
-			'chart-pie'    => 'graphique camembert secteurs répartition statistiques',
-			'trending-up'  => 'tendance croissance hausse progression statistiques',
-			'activity'     => 'activité pouls journal suivi monitoring',
-			'database'     => 'base de données sql tables stockage',
-			'server'       => 'serveur hébergement infrastructure machine',
-			'hard-drive'   => 'disque dur stockage espace sauvegarde',
-			'table'        => 'tableau tableur grille colonnes données',
+			'chart-column'           => 'graphique barres statistiques rapport histogramme',
+			'chart-line'             => 'graphique courbe statistiques évolution tendance',
+			'chart-pie'              => 'graphique camembert secteurs répartition statistiques',
+			'trending-up'            => 'tendance croissance hausse progression statistiques',
+			'activity'               => 'activité pouls journal suivi monitoring',
+			'database'               => 'base de données sql tables stockage',
+			'server'                 => 'serveur hébergement infrastructure machine',
+			'hard-drive'             => 'disque dur stockage espace sauvegarde',
+			'table'                  => 'tableau tableur grille colonnes données',
 
 			// Apparence.
-			'palette'            => 'palette couleurs thème design apparence',
-			'swatch-book'        => 'nuancier couleurs échantillons charte thème',
-			'paintbrush'         => 'pinceau peinture style personnalisation thème',
-			'brush'              => 'brosse pinceau style couleur personnalisation',
-			'layers'             => 'calques couches empilement superposition',
-			'blocks'             => 'blocs éditeur gutenberg composants briques',
-			'toy-brick'          => 'brique bloc module extension composant',
-			'puzzle'             => 'puzzle extension module greffon plugin pièce',
-			'component'          => 'composant élément bloc module',
-			'wand-sparkles'      => 'baguette magique automatique effets ia embellir',
-			'sliders-horizontal' => 'réglages curseurs options filtres paramètres',
-			'sliders-vertical'   => 'réglages curseurs égaliseur options paramètres',
-			'ruler'              => 'règle mesure dimensions taille espacement',
-			'frame'              => 'cadre encadrement bordure conteneur',
-			'layout-template'    => 'modèle gabarit template mise en page structure',
+			'palette'                => 'palette couleurs thème design apparence',
+			'swatch-book'            => 'nuancier couleurs échantillons charte thème',
+			'paintbrush'             => 'pinceau peinture style personnalisation thème',
+			'brush'                  => 'brosse pinceau style couleur personnalisation',
+			'layers'                 => 'calques couches empilement superposition',
+			'blocks'                 => 'blocs éditeur gutenberg composants briques',
+			'toy-brick'              => 'brique bloc module extension composant',
+			'puzzle'                 => 'puzzle extension module greffon plugin pièce',
+			'component'              => 'composant élément bloc module',
+			'wand-sparkles'          => 'baguette magique automatique effets ia embellir',
+			'sliders-horizontal'     => 'réglages curseurs options filtres paramètres',
+			'sliders-vertical'       => 'réglages curseurs égaliseur options paramètres',
+			'ruler'                  => 'règle mesure dimensions taille espacement',
+			'frame'                  => 'cadre encadrement bordure conteneur',
+			'layout-template'        => 'modèle gabarit template mise en page structure',
 
 			// Système.
-			'settings'      => 'réglages paramètres configuration options engrenage',
-			'settings-2'    => 'réglages paramètres options configuration curseurs',
-			'wrench'        => 'clé outils maintenance réparation dépannage',
-			'cog'           => 'engrenage réglages configuration rouage paramètres',
-			'shield'        => 'bouclier sécurité protection pare-feu',
-			'shield-check'  => 'sécurité vérifiée protection validée bouclier',
-			'lock'          => 'cadenas verrou sécurité privé protégé mot de passe',
-			'key'           => 'clé mot de passe accès licence identifiant jeton',
-			'plug'          => 'prise branchement extension connexion intégration',
-			'power'         => 'alimentation marche arrêt activer désactiver',
-			'terminal'      => 'terminal console commande shell cli',
-			'code'          => 'code développement html balise snippet',
-			'bug'           => 'bogue erreur débogage anomalie problème',
-			'refresh-cw'    => 'actualiser recharger synchroniser mise à jour rafraîchir',
-			'hammer'        => 'marteau outils construction maintenance',
-			'life-buoy'     => 'bouée support aide assistance secours',
-			'log-out'       => 'déconnexion sortir quitter session',
-			'globe'         => 'globe monde site web international langue',
-			'map'           => 'carte plan géographie itinéraire',
-			'map-pin'       => 'épingle localisation adresse position lieu',
-			'map-pinned'    => 'carte localisation adresse position lieux',
-			'pin'           => 'épingle épingler fixer marquer',
-			'megaphone'     => 'mégaphone annonce marketing communication promotion',
-			'rss'           => 'flux rss syndication abonnement actualités',
-			'share-2'       => 'partager partage réseaux sociaux diffusion',
-			'external-link' => 'lien externe nouvel onglet sortant ouvrir',
-			'monitor'       => 'écran bureau ordinateur affichage desktop',
-			'smartphone'    => 'mobile téléphone responsive portable écran',
-			'languages'     => 'langues traduction international multilingue localisation',
+			'settings'               => 'réglages paramètres configuration options engrenage',
+			'settings-2'             => 'réglages paramètres options configuration curseurs',
+			'wrench'                 => 'clé outils maintenance réparation dépannage',
+			'cog'                    => 'engrenage réglages configuration rouage paramètres',
+			'shield'                 => 'bouclier sécurité protection pare-feu',
+			'shield-check'           => 'sécurité vérifiée protection validée bouclier',
+			'lock'                   => 'cadenas verrou sécurité privé protégé mot de passe',
+			'key'                    => 'clé mot de passe accès licence identifiant jeton',
+			'plug'                   => 'prise branchement extension connexion intégration',
+			'power'                  => 'alimentation marche arrêt activer désactiver',
+			'terminal'               => 'terminal console commande shell cli',
+			'code'                   => 'code développement html balise snippet',
+			'bug'                    => 'bogue erreur débogage anomalie problème',
+			'refresh-cw'             => 'actualiser recharger synchroniser mise à jour rafraîchir',
+			'hammer'                 => 'marteau outils construction maintenance',
+			'life-buoy'              => 'bouée support aide assistance secours',
+			'log-out'                => 'déconnexion sortir quitter session',
+			'globe'                  => 'globe monde site web international langue',
+			'map'                    => 'carte plan géographie itinéraire',
+			'map-pin'                => 'épingle localisation adresse position lieu',
+			'map-pinned'             => 'carte localisation adresse position lieux',
+			'pin'                    => 'épingle épingler fixer marquer',
+			'megaphone'              => 'mégaphone annonce marketing communication promotion',
+			'rss'                    => 'flux rss syndication abonnement actualités',
+			'share-2'                => 'partager partage réseaux sociaux diffusion',
+			'external-link'          => 'lien externe nouvel onglet sortant ouvrir',
+			'monitor'                => 'écran bureau ordinateur affichage desktop',
+			'smartphone'             => 'mobile téléphone responsive portable écran',
+			'languages'              => 'langues traduction international multilingue localisation',
 		];
 	}
 

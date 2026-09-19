@@ -11,15 +11,29 @@ class MenuProfileManager {
 	const OPTION_KEY       = 'skmt_wl_menu_profiles';
 	const CACHE_KEY_PREFIX = 'skmt_wl_menu_user_';
 
+	/**
+	 * Génération du cache : incrémentée à chaque mutation de profil et incluse
+	 * dans la clé de transient. Invalider tout le monde coûte une écriture
+	 * d'option, au lieu d'un delete_transient par utilisateur — plafonné à 500
+	 * comptes, au-delà desquels les autres gardaient un profil périmé.
+	 */
+	const CACHE_GEN_OPTION = 'skmt_wl_menu_cache_gen';
+
 	/* ================================================================
 	 * CRUD
 	 * ================================================================ */
 
+	/**
+	 * @return array<int, array<string, mixed>>
+	 */
 	public static function get_all(): array {
 		$profiles = get_option( self::OPTION_KEY, [] );
 		return is_array( $profiles ) ? $profiles : [];
 	}
 
+	/**
+	 * @return array<string, mixed>|null
+	 */
 	public static function get( string $id ): ?array {
 		foreach ( self::get_all() as $profile ) {
 			if ( isset( $profile['id'] ) && $profile['id'] === $id ) {
@@ -31,6 +45,8 @@ class MenuProfileManager {
 
 	/**
 	 * Insert ou met à jour un profil (match par id).
+	 *
+	 * @param array<string, mixed> $profile
 	 */
 	public static function save( array $profile ): bool {
 		$profiles = self::get_all();
@@ -53,10 +69,12 @@ class MenuProfileManager {
 	}
 
 	public static function delete( string $id ): bool {
-		$profiles = array_values( array_filter(
-			self::get_all(),
-			fn( $p ) => ! isset( $p['id'] ) || $p['id'] !== $id
-		) );
+		$profiles = array_values(
+			array_filter(
+				self::get_all(),
+				fn( $p ) => ! isset( $p['id'] ) || $p['id'] !== $id
+			)
+		);
 
 		self::clear_all_cache();
 		return (bool) update_option( self::OPTION_KEY, $profiles );
@@ -72,9 +90,11 @@ class MenuProfileManager {
 	 * Priorité : include_users > include_roles > apply_to_all
 	 * En cas d'égalité : profil le plus récent (updated_at).
 	 * Les exclusions (exclude_users, exclude_roles) priment sur tout.
+	 *
+	 * @return array<string, mixed>|null
 	 */
 	public static function get_active_for_user( int $user_id ): ?array {
-		$cache_key = self::CACHE_KEY_PREFIX . $user_id;
+		$cache_key = self::cache_key( $user_id );
 		$cached    = get_transient( $cache_key );
 
 		if ( false !== $cached ) {
@@ -150,18 +170,20 @@ class MenuProfileManager {
 	 * CACHE
 	 * ================================================================ */
 
+	private static function cache_key( int $user_id ): string {
+		return self::CACHE_KEY_PREFIX . (int) get_option( self::CACHE_GEN_OPTION, 1 ) . '_' . $user_id;
+	}
+
 	public static function clear_user_cache( int $user_id = 0 ): void {
 		if ( $user_id > 0 ) {
-			delete_transient( self::CACHE_KEY_PREFIX . $user_id );
+			delete_transient( self::cache_key( $user_id ) );
 			return;
 		}
 		self::clear_all_cache();
 	}
 
+	/** Les transients de l'ancienne génération expirent d'eux-mêmes (1 h). */
 	public static function clear_all_cache(): void {
-		$users = get_users( [ 'fields' => 'ID', 'number' => 500 ] );
-		foreach ( $users as $uid ) {
-			delete_transient( self::CACHE_KEY_PREFIX . (int) $uid );
-		}
+		update_option( self::CACHE_GEN_OPTION, (int) get_option( self::CACHE_GEN_OPTION, 1 ) + 1 );
 	}
 }

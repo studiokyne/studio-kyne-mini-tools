@@ -19,20 +19,72 @@ class SvgHandler {
 
 	/** Éléments SVG autorisés (liste blanche). */
 	private const ALLOWED_TAGS = [
-		'a', 'circle', 'clippath', 'defs', 'desc', 'ellipse', 'feblend',
-		'fecolormatrix', 'fecomponenttransfer', 'fecomposite', 'feconvolvematrix',
-		'fediffuselighting', 'fedisplacementmap', 'fedistantlight', 'feflood',
-		'fefunca', 'fefuncb', 'fefuncg', 'fefuncr', 'fegaussianblur', 'feimage',
-		'femerge', 'femergenode', 'femorphology', 'feoffset', 'fepointlight',
-		'fespecularlighting', 'fespotlight', 'fetile', 'feturbulence', 'filter',
-		'g', 'image', 'line', 'lineargradient', 'marker', 'mask', 'metadata',
-		'path', 'pattern', 'polygon', 'polyline', 'radialgradient', 'rect', 'stop',
-		'style', 'svg', 'switch', 'symbol', 'text', 'textpath', 'title', 'tspan', 'use',
+		'a',
+		'circle',
+		'clippath',
+		'defs',
+		'desc',
+		'ellipse',
+		'feblend',
+		'fecolormatrix',
+		'fecomponenttransfer',
+		'fecomposite',
+		'feconvolvematrix',
+		'fediffuselighting',
+		'fedisplacementmap',
+		'fedistantlight',
+		'feflood',
+		'fefunca',
+		'fefuncb',
+		'fefuncg',
+		'fefuncr',
+		'fegaussianblur',
+		'feimage',
+		'femerge',
+		'femergenode',
+		'femorphology',
+		'feoffset',
+		'fepointlight',
+		'fespecularlighting',
+		'fespotlight',
+		'fetile',
+		'feturbulence',
+		'filter',
+		'g',
+		'image',
+		'line',
+		'lineargradient',
+		'marker',
+		'mask',
+		'metadata',
+		'path',
+		'pattern',
+		'polygon',
+		'polyline',
+		'radialgradient',
+		'rect',
+		'stop',
+		'style',
+		'svg',
+		'switch',
+		'symbol',
+		'text',
+		'textpath',
+		'title',
+		'tspan',
+		'use',
 	];
 
-	/** Réglages du module (svg_upload, svg_roles). */
+	/**
+	 * Réglages du module (svg_upload, svg_roles).
+	 *
+	 * @var array<string, mixed>
+	 */
 	private array $settings;
 
+	/**
+	 * @param array<string, mixed> $settings
+	 */
 	public function __construct( array $settings ) {
 		$this->settings = $settings;
 	}
@@ -46,7 +98,7 @@ class SvgHandler {
 		}
 
 		add_filter( 'upload_mimes', [ $this, 'allow_mime' ] );
-		add_filter( 'wp_check_filetype_and_ext', [ $this, 'fix_filetype' ], 10, 4 );
+		add_filter( 'wp_check_filetype_and_ext', [ $this, 'fix_filetype' ], 10, 3 );
 		add_filter( 'wp_handle_upload_prefilter', [ $this, 'sanitize_on_upload' ] );
 	}
 
@@ -73,6 +125,9 @@ class SvgHandler {
 
 	/**
 	 * Ajoute le MIME SVG à la liste autorisée pour les rôles habilités.
+	 *
+	 * @param array<string, string> $mimes
+	 * @return array<string, string>
 	 */
 	public function allow_mime( $mimes ) {
 		if ( $this->current_user_can_upload() ) {
@@ -83,8 +138,13 @@ class SvgHandler {
 
 	/**
 	 * Corrige la détection type/extension de WordPress pour les .svg.
+	 *
+	 * @param array<string, mixed> $data
+	 * @param string $file
+	 * @param string $filename
+	 * @return array<string, mixed>
 	 */
-	public function fix_filetype( $data, $file, $filename, $mimes ) {
+	public function fix_filetype( $data, $file, $filename ) {
 		if ( ! empty( $data['ext'] ) && ! empty( $data['type'] ) ) {
 			return $data;
 		}
@@ -104,6 +164,9 @@ class SvgHandler {
 	/**
 	 * Filtre wp_handle_upload_prefilter : assainit le SVG avant qu'il ne soit
 	 * déplacé dans la médiathèque. Rejette le fichier si l'assainissement échoue.
+	 *
+	 * @param array<string, mixed> $file
+	 * @return array<string, mixed>
 	 */
 	public function sanitize_on_upload( $file ) {
 		$type = $file['type'] ?? '';
@@ -126,7 +189,8 @@ class SvgHandler {
 			return $file;
 		}
 
-		$dirty = file_get_contents( $path );
+		// Fichier temporaire local de l'upload PHP : WP_Filesystem, s'il passe par FTP, ne l'atteint pas.
+		$dirty = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( false === $dirty || '' === trim( (string) $dirty ) ) {
 			$file['error'] = __( 'Le fichier SVG est vide ou illisible.', 'studio-kyne-mini-tools' );
 			return $file;
@@ -138,7 +202,7 @@ class SvgHandler {
 			return $file;
 		}
 
-		file_put_contents( $path, $clean );
+		file_put_contents( $path, $clean ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 
 		return $file;
 	}
@@ -148,7 +212,7 @@ class SvgHandler {
 	 */
 	public function sanitize( string $svg ): ?string {
 		// Retire une éventuelle BOM et les instructions de traitement PHP.
-		$svg = preg_replace( '/<\?php.*?\?>/is', '', $svg );
+		$svg = (string) preg_replace( '/<\?php.*?\?>/is', '', $svg );
 
 		// Bloque les définitions de type de document (attaques XXE / entités externes).
 		if ( preg_match( '/<!DOCTYPE/i', $svg ) && preg_match( '/<!ENTITY/i', $svg ) ) {
@@ -161,10 +225,10 @@ class SvgHandler {
 		// on ne force l'ancien garde-fou que sur PHP < 8.0 (déprécié au-delà).
 		$entity_previous = null;
 		if ( \PHP_VERSION_ID < 80000 && function_exists( 'libxml_disable_entity_loader' ) ) {
-			$entity_previous = libxml_disable_entity_loader( true );
+			$entity_previous = libxml_disable_entity_loader( true ); // phpcs:ignore Generic.PHP.DeprecatedFunctions.Deprecated -- déprécié en PHP 8, seul garde-fou XXE en PHP 7.4.
 		}
 
-		$dom = new \DOMDocument();
+		$dom                     = new \DOMDocument();
 		$dom->preserveWhiteSpace = false;
 
 		// NB : on n'ajoute jamais LIBXML_NOENT — l'expansion d'entités est un vecteur d'attaque.
@@ -173,14 +237,15 @@ class SvgHandler {
 		libxml_clear_errors();
 		libxml_use_internal_errors( $libxml_previous );
 		if ( null !== $entity_previous && \PHP_VERSION_ID < 80000 && function_exists( 'libxml_disable_entity_loader' ) ) {
-			libxml_disable_entity_loader( $entity_previous );
+			libxml_disable_entity_loader( $entity_previous ); // phpcs:ignore Generic.PHP.DeprecatedFunctions.Deprecated -- idem, restauration de l'état précédent.
 		}
 
-		if ( ! $loaded || ! $dom->documentElement ) {
+		$root = $dom->documentElement;
+		if ( ! $loaded || ! $root instanceof \DOMElement ) {
 			return null;
 		}
 
-		if ( 'svg' !== strtolower( $dom->documentElement->nodeName ) ) {
+		if ( 'svg' !== strtolower( $root->nodeName ) ) {
 			return null;
 		}
 
@@ -192,10 +257,10 @@ class SvgHandler {
 		}
 
 		// Nettoie les attributs de la racine <svg> elle-même, puis récursivement les enfants.
-		$this->clean_attributes( $dom->documentElement );
-		$this->clean_node( $dom->documentElement );
+		$this->clean_attributes( $root );
+		$this->clean_node( $root );
 
-		$out = $dom->saveXML( $dom->documentElement, LIBXML_NOEMPTYTAG );
+		$out = $dom->saveXML( $root, LIBXML_NOEMPTYTAG );
 		if ( false === $out ) {
 			return null;
 		}
@@ -213,7 +278,7 @@ class SvgHandler {
 			return;
 		}
 		foreach ( iterator_to_array( $node->childNodes ) as $child ) {
-			if ( XML_ELEMENT_NODE !== $child->nodeType ) {
+			if ( ! $child instanceof \DOMElement ) {
 				// Retire commentaires / PI / doctype résiduels.
 				if ( in_array( $child->nodeType, [ XML_COMMENT_NODE, XML_PI_NODE ], true ) ) {
 					$node->removeChild( $child );
@@ -221,7 +286,8 @@ class SvgHandler {
 				continue;
 			}
 
-			$tag = strtolower( $child->localName ?: $child->nodeName );
+			$local = (string) $child->localName;
+			$tag   = strtolower( '' !== $local ? $local : $child->nodeName );
 
 			if ( ! in_array( $tag, self::ALLOWED_TAGS, true ) ) {
 				$node->removeChild( $child );
@@ -262,7 +328,7 @@ class SvgHandler {
 			$el->removeChild( $el->firstChild );
 		}
 
-		if ( '' !== trim( $propre ) ) {
+		if ( '' !== trim( $propre ) && null !== $el->ownerDocument ) {
 			$el->appendChild( $el->ownerDocument->createTextNode( $propre ) );
 		}
 	}
@@ -286,12 +352,12 @@ class SvgHandler {
 			$decode = preg_replace_callback(
 				'/\\\\([0-9a-fA-F]{1,6})[ \t\n]?/',
 				static function ( array $m ) {
-					$cp = hexdec( $m[1] );
+					$cp = (int) hexdec( $m[1] );
 					return ( $cp > 0 && $cp < 0x110000 ) ? (string) mb_chr( $cp, 'UTF-8' ) : '';
 				},
 				$css
 			);
-			$css = ( null === $decode ) ? $css : $decode;
+			$css    = ( null === $decode ) ? $css : $decode;
 		}
 
 		// At-rules qui chargent une ressource externe.
@@ -313,9 +379,11 @@ class SvgHandler {
 			$css
 		);
 
-		// Filet : si un schéma exécutable subsiste malgré tout, on ne cherche
-		// pas à réparer la feuille — on la jette.
-		if ( preg_match( '/(javascript|vbscript|data\s*:\s*text\/html)\s*:/i', $css ) ) {
+		// Filet : si un schéma exécutable ou un vecteur historique subsiste
+		// malgré tout (ex. « expression(…) » sans propriété devant, que le
+		// motif de déclaration ne couvre pas), on ne cherche pas à réparer la
+		// feuille — on la jette.
+		if ( preg_match( '/(javascript|vbscript|data\s*:\s*text\/html)\s*:|expression\s*\(|-moz-binding|behavior\s*:/i', $css ) ) {
 			return '';
 		}
 
@@ -346,15 +414,23 @@ class SvgHandler {
 
 			// Attributs pouvant embarquer du script.
 			$decoded = html_entity_decode( (string) $value, ENT_QUOTES );
-			$decoded = preg_replace( '/\s+/', '', $decoded );
+			$decoded = (string) preg_replace( '/\s+/', '', $decoded );
 			if ( preg_match( '/(javascript|data:text\/html|vbscript):/i', $decoded ) ) {
 				$el->removeAttributeNode( $attr );
 				continue;
 			}
 
-			// style : bloque url(javascript:…), expression(), et @import.
-			if ( 'style' === $name && preg_match( '/(javascript:|expression\(|@import|url\(\s*["\']?\s*data:text\/html)/i', $decoded ) ) {
-				$el->removeAttributeNode( $attr );
+			// style : le MÊME nettoyeur que l'élément <style> (commentaires et
+			// échappements normalisés, url() sur liste blanche, expression()
+			// et -moz-binding retirés) — on n'entretient pas deux définitions
+			// du « sûr ». Un style vidé par le nettoyage est retiré.
+			if ( 'style' === $name ) {
+				$propre = trim( $this->sanitize_css( (string) $value ) );
+				if ( '' === $propre ) {
+					$el->removeAttributeNode( $attr );
+				} else {
+					$attr->nodeValue = $propre;
+				}
 			}
 		}
 	}

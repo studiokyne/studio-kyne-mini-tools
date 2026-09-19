@@ -10,20 +10,6 @@ defined( 'ABSPATH' ) || exit;
  */
 class HardeningService {
 
-	private bool $disable_xmlrpc = false;
-	private bool $prevent_user_enum = false;
-	private bool $hide_wp_version = false;
-
-	public function __construct(
-		bool $disable_xmlrpc = false,
-		bool $prevent_user_enum = false,
-		bool $hide_wp_version = false
-	) {
-		$this->disable_xmlrpc    = $disable_xmlrpc;
-		$this->prevent_user_enum = $prevent_user_enum;
-		$this->hide_wp_version   = $hide_wp_version;
-	}
-
 	// === XML-RPC ===
 
 	/**
@@ -36,7 +22,7 @@ class HardeningService {
 	/**
 	 * Bloque l'accès au serveur XML-RPC avec un 403.
 	 */
-	public function block_xmlrpc_server_class( string $class ): string {
+	public function block_xmlrpc_server_class(): string {
 		http_response_code( 403 );
 		exit;
 	}
@@ -215,11 +201,10 @@ class HardeningService {
 	 * Les codes qui ne disent rien d'un compte — mot de passe vide, cookies
 	 * bloqués — sont laissés intacts : l'utilisateur légitime en a besoin.
 	 *
-	 * @param mixed  $errors      WP_Error de la page de connexion.
-	 * @param string $redirect_to Destination après connexion (inutilisée).
+	 * @param mixed $errors WP_Error de la page de connexion.
 	 * @return mixed
 	 */
-	public function filter_login_errors( $errors, $redirect_to = '' ) {
+	public function filter_login_errors( $errors ) {
 		if ( ! $errors instanceof \WP_Error ) {
 			return $errors;
 		}
@@ -279,6 +264,9 @@ class HardeningService {
 
 	/**
 	 * Hook wp_headers : retire les headers exposant la version.
+	 *
+	 * @param array<string, string> $headers
+	 * @return array<string, string>
 	 */
 	public function hide_wp_version_headers( array $headers ): array {
 		unset( $headers['X-Powered-By'] );

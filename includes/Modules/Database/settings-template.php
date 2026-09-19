@@ -1,4 +1,5 @@
-<?php if ( ! defined( 'ABSPATH' ) ) exit; ?>
+<?php if ( ! defined( 'ABSPATH' ) ) {
+	exit;} ?>
 
 <div
 	class="skmt-db"
@@ -18,6 +19,12 @@
 						placeholder="<?php esc_attr_e( 'Rechercher une table…', 'studio-kyne-mini-tools' ); ?>">
 				</div>
 			</div>
+			<button type="button" class="skmt-db__table-item skmt-db__cleanup-link" id="skmt-db-cleanup-link">
+				<span class="skmt-db__table-item-name">
+					<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m16 22-1-4"/><path d="M19 14a1 1 0 0 0 1-1v-1a2 2 0 0 0-2-2h-3a1 1 0 0 1-1-1V4a2 2 0 0 0-4 0v5a1 1 0 0 1-1 1H6a2 2 0 0 0-2 2v1a1 1 0 0 0 1 1"/><path d="M19 14H5l-1.973 6.767A1 1 0 0 0 4 22h16a1 1 0 0 0 .973-1.233z"/><path d="m8 22 1-4"/></svg>
+					<?php esc_html_e( 'Nettoyage', 'studio-kyne-mini-tools' ); ?>
+				</span>
+			</button>
 			<div class="skmt-db__table-list" id="skmt-db-table-list">
 				<div class="skmt-db__loading"><?php esc_html_e( 'Chargement…', 'studio-kyne-mini-tools' ); ?></div>
 			</div>
@@ -30,6 +37,9 @@
 			<div class="skmt-db__empty" id="skmt-db-empty">
 				<p><?php esc_html_e( 'Sélectionnez une table dans la barre latérale.', 'studio-kyne-mini-tools' ); ?></p>
 			</div>
+
+			<!-- Vue Nettoyage (générée en JS) -->
+			<div id="skmt-db-cleanup-view" class="skmt-db__view skmt-db__cleanup" style="display:none"></div>
 
 			<!-- Vue table (masquée jusqu'à sélection) -->
 			<div id="skmt-db-table-view" class="skmt-db__view" style="display:none">
@@ -78,23 +88,19 @@
 					</div>
 				</div>
 
-				<!-- Tabs Données / Structure / Requête SQL -->
-				<div class="skmt-db__tabs">
-					<button type="button" class="skmt-db__tab is-active" data-tab="data">
-						<?php esc_html_e( 'Données', 'studio-kyne-mini-tools' ); ?>
-					</button>
-					<button type="button" class="skmt-db__tab" data-tab="structure">
-						<?php esc_html_e( 'Structure', 'studio-kyne-mini-tools' ); ?>
-					</button>
-					<button type="button" class="skmt-db__tab" data-tab="query">
-						<?php esc_html_e( 'Requête SQL', 'studio-kyne-mini-tools' ); ?>
-					</button>
+				<!-- Onglets Données / Structure / Requête SQL : composant skmt-tabs.
+					Le chargement de chaque onglet est piloté par database.js
+					(événement skmt:tab). -->
+				<div class="skmt-tabs" role="tablist" data-skmt-tabs="database" aria-label="<?php esc_attr_e( 'Vues de la table', 'studio-kyne-mini-tools' ); ?>">
+					<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="data"><?php esc_html_e( 'Données', 'studio-kyne-mini-tools' ); ?></button>
+					<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="structure"><?php esc_html_e( 'Structure', 'studio-kyne-mini-tools' ); ?></button>
+					<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="query"><?php esc_html_e( 'Requête SQL', 'studio-kyne-mini-tools' ); ?></button>
 				</div>
 
-				<!-- Contenu des tabs (généré en JS) -->
-				<div id="skmt-db-tab-data" class="skmt-db__tab-content"></div>
-				<div id="skmt-db-tab-structure" class="skmt-db__tab-content" style="display:none"></div>
-				<div id="skmt-db-tab-query" class="skmt-db__tab-content" style="display:none"></div>
+				<!-- Contenu des onglets (généré en JS) -->
+				<div id="skmt-db-tab-data" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="data"></div>
+				<div id="skmt-db-tab-structure" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="structure" hidden></div>
+				<div id="skmt-db-tab-query" class="skmt-tabs__panel skmt-db__tab-content" role="tabpanel" data-skmt-tabs-group="database" data-skmt-tab-panel="query" hidden></div>
 
 			</div><!-- #skmt-db-table-view -->
 		</div><!-- .skmt-db__main -->

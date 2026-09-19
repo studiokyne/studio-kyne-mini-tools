@@ -13,9 +13,24 @@ use StudioKyne\MiniTools\Core\AbstractModule;
  */
 class Module extends AbstractModule {
 
+	/**
+	 * Premiers segments interdits pour l'URL de connexion personnalisée.
+	 *
+	 * `admin` et `login` sont redirigés par le cœur vers wp-admin / wp-login
+	 * (wp_redirect_admin_locations) ; `index` et `xmlrpc` sont des fichiers ;
+	 * `feed`, `embed`, `comments` sont des bases de réécriture. Tout segment en
+	 * `wp-` est refusé d'un bloc (wp-admin, wp-login, wp-content, wp-json…).
+	 * Un slug réservé enferme l'administrateur hors du site, sans autre issue
+	 * que la constante SKMT_DISABLE_LOGIN_URL.
+	 */
+	private const RESERVED_LOGIN_SEGMENTS = [ 'admin', 'login', 'index', 'index-php', 'xmlrpc', 'xmlrpc-php', 'feed', 'embed', 'comments' ];
+
 	private RateLimiter $rate_limiter;
 	private HardeningService $hardening;
 	private LoginUrlHandler $login_handler;
+	/**
+	 * @var array<string, mixed>
+	 */
 	private array $settings = [];
 
 	/**
@@ -24,19 +39,15 @@ class Module extends AbstractModule {
 	public function init(): void {
 		$this->settings = $this->get_module_settings( self::get_defaults() );
 
-		$auth = $this->settings['authentication'];
+		$auth                = $this->settings['authentication'];
 		$this->rate_limiter  = new RateLimiter(
 			$auth['rate_limit_whitelist'] ?? [],
-			$auth['rate_limit_attempts']  ?? 5,
-			$auth['rate_limit_window']    ?? 900,
-			$auth['rate_limit_lockout']   ?? 1800,
-			$auth['ip_source']            ?? ClientIp::SOURCE_REMOTE_ADDR
+			$auth['rate_limit_attempts'] ?? 5,
+			$auth['rate_limit_window'] ?? 900,
+			$auth['rate_limit_lockout'] ?? 1800,
+			$auth['ip_source'] ?? ClientIp::SOURCE_REMOTE_ADDR
 		);
-		$this->hardening     = new HardeningService(
-			$this->settings['hardening']['disable_xmlrpc'] ?? false,
-			$this->settings['hardening']['prevent_user_enum'] ?? false,
-			$this->settings['hardening']['hide_wp_version'] ?? false
-		);
+		$this->hardening     = new HardeningService();
 		$this->login_handler = new LoginUrlHandler( $this->settings['authentication']['custom_login_url'] ?? '/connexion' );
 
 		// === AUTHENTICATION HOOKS ===
@@ -63,11 +74,11 @@ class Module extends AbstractModule {
 		}
 
 		if ( ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) && ! self::login_url_disabled() ) {
-			add_action( 'wp_loaded',          [ $this->login_handler, 'wp_loaded' ], 10 );
-			add_filter( 'login_url',          [ $this->login_handler, 'filter_login_url' ], 10, 3 );
-			add_filter( 'site_url',           [ $this->login_handler, 'filter_site_url' ], 10 );
-			add_filter( 'network_site_url',   [ $this->login_handler, 'filter_site_url' ], 10 );
-			add_filter( 'wp_redirect',        [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_action( 'wp_loaded', [ $this->login_handler, 'wp_loaded' ], 10 );
+			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ] );
+			add_filter( 'site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'network_site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
+			add_filter( 'wp_redirect', [ $this->login_handler, 'filter_site_url' ], 10 );
 		}
 
 		// === HARDENING HOOKS ===
@@ -85,7 +96,7 @@ class Module extends AbstractModule {
 			add_filter( 'rest_request_before_callbacks', [ $this->hardening, 'prevent_rest_user_enumeration' ], 10, 3 );
 			add_filter( 'oembed_response_data', [ $this->hardening, 'filter_oembed_response_data' ], PHP_INT_MAX );
 			add_filter( 'wp_sitemaps_add_provider', [ $this->hardening, 'filter_sitemap_providers' ], 10, 2 );
-			add_filter( 'wp_login_errors', [ $this->hardening, 'filter_login_errors' ], PHP_INT_MAX, 2 );
+			add_filter( 'wp_login_errors', [ $this->hardening, 'filter_login_errors' ], PHP_INT_MAX );
 			add_action( 'lost_password', [ $this->hardening, 'mask_lost_password_oracle' ], PHP_INT_MAX );
 		}
 
@@ -158,15 +169,6 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Hook wp_scheduled_delete — nettoie les entrées de rate limit expirées.
-	 *
-	 * @return void
-	 */
-	public function cleanup_rate_limits(): void {
-		$this->rate_limiter->cleanup_expired();
-	}
-
-	/**
 	 * Porte de sortie : desactive l'URL de connexion personnalisee.
 	 *
 	 * A poser dans wp-config.php quand le slug a ete oublie ou mal saisi —
@@ -199,7 +201,8 @@ class Module extends AbstractModule {
 	 * des clés à plat : sans cette conversion, un import écraserait tout par
 	 * les valeurs par défaut.
 	 *
-	 * @param array $stored Réglages tels qu'ils sont en base.
+	 * @param array<string, mixed> $stored Réglages tels qu'ils sont en base.
+	 * @return array<string, mixed>
 	 */
 	public function to_form_payload( array $stored ): array {
 		$auth      = is_array( $stored['authentication'] ?? null ) ? $stored['authentication'] : [];
@@ -218,7 +221,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les settings du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function get_settings(): array {
 		// Une instance créée hors du cycle d'initialisation (import de
@@ -234,7 +237,7 @@ class Module extends AbstractModule {
 	/**
 	 * Sauvegarde les settings du module.
 	 *
-	 * @param array $settings
+	 * @param array<string, mixed> $settings
 	 * @return bool
 	 */
 	public function save_settings( array $settings ): bool {
@@ -248,12 +251,11 @@ class Module extends AbstractModule {
 		$current['authentication']['enable_custom_login_url'] = ! empty( $settings['enable_custom_login_url'] );
 
 		if ( isset( $settings['custom_login_url'] ) ) {
-			$url = sanitize_text_field( wp_unslash( $settings['custom_login_url'] ) );
-			if ( ! empty( $url ) ) {
-				if ( $url[0] !== '/' ) {
-					$url = '/' . $url;
-				}
-				$current['authentication']['custom_login_url'] = $url;
+			// Un slug refusé laisse la valeur précédente en place : mieux vaut
+			// un réglage inchangé qu'une connexion impossible à router.
+			$slug = self::sanitize_login_slug( (string) wp_unslash( $settings['custom_login_url'] ) );
+			if ( null !== $slug ) {
+				$current['authentication']['custom_login_url'] = '/' . $slug;
 			}
 		}
 
@@ -281,9 +283,32 @@ class Module extends AbstractModule {
 	}
 
 	/**
+	 * Normalise un slug de connexion saisi par l'utilisateur, ou null s'il est
+	 * inutilisable.
+	 *
+	 * Chaque segment passe par sanitize_title() : seuls `[a-z0-9-]` et le
+	 * séparateur `/` survivent, donc rien qui ne puisse être comparé au chemin
+	 * d'une requête. Le premier segment ne doit pas être réservé (voir
+	 * RESERVED_LOGIN_SEGMENTS).
+	 */
+	public static function sanitize_login_slug( string $raw ): ?string {
+		$segments = array_values( array_filter( array_map( 'sanitize_title', explode( '/', trim( $raw ) ) ) ) );
+		if ( ! $segments ) {
+			return null;
+		}
+
+		$first = $segments[0];
+		if ( 0 === strpos( $first, 'wp-' ) || in_array( $first, self::RESERVED_LOGIN_SEGMENTS, true ) ) {
+			return null;
+		}
+
+		return implode( '/', $segments );
+	}
+
+	/**
 	 * Retourne les CSS du module.
 	 *
-	 * @return array
+	 * @return string[]
 	 */
 	public function get_admin_css(): array {
 		return [
@@ -294,7 +319,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les JS du module.
 	 *
-	 * @return array
+	 * @return string[]
 	 */
 	public function get_admin_js(): array {
 		return [
@@ -305,7 +330,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les données JS du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public function get_admin_js_data(): array {
 		return [
@@ -316,23 +341,9 @@ class Module extends AbstractModule {
 	}
 
 	/**
-	 * Hook d'activation du module.
-	 *
-	 * @return void
-	 */
-	public function on_activate(): void {}
-
-	/**
-	 * Hook de désactivation du module.
-	 *
-	 * @return void
-	 */
-	public function on_deactivate(): void {}
-
-	/**
 	 * Retourne les defaults du module.
 	 *
-	 * @return array
+	 * @return array<string, mixed>
 	 */
 	public static function get_defaults(): array {
 		return [
@@ -359,7 +370,7 @@ class Module extends AbstractModule {
 	/**
 	 * Retourne les clés à supprimer à la désinstallation.
 	 *
-	 * @return array
+	 * @return array{options?: string[], meta?: string[], user_meta?: string[], post_type?: string[], taxonomy?: string[]}
 	 */
 	public static function get_uninstall_keys(): array {
 		return [
