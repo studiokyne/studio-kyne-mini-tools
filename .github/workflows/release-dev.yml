@@ -45,9 +45,12 @@ jobs:
           # Strip any suffix to get the base semver (e.g. 1.0.2-dev.4 -> 1.0.2)
           file_base_version=$(echo "$file_version" | sed -E 's/-[a-z].*//')
 
+          # Pre-releases target the next patch (1.1.0 -> 1.1.1-dev.N): in SemVer and
+          # version_compare(), 1.1.0-dev.N is OLDER than 1.1.0, not newer.
           latest_stable_tag=$(git tag -l 'v*' | grep -E '^v[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n1 || true)
           if [[ -n "$latest_stable_tag" ]]; then
-            base_version="${latest_stable_tag#v}"
+            IFS='.' read -r major minor patch <<< "${latest_stable_tag#v}"
+            base_version="${major}.${minor}.$((patch + 1))"
           else
             base_version="$file_base_version"
           fi
