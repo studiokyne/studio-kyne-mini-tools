@@ -66,6 +66,9 @@ class Module extends AbstractModule {
 		add_action( 'wp_ajax_skmt_db_drop_table', [ $this, 'ajax_drop_table' ] );
 		add_action( 'wp_ajax_skmt_db_export_sql', [ $this, 'ajax_export_sql' ] );
 		add_action( 'wp_ajax_skmt_db_run_query', [ $this, 'ajax_run_query' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_scan', [ $this, 'ajax_cleanup_scan' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_run', [ $this, 'ajax_cleanup_run' ] );
+		add_action( 'wp_ajax_skmt_db_cleanup_optimize', [ $this, 'ajax_cleanup_optimize' ] );
 	}
 
 	/**
@@ -103,38 +106,73 @@ class Module extends AbstractModule {
 	public function get_admin_js_data(): array {
 		return [
 			'i18n' => [
-				'confirmDelete'   => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
-				'confirmTruncate' => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
-				'queryWarning'    => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
-				'confirmWrite'    => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
+				'confirmDelete'     => __( 'Supprimer cette ligne ?', 'studio-kyne-mini-tools' ),
+				'confirmTruncate'   => __( 'Vider la table ? Cette action est irréversible.', 'studio-kyne-mini-tools' ),
+				'queryWarning'      => __( 'Attention : les requêtes de modification (UPDATE, DELETE, DROP…) s\'exécutent directement sur la base de données. Aucun undo possible.', 'studio-kyne-mini-tools' ),
+				'confirmWrite'      => __( 'Cette requête modifie la base de données et est irréversible. Confirmer l\'exécution ?', 'studio-kyne-mini-tools' ),
 				// Actions génériques
-				'confirm'         => __( 'Confirmer', 'studio-kyne-mini-tools' ),
-				'cancel'          => __( 'Annuler', 'studio-kyne-mini-tools' ),
-				'delete'          => __( 'Supprimer', 'studio-kyne-mini-tools' ),
-				'execute'         => __( 'Exécuter', 'studio-kyne-mini-tools' ),
+				'confirm'           => __( 'Confirmer', 'studio-kyne-mini-tools' ),
+				'cancel'            => __( 'Annuler', 'studio-kyne-mini-tools' ),
+				'delete'            => __( 'Supprimer', 'studio-kyne-mini-tools' ),
+				'execute'           => __( 'Exécuter', 'studio-kyne-mini-tools' ),
 				// États / feedback
-				'loading'         => __( 'Chargement…', 'studio-kyne-mini-tools' ),
-				'executing'       => __( 'Exécution…', 'studio-kyne-mini-tools' ),
-				'inserting'       => __( 'Insertion…', 'studio-kyne-mini-tools' ),
-				'rowAdded'        => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
-				'rowUpdated'      => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
-				'rowDeleted'      => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
-				'tableTruncated'  => __( 'Table vidée', 'studio-kyne-mini-tools' ),
-				'tableDropped'    => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
-				'error'           => __( 'Erreur', 'studio-kyne-mini-tools' ),
-				'networkError'    => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
+				'loading'           => __( 'Chargement…', 'studio-kyne-mini-tools' ),
+				'executing'         => __( 'Exécution…', 'studio-kyne-mini-tools' ),
+				'inserting'         => __( 'Insertion…', 'studio-kyne-mini-tools' ),
+				'rowAdded'          => __( 'Ligne ajoutée', 'studio-kyne-mini-tools' ),
+				'rowUpdated'        => __( 'Ligne mise à jour', 'studio-kyne-mini-tools' ),
+				'rowDeleted'        => __( 'Ligne supprimée', 'studio-kyne-mini-tools' ),
+				'tableTruncated'    => __( 'Table vidée', 'studio-kyne-mini-tools' ),
+				'tableDropped'      => __( 'Table supprimée', 'studio-kyne-mini-tools' ),
+				'error'             => __( 'Erreur', 'studio-kyne-mini-tools' ),
+				'networkError'      => __( 'Erreur réseau', 'studio-kyne-mini-tools' ),
 				// Libellés de tableau / recherche
-				'noTables'        => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
-				'noRows'          => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
-				'noColumn'        => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
-				'noHistory'       => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
-				'clearHistory'    => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
-				'searchInTable'   => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
-				'rowsLabel'       => __( 'lignes', 'studio-kyne-mini-tools' ),
-				'perPageLabel'    => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
-				'setNull'         => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
+				'noTables'          => __( 'Aucune table trouvée.', 'studio-kyne-mini-tools' ),
+				'noRows'            => __( 'Aucune ligne.', 'studio-kyne-mini-tools' ),
+				'noColumn'          => __( 'Aucune colonne.', 'studio-kyne-mini-tools' ),
+				'noHistory'         => __( 'Aucun historique.', 'studio-kyne-mini-tools' ),
+				'clearHistory'      => __( 'Vider l\'historique', 'studio-kyne-mini-tools' ),
+				'searchInTable'     => __( 'Rechercher dans la table…', 'studio-kyne-mini-tools' ),
+				'rowsLabel'         => __( 'lignes', 'studio-kyne-mini-tools' ),
+				'perPageLabel'      => __( 'Lignes / page', 'studio-kyne-mini-tools' ),
+				'setNull'           => __( 'Définir NULL', 'studio-kyne-mini-tools' ),
+				// Nettoyage
+				'cleanupTitle'      => __( 'Nettoyage', 'studio-kyne-mini-tools' ),
+				'cleanupIntro'      => __( 'Chaque élément est d\'abord compté ; rien n\'est supprimé sans votre confirmation. Faites une sauvegarde de la base avant un gros nettoyage.', 'studio-kyne-mini-tools' ),
+				'cleanupItems'      => __( 'Données superflues', 'studio-kyne-mini-tools' ),
+				'cleanupClean'      => __( 'Nettoyer', 'studio-kyne-mini-tools' ),
+				'cleanupAll'        => __( 'Tout nettoyer', 'studio-kyne-mini-tools' ),
+				'cleanupRescan'     => __( 'Recompter', 'studio-kyne-mini-tools' ),
+				'cleanupRunning'    => __( 'Nettoyage…', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre d'éléments, 2: libellé de l'élément. */
+				'cleanupConfirm'    => __( 'Supprimer définitivement %1$s élément(s) : %2$s ?', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre total d'éléments. */
+				'cleanupConfirmAll' => __( 'Supprimer définitivement %s élément(s), toutes catégories confondues ?', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre d'éléments supprimés, 2: libellé de l'élément. */
+				'cleanupDone'       => __( '%1$s élément(s) supprimé(s) : %2$s', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre total d'éléments supprimés. */
+				'cleanupDoneTotal'  => __( '%s élément(s) supprimé(s)', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre d'éléments restants. */
+				'cleanupLeft'       => __( '%s élément(s) n\'ont pas pu être supprimés.', 'studio-kyne-mini-tools' ),
+				'optimizeTitle'     => __( 'Optimisation des tables', 'studio-kyne-mini-tools' ),
+				/* translators: 1: nombre de tables, 2: taille récupérable. */
+				'optimizeSummary'   => __( '%1$s table(s) fragmentée(s), %2$s récupérables.', 'studio-kyne-mini-tools' ),
+				'optimizeNone'      => __( 'Aucune table fragmentée.', 'studio-kyne-mini-tools' ),
+				'optimizeBtn'       => __( 'Optimiser', 'studio-kyne-mini-tools' ),
+				'optimizeConfirm'   => __( 'OPTIMIZE TABLE reconstruit chaque table et peut la verrouiller quelques secondes. Lancer l\'optimisation ?', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nombre de tables optimisées. */
+				'optimizeDone'      => __( '%s table(s) optimisée(s)', 'studio-kyne-mini-tools' ),
+				'foreignTitle'      => __( 'Tables d\'extensions', 'studio-kyne-mini-tools' ),
+				'foreignIntro'      => __( 'Tables hors cœur WordPress. L\'extension propriétaire est devinée d\'après le nom de la table : vérifiez avant de supprimer. Aucune table n\'est supprimée automatiquement.', 'studio-kyne-mini-tools' ),
+				'foreignNone'       => __( 'Aucune table d\'extension.', 'studio-kyne-mini-tools' ),
+				'foreignUnknown'    => __( 'Aucune extension correspondante', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nom(s) d'extension. */
+				'foreignInactive'   => __( 'Extension inactive : %s', 'studio-kyne-mini-tools' ),
+				/* translators: %s: nom(s) d'extension. */
+				'foreignActive'     => __( 'Extension active : %s', 'studio-kyne-mini-tools' ),
+				'open'              => __( 'Ouvrir', 'studio-kyne-mini-tools' ),
 				/* translators: %d: nombre maximal de lignes affichées. */
-				'queryTruncated'  => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
+				'queryTruncated'    => __( 'Résultat tronqué à %d lignes. Ajoutez une clause LIMIT pour cibler votre requête.', 'studio-kyne-mini-tools' ),
 			],
 		];
 	}
@@ -545,6 +583,74 @@ class Module extends AbstractModule {
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery, WordPress.DB.PreparedSQL.NotPrepared
 		$result = $wpdb->query( 'DROP TABLE `' . $table . '`' );
 		if ( false === $result ) {
+			wp_send_json_error( [ 'message' => $wpdb->last_error ] );
+		}
+		wp_send_json_success();
+	}
+
+	/* ================================================================
+	 * AJAX — NETTOYAGE (endpoints typés, jamais via ajax_run_query)
+	 * ================================================================ */
+
+	public function ajax_cleanup_scan(): void {
+		$this->guard();
+
+		$cleanup = new Cleanup();
+		$items   = [];
+		foreach ( Cleanup::items() as $key => $item ) {
+			$items[] = [
+				'key'         => $key,
+				'label'       => $item['label'],
+				'description' => $item['description'],
+				'count'       => $cleanup->count( $key ),
+			];
+		}
+
+		wp_send_json_success(
+			[
+				'items'      => $items,
+				'fragmented' => $cleanup->fragmented_tables(),
+				'foreign'    => $cleanup->foreign_tables(),
+			]
+		);
+	}
+
+	/**
+	 * Purge un lot d'un élément. Le client rappelle tant que `deleted` et
+	 * `remaining` sont non nuls.
+	 */
+	public function ajax_cleanup_run(): void {
+		$this->guard();
+
+		$item = isset( $_POST['item'] ) ? sanitize_key( wp_unslash( $_POST['item'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par guard().
+		if ( ! array_key_exists( $item, Cleanup::items() ) ) {
+			wp_send_json_error( [ 'message' => __( 'Élément inconnu.', 'studio-kyne-mini-tools' ) ] );
+		}
+
+		$cleanup = new Cleanup();
+		$deleted = $cleanup->run( $item );
+		wp_send_json_success(
+			[
+				'deleted'   => $deleted,
+				'remaining' => $cleanup->count( $item ),
+			]
+		);
+	}
+
+	/**
+	 * Optimise UNE table du site : `OPTIMIZE TABLE` reconstruit une table
+	 * InnoDB entière, un appel par table évite le dépassement de délai.
+	 */
+	public function ajax_cleanup_optimize(): void {
+		$this->guard();
+
+		$table   = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- vérifié par guard().
+		$cleanup = new Cleanup();
+		if ( ! $cleanup->is_site_table( $table ) ) {
+			wp_send_json_error( [ 'message' => __( 'Table introuvable.', 'studio-kyne-mini-tools' ) ] );
+		}
+		if ( ! $cleanup->optimize( $table ) ) {
+			global $wpdb;
 			wp_send_json_error( [ 'message' => $wpdb->last_error ] );
 		}
 		wp_send_json_success();
