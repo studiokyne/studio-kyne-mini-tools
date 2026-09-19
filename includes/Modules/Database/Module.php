@@ -245,7 +245,7 @@ class Module extends AbstractModule {
 	 * La validation contre information_schema garantit que les backticks sont sûrs.
 	 */
 	private function read_table(): ?string {
-		$table = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : '';
+		$table = isset( $_POST['table'] ) ? sanitize_text_field( wp_unslash( $_POST['table'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- appelé uniquement après guard().
 		return $this->validate_table( $table );
 	}
 
@@ -304,11 +304,13 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
-		$page      = max( 1, (int) ( $_POST['page'] ?? 1 ) );
-		$per_page  = min( 200, max( 10, (int) ( $_POST['per_page'] ?? 50 ) ) );
+		// phpcs:disable WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard() en tête de handler.
+		$page      = max( 1, isset( $_POST['page'] ) ? (int) $_POST['page'] : 1 );
+		$per_page  = min( 200, max( 10, isset( $_POST['per_page'] ) ? (int) $_POST['per_page'] : 50 ) );
 		$search    = isset( $_POST['search'] ) ? sanitize_text_field( wp_unslash( $_POST['search'] ) ) : '';
 		$order_col = isset( $_POST['order_col'] ) ? sanitize_text_field( wp_unslash( $_POST['order_col'] ) ) : '';
 		$order_dir = strtoupper( isset( $_POST['order_dir'] ) ? sanitize_text_field( wp_unslash( $_POST['order_dir'] ) ) : 'ASC' ) === 'DESC' ? 'DESC' : 'ASC';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
 		$table = $this->read_table();
 		if ( null === $table ) {
@@ -390,11 +392,13 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; valeur et clé primaire brutes, passées à $wpdb->update() qui échappe.
 		$primary_col = isset( $_POST['primary_col'] ) ? sanitize_text_field( wp_unslash( $_POST['primary_col'] ) ) : '';
 		$primary_val = isset( $_POST['primary_val'] ) ? wp_unslash( $_POST['primary_val'] ) : '';
 		$col         = isset( $_POST['col'] ) ? sanitize_text_field( wp_unslash( $_POST['col'] ) ) : '';
 		$value       = isset( $_POST['value'] ) ? wp_unslash( $_POST['value'] ) : '';
 		$set_null    = ! empty( $_POST['set_null'] );
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		$table = $this->read_table();
 		if ( null === $table || ! $primary_col || ! $col ) {
@@ -431,8 +435,10 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; clé primaire passée à $wpdb->delete() qui échappe.
 		$primary_col = isset( $_POST['primary_col'] ) ? sanitize_text_field( wp_unslash( $_POST['primary_col'] ) ) : '';
 		$primary_val = isset( $_POST['primary_val'] ) ? wp_unslash( $_POST['primary_val'] ) : '';
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		$table = $this->read_table();
 		if ( null === $table || ! $primary_col ) {
@@ -463,8 +469,10 @@ class Module extends AbstractModule {
 		global $wpdb;
 
 		// Champs soumis (col => valeur brute) + colonnes explicitement NULL.
+		// phpcs:disable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; valeurs brutes typées plus bas contre les colonnes réelles, écrites via $wpdb->insert() qui échappe.
 		$fields = isset( $_POST['fields'] ) && is_array( $_POST['fields'] ) ? wp_unslash( $_POST['fields'] ) : [];
 		$nulls  = isset( $_POST['nulls'] ) && is_array( $_POST['nulls'] ) ? array_map( 'sanitize_text_field', wp_unslash( $_POST['nulls'] ) ) : [];
+		// phpcs:enable WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 
 		// Colonnes réelles de la table (whitelist + typage).
 		$columns = $this->get_columns_map( $table );
@@ -656,7 +664,7 @@ class Module extends AbstractModule {
 		$this->guard();
 
 		global $wpdb;
-		$sql = isset( $_POST['sql'] ) ? trim( (string) wp_unslash( $_POST['sql'] ) ) : '';
+		$sql = isset( $_POST['sql'] ) ? trim( (string) wp_unslash( $_POST['sql'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par guard() en tête de handler ; SQL saisi par l'administrateur, filtré par find_forbidden_keyword() et confirmé côté client pour toute écriture.
 		if ( '' === $sql ) {
 			wp_send_json_error( [ 'message' => __( 'Requête vide.', 'studio-kyne-mini-tools' ) ] );
 		}
@@ -673,7 +681,7 @@ class Module extends AbstractModule {
 		$is_select  = $this->is_read_query( $normalized );
 
 		// Garde-fou 2 : toute requête d'écriture exige une confirmation explicite côté client.
-		if ( ! $is_select && empty( $_POST['confirm'] ) ) {
+		if ( ! $is_select && empty( $_POST['confirm'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par guard() en tête de handler.
 			wp_send_json_error(
 				[
 					'message'       => __( 'Cette requête modifie la base. Confirmation requise.', 'studio-kyne-mini-tools' ),
