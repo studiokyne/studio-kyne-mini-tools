@@ -47,6 +47,9 @@ class Updater {
 	/** Sentinelle stockée dans le transient pour mémoriser un échec. */
 	private const FAILURE_MARKER = 'skmt_update_check_failed';
 
+	/** Nombre maximal de notes de version conservées (canal dev). */
+	private const MAX_NOTES = 10;
+
 	/**
 	 * Initialise l'updater.
 	 */
@@ -226,7 +229,65 @@ class Updater {
 			'last_updated'   => $remote['published_at'],
 			'sections'       => [
 				'description' => __( 'Suite d\'outils modulaires pour optimiser et améliorer votre site WordPress.', 'studio-kyne-mini-tools' ),
+				'changelog'   => $this->render_changelog( $remote['notes'] ?? [] ),
 			],
+		];
+	}
+
+	/**
+	 * Construit l'onglet « Journal des modifications » de la modale de détails.
+	 *
+	 * Sur le canal dev, une mise à jour peut sauter plusieurs pré-versions :
+	 * on affiche toutes les notes postérieures à la version installée. Si le
+	 * site est à jour, on retombe sur les notes de la dernière version.
+	 *
+	 * @param mixed $notes Notes normalisées (version, date, html).
+	 */
+	private function render_changelog( $notes ): string {
+		if ( ! is_array( $notes ) || [] === $notes ) {
+			return '<p>' . esc_html__( 'Aucune note de version disponible.', 'studio-kyne-mini-tools' ) . '</p>';
+		}
+
+		$newer = array_filter(
+			$notes,
+			function ( $note ) {
+				return version_compare( SKMT_VERSION, $note['version'], '<' );
+			}
+		);
+
+		if ( [] === $newer ) {
+			$newer = [ reset( $notes ) ];
+		}
+
+		$html = '';
+
+		foreach ( $newer as $note ) {
+			$date  = '' !== $note['date'] ? (string) mysql2date( (string) get_option( 'date_format' ), $note['date'] ) : '';
+			$html .= '<h4>' . esc_html( 'v' . $note['version'] ) . ( '' !== $date ? ' — ' . esc_html( $date ) : '' ) . '</h4>';
+			// HTML rendu par GitHub : filtré ici, puis de nouveau par WordPress
+			// à l'affichage de la modale.
+			$html .= wp_kses_post( $note['html'] );
+		}
+
+		return $html;
+	}
+
+	/**
+	 * État connu de la mise à jour, sans appel réseau.
+	 *
+	 * Lit uniquement le cache : le tableau de bord ne doit jamais déclencher un
+	 * appel HTTP de 10 s. Cache vide ou échec récent → `remote` à null.
+	 *
+	 * @return array{channel: string, remote: ?string, has_update: bool}
+	 */
+	public function get_status(): array {
+		$cached = get_transient( $this->transient_key . '_' . $this->channel );
+		$remote = is_array( $cached ) && ! empty( $cached['version'] ) ? (string) $cached['version'] : null;
+
+		return [
+			'channel'    => $this->channel,
+			'remote'     => $remote,
+			'has_update' => null !== $remote && $this->compare_versions( SKMT_VERSION, $remote ),
 		];
 	}
 
@@ -256,7 +317,9 @@ class Updater {
 			[
 				'timeout' => 10,
 				'headers' => [
-					'Accept'     => 'application/vnd.github.v3+json',
+					// Variante « html » : GitHub renvoie les notes déjà rendues
+					// (`body_html`), ce qui évite d'embarquer un parseur Markdown.
+					'Accept'     => 'application/vnd.github.html+json',
 					'User-Agent' => 'StudioKyneMiniTools',
 				],
 			]
@@ -324,15 +387,23 @@ class Updater {
 				}
 			);
 
-			foreach ( $body as $release ) {
-				if ( empty( $release['prerelease'] ) ) {
-					continue;
-				}
+			$prereleases = array_values(
+				array_filter(
+					$body,
+					function ( $release ) {
+						return is_array( $release ) && ! empty( $release['prerelease'] ) && ! empty( $release['tag_name'] );
+					}
+				)
+			);
 
-				return $this->format_release_payload( $release );
+			if ( [] === $prereleases ) {
+				return false;
 			}
 
-			return false;
+			$payload          = $this->format_release_payload( $prereleases[0] );
+			$payload['notes'] = array_map( [ $this, 'format_release_note' ], array_slice( $prereleases, 0, self::MAX_NOTES ) );
+
+			return $payload;
 		}
 
 		if ( empty( $body['tag_name'] ) ) {
@@ -356,6 +427,21 @@ class Updater {
 			'url'          => $release['html_url'] ?? '',
 			'download_url' => '' !== $download_url ? $download_url : ( $release['zipball_url'] ?? '' ),
 			'published_at' => $release['published_at'] ?? '',
+			'notes'        => [ $this->format_release_note( $release ) ],
+		];
+	}
+
+	/**
+	 * Extrait la note d'une release (version, date, HTML rendu par GitHub).
+	 *
+	 * @param array<string, mixed> $release
+	 * @return array{version: string, date: string, html: string}
+	 */
+	private function format_release_note( array $release ): array {
+		return [
+			'version' => ltrim( (string) ( $release['tag_name'] ?? '' ), 'v' ),
+			'date'    => (string) ( $release['published_at'] ?? '' ),
+			'html'    => (string) ( $release['body_html'] ?? '' ),
 		];
 	}
 

@@ -141,6 +141,11 @@ Distinctes des toasts éphémères (`skmtShowToast`), `Admin::add_persistent_not
 
 `Core/Updater.php` met la réponse GitHub en cache 12 h **et met les échecs en cache 15 min**. Sans ce cache négatif, un GitHub injoignable ou un quota anonyme épuisé (60 req/h) déclenche un nouvel appel HTTP de 10 s à chaque vérification, c'est-à-dire à presque chaque chargement d'une page d'administration. Le bouton « vérifier les mises à jour » supprime d'abord les deux transients, il contourne donc toujours le cache.
 
+- **Journal des modifications.** L'API est appelée avec `Accept: application/vnd.github.html+json` : GitHub renvoie les notes déjà rendues (`body_html`), pas de parseur Markdown à embarquer. Le HTML passe par `wp_kses_post()` avant d'aller dans l'onglet `changelog` de `plugins_api`. Sur le canal dev, les 10 dernières pré-versions sont gardées en cache et la modale affiche toutes celles postérieures à la version installée (une mise à jour saute souvent plusieurs pré-versions).
+- **Mise à jour automatique.** La bascule des Réglages écrit directement dans l'option WordPress `auto_update_plugins`, la même que la colonne « Mises à jour auto » de la liste des extensions : une seule source de vérité, rien dans `skmt_settings`, donc ni export ni réinitialisation. Elle est désactivée si `wp_is_auto_update_enabled_for_type( 'plugin' )` est faux ou sans `update_plugins` (multisite : réservé au super admin).
+- **Tableau de bord.** `Updater::get_status()` lit **uniquement** le transient : afficher le canal et la version distante ne doit jamais déclencher un appel HTTP de 10 s. Cache vide → pas de badge.
+- **Pas d'ETag, pas de token (décision du 2026-09-19, #18).** Une requête conditionnelle qui reçoit un `304` n'épargne le quota GitHub **que si elle est authentifiée** ; en anonyme elle est décomptée comme une autre. Le dépôt restant public, pas de token, donc l'ETag n'apporterait qu'un gain de bande passante : écarté. Le quota reste protégé par le cache 12 h et le cache négatif.
+
 ## Outillage de développement
 
 Composer sert **uniquement** au développement : aucune dépendance d'exécution, `vendor/` est ignoré par Git et exclu des ZIP de release (comme `composer.*`, `phpcs.*`, `phpstan*`, `tools/`, `CLAUDE.md`, `docs/`).

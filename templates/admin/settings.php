@@ -10,6 +10,11 @@ global $wpdb;
 $global         = $this->settings->get( 'global', [] );
 $update_channel = $global['update_channel'] ?? 'stable';
 
+// Mise à jour automatique : la source de vérité reste l'option WordPress
+// `auto_update_plugins`, partagée avec la liste des extensions.
+$can_auto_update = wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' );
+$auto_update_on  = in_array( plugin_basename( SKMT_PLUGIN_FILE ), (array) get_site_option( 'auto_update_plugins', [] ), true );
+
 // Capacités image : la même détection que le module Image Optimizer (vrai
 // encodage d'essai, mis en cache), et non queryFormats()/gd_info() qui
 // annoncent parfois un format sans délégué d'encodage réel.
@@ -93,21 +98,23 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 
 				<div class="skmt-option">
 					<div class="skmt-option__content">
-						<span class="skmt-option__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></span>
+						<label for="skmt_auto_update" class="skmt-option__label"><?php echo esc_html__( 'Mises à jour automatiques', 'studio-kyne-mini-tools' ); ?></label>
 						<p class="skmt-option__desc">
 							<?php
-							printf(
-								/* translators: %s: lien vers l'écran des extensions WordPress. */
-								esc_html__( 'Gérées par WordPress. Activez « Mises à jour auto » depuis la %s.', 'studio-kyne-mini-tools' ),
-								'<a href="' . esc_url( admin_url( 'plugins.php' ) ) . '">' . esc_html__( 'liste des extensions', 'studio-kyne-mini-tools' ) . '</a>'
+							echo esc_html(
+								$can_auto_update
+									? __( 'Installe les nouvelles versions du canal choisi sans intervention. Même réglage que la colonne « Mises à jour auto » de la liste des extensions.', 'studio-kyne-mini-tools' )
+									: __( 'Les mises à jour automatiques des extensions sont désactivées sur ce site, ou votre compte ne peut pas les gérer.', 'studio-kyne-mini-tools' )
 							);
 							?>
 						</p>
 					</div>
 					<div class="skmt-option__control">
-						<a href="<?php echo esc_url( admin_url( 'plugins.php' ) ); ?>" class="skmt-btn skmt-btn--secondary skmt-btn--sm">
-							<?php echo esc_html__( 'Ouvrir les extensions', 'studio-kyne-mini-tools' ); ?>
-						</a>
+						<input type="hidden" name="skmt_global[auto_update_initial]" value="<?php echo $auto_update_on ? '1' : '0'; ?>">
+						<label class="skmt-toggle">
+							<input type="checkbox" id="skmt_auto_update" name="skmt_global[auto_update]" value="1" <?php checked( $auto_update_on ); ?> <?php disabled( ! $can_auto_update ); ?>>
+							<span class="skmt-toggle__slider"></span>
+						</label>
 					</div>
 				</div>
 

@@ -713,6 +713,19 @@ class Admin {
 				'update_channel' => isset( $_POST['skmt_global']['update_channel'] ) ? sanitize_key( $_POST['skmt_global']['update_channel'] ) : 'stable',
 			];
 			$this->settings->set( 'global', $global );
+
+			// Case décochée = absente du POST. Pas stockée dans skmt_settings :
+			// elle pilote l'option WordPress, donc n'entre ni dans l'export ni
+			// dans la réinitialisation. On n'écrit que si l'utilisateur a changé
+			// la case depuis le chargement de la page : sinon, enregistrer le
+			// seul canal annulerait un réglage fait entre-temps depuis la liste
+			// des extensions ou WP-CLI.
+			$auto_update         = ! empty( $_POST['skmt_global']['auto_update'] );
+			$auto_update_initial = ! empty( $_POST['skmt_global']['auto_update_initial'] );
+
+			if ( $auto_update !== $auto_update_initial && wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' ) ) {
+				$this->set_auto_update( $auto_update );
+			}
 		}
 
 		// Réglages d'un module
@@ -873,6 +886,28 @@ class Admin {
 			)
 		);
 		exit;
+	}
+
+	/**
+	 * Active ou coupe la mise à jour automatique du plugin.
+	 *
+	 * Écrit dans `auto_update_plugins`, l'option que WordPress lit pour ses
+	 * mises à jour de fond et qu'il modifie depuis la liste des extensions.
+	 *
+	 * @param bool $enabled État voulu.
+	 */
+	private function set_auto_update( bool $enabled ): void {
+		$plugin_file = plugin_basename( SKMT_PLUGIN_FILE );
+		$current     = (array) get_site_option( 'auto_update_plugins', [] );
+		$is_enabled  = in_array( $plugin_file, $current, true );
+
+		if ( $enabled === $is_enabled ) {
+			return;
+		}
+
+		$updated = $enabled ? array_merge( $current, [ $plugin_file ] ) : array_diff( $current, [ $plugin_file ] );
+
+		update_site_option( 'auto_update_plugins', array_values( array_unique( $updated ) ) );
 	}
 
 	/**
