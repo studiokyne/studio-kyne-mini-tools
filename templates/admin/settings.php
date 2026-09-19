@@ -110,6 +110,7 @@ $wp_memory_limit = defined( 'WP_MEMORY_LIMIT' ) ? WP_MEMORY_LIMIT : __( 'N/A', '
 						</p>
 					</div>
 					<div class="skmt-option__control">
+						<input type="hidden" name="skmt_global[auto_update_initial]" value="<?php echo $auto_update_on ? '1' : '0'; ?>">
 						<label class="skmt-toggle">
 							<input type="checkbox" id="skmt_auto_update" name="skmt_global[auto_update]" value="1" <?php checked( $auto_update_on ); ?> <?php disabled( ! $can_auto_update ); ?>>
 							<span class="skmt-toggle__slider"></span>

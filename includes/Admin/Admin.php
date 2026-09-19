@@ -716,9 +716,15 @@ class Admin {
 
 			// Case décochée = absente du POST. Pas stockée dans skmt_settings :
 			// elle pilote l'option WordPress, donc n'entre ni dans l'export ni
-			// dans la réinitialisation.
-			if ( wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' ) ) {
-				$this->set_auto_update( ! empty( $_POST['skmt_global']['auto_update'] ) );
+			// dans la réinitialisation. On n'écrit que si l'utilisateur a changé
+			// la case depuis le chargement de la page : sinon, enregistrer le
+			// seul canal annulerait un réglage fait entre-temps depuis la liste
+			// des extensions ou WP-CLI.
+			$auto_update         = ! empty( $_POST['skmt_global']['auto_update'] );
+			$auto_update_initial = ! empty( $_POST['skmt_global']['auto_update_initial'] );
+
+			if ( $auto_update !== $auto_update_initial && wp_is_auto_update_enabled_for_type( 'plugin' ) && current_user_can( 'update_plugins' ) ) {
+				$this->set_auto_update( $auto_update );
 			}
 		}
 
