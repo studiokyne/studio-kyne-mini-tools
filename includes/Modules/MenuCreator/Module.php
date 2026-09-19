@@ -1152,7 +1152,7 @@ class Module extends AbstractModule {
 			wp_send_json_error();
 		}
 
-		$query = sanitize_text_field( $_GET['q'] ?? '' ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$query = isset( $_GET['q'] ) ? sanitize_text_field( wp_unslash( $_GET['q'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$users = get_users(
 			[
 				'search' => '*' . $query . '*',

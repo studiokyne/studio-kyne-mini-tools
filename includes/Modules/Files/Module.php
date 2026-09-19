@@ -188,7 +188,7 @@ class Module extends AbstractModule {
 	}
 
 	private function get_post_path( string $key = 'path' ): string {
-		$raw = isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : '';
+		$raw = isset( $_POST[ $key ] ) ? sanitize_text_field( wp_unslash( $_POST[ $key ] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce().
 		return rawurldecode( $raw );
 	}
 
@@ -230,12 +230,12 @@ class Module extends AbstractModule {
 	public function ajax_delete(): void {
 		$this->check_nonce();
 		$this->check_file_mods( false );
-		$paths  = isset( $_POST['paths'] ) ? (array) wp_unslash( $_POST['paths'] ) : [];
+		$paths  = isset( $_POST['paths'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['paths'] ) ) : []; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce().
 		$errors = [];
 
 		foreach ( $paths as $path ) {
 			try {
-				$this->fm->delete( sanitize_text_field( $path ) );
+				$this->fm->delete( $path );
 			} catch ( \Exception $e ) {
 				$errors[] = $e->getMessage();
 			}
@@ -252,7 +252,7 @@ class Module extends AbstractModule {
 		$this->check_nonce();
 		$this->check_file_mods( false );
 		$path     = $this->get_post_path();
-		$new_name = isset( $_POST['new_name'] ) ? sanitize_file_name( wp_unslash( $_POST['new_name'] ) ) : '';
+		$new_name = isset( $_POST['new_name'] ) ? sanitize_file_name( wp_unslash( $_POST['new_name'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce().
 
 		try {
 			$this->fm->rename( $path, $new_name );
@@ -294,8 +294,8 @@ class Module extends AbstractModule {
 	public function ajax_zip(): void {
 		$this->check_nonce();
 		$this->check_file_mods( false );
-		$paths  = isset( $_POST['paths'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['paths'] ) ) : [];
-		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : 'archive.zip';
+		$paths  = isset( $_POST['paths'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['paths'] ) ) : []; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce().
+		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : 'archive.zip'; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce().
 		$parent = $this->get_post_path( 'parent' );
 		$dest   = ( '' !== $parent ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
 
@@ -349,7 +349,7 @@ class Module extends AbstractModule {
 		$this->check_nonce();
 		$this->check_file_mods( true );
 		$path    = $this->get_post_path();
-		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : '';
+		$content = isset( $_POST['content'] ) ? wp_unslash( $_POST['content'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- nonce vérifié par check_nonce() ; contenu de fichier source enregistré tel quel, écriture réservée à get_required_capability() et bloquée par DISALLOW_FILE_EDIT.
 
 		try {
 			$this->fm->save_content( $path, $content );

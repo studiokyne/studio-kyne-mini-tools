@@ -92,7 +92,7 @@ class LoginUrlHandler {
 		$request_uri = isset( $_SERVER['REQUEST_URI'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) ) : '';
 		$request     = wp_parse_url( rawurldecode( $request_uri ) );
 		$path        = $request['path'] ?? '';
-		$action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : '';
+		$action      = isset( $_GET['action'] ) ? sanitize_text_field( wp_unslash( $_GET['action'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- routage de wp-login.php, l'action est rejouée par WordPress qui vérifie ses propres nonces.
 
 		if ( in_array( $action, self::PASSTHROUGH_ACTIONS, true ) ) {
 			return;
