@@ -15,7 +15,15 @@ $module_settings = $instance->get_settings();
 	<input type="hidden" name="action" value="skmt_save_settings">
 	<input type="hidden" name="skmt_tab" value="<?php echo esc_attr( $tab ); ?>">
 
+	<div class="skmt-tabs" role="tablist" data-skmt-tabs="image_optimizer" aria-label="<?php esc_attr_e( 'Sections de l\'Image Optimizer', 'studio-kyne-mini-tools' ); ?>">
+		<button type="button" class="skmt-tabs__tab is-active" role="tab" data-skmt-tab="settings"><?php esc_html_e( 'Réglages', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="svg"><?php esc_html_e( 'SVG', 'studio-kyne-mini-tools' ); ?></button>
+		<button type="button" class="skmt-tabs__tab" role="tab" data-skmt-tab="bulk"><?php esc_html_e( 'Optimisation en masse', 'studio-kyne-mini-tools' ); ?></button>
+	</div>
+
 	<div class="skmt-module-form__scroll">
+
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="settings">
 
 	<!-- Comportement -->
 	<div class="skmt-section">
@@ -170,8 +178,9 @@ $module_settings = $instance->get_settings();
 			</div>
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="svg" hidden>
 
 	<!-- Téléchargements SVG -->
 	<?php $svg_enabled = ! empty( $module_settings['svg_upload'] ); ?>
@@ -222,8 +231,9 @@ $module_settings = $instance->get_settings();
 			</div>
 		</div>
 	</div>
+	</div>
 
-	<div class="skmt-divider"></div>
+	<div class="skmt-tabs__panel" role="tabpanel" data-skmt-tabs-group="image_optimizer" data-skmt-tab-panel="bulk" hidden>
 
 	<!-- Optimisation en masse -->
 	<div class="skmt-section">
@@ -273,6 +283,7 @@ $module_settings = $instance->get_settings();
 				</div>
 			</div>
 		</div>
+	</div>
 	</div>
 
 	</div><!-- .skmt-module-form__scroll -->

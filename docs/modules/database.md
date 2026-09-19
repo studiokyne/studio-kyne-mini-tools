@@ -21,6 +21,8 @@ Tout côté serveur, jamais de confiance au client.
 
 ## Interface
 
+Les onglets Données / Structure / Requête SQL utilisent le composant partagé `skmt-tabs` (voir [design-system.md](../design-system.md#onglets)) : `admin.js` gère l'affichage, et `database.js` ne fait que charger la vue ouverte sur l'événement `skmt:tab`, en l'ignorant tant qu'aucune table n'est choisie (au chargement, l'onglet mémorisé est restauré avant toute sélection). `switchTab()` passe par `window.skmtTabs.activate()`, qui émet l'événement même si l'onglet est déjà ouvert : changer de table recharge donc bien les données. Chaque panneau garde `.skmt-db__tab-content`, dont le `display:flex` est neutralisé par `.skmt-tabs__panel[hidden]`, plus spécifique.
+
 La hauteur de la mise en page est en CSS pur via la chaîne flex `.skmt-admin-main:has(.skmt-db)` (pas de handler de redimensionnement JS). L'historique SQL est local au navigateur (`localStorage`, avec un bouton d'effacement) — pas persisté côté serveur. Toutes les chaînes JS visibles passent par `skmtAdmin.i18n` (alimenté par `get_admin_js_data()`). Pas d'édition dans l'onglet Structure, pas d'export CSV.
 
 ## Nettoyage
