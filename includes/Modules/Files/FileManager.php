@@ -3,6 +3,11 @@ namespace StudioKyne\MiniTools\Modules\Files;
 
 defined( 'ABSPATH' ) || exit;
 
+// Gestionnaire de fichiers : les appels PHP directs sont voulus. WP_Filesystem peut
+// passer par FTP/SSH, sous un autre utilisateur que PHP : droits affichés (is_writable)
+// et opérations réelles divergeraient. Voir docs/modules/files.md.
+// phpcs:disable WordPress.WP.AlternativeFunctions
+
 /**
  * Moteur des opérations fichier, strictement limité à un répertoire racine.
  * Toute tentative de sortir de la racine lève une InvalidArgumentException.
@@ -241,7 +246,6 @@ class FileManager {
 		if ( ! is_file( $abs ) ) {
 			throw new \InvalidArgumentException( 'Not a file.' );
 		}
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$content = file_get_contents( $abs );
 		if ( false === $content ) {
 			throw new \RuntimeException( 'Cannot read file.' );
@@ -260,7 +264,6 @@ class FileManager {
 
 		// L'échec doit remonter : sans exception, l'appelant annonce un
 		// enregistrement réussi alors que rien n'a été écrit sur le disque.
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_put_contents_file_put_contents
 		if ( file_put_contents( $abs, $content ) === false ) {
 			throw new \RuntimeException( 'Écriture impossible : ' . $rel ); // phpcs:ignore WordPress.Security.EscapeOutput.ExceptionNotEscaped -- message renvoyé en JSON, échappé à l'affichage par le toast.
 		}

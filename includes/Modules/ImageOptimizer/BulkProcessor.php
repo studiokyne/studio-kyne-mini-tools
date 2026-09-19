@@ -194,7 +194,8 @@ class BulkProcessor {
 			try {
 				( $this->process_fn )( $attachment_id );
 			} catch ( \Throwable $e ) {
-				// Un attachment en erreur ne bloque pas les suivants.
+				// Un attachment en erreur ne bloque pas les suivants, mais on le signale.
+				error_log( sprintf( '[SKMT Image Optimizer] traitement en lot : attachment %d en erreur : %s', $attachment_id, $e->getMessage() ) ); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- journal d'erreur volontaire, sans interface pour l'afficher.
 			}
 			++$processed_now;
 		}

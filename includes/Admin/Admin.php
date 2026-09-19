@@ -56,7 +56,7 @@ class Admin {
 
 		add_action( 'admin_menu', [ $this, 'add_menu_page' ] );
 		add_filter( 'parent_file', [ $this, 'filter_parent_file' ] );
-		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ], 10, 2 );
+		add_filter( 'submenu_file', [ $this, 'filter_submenu_file' ] );
 		add_action( 'admin_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_action( 'admin_post_skmt_save_settings', [ $this, 'handle_save_settings' ] );
 		add_action( 'admin_post_skmt_toggle_module', [ $this, 'handle_toggle_module' ] );
@@ -114,7 +114,7 @@ class Admin {
 
 		global $submenu;
 		if ( isset( $submenu[ $this->slug ] ) ) {
-			$submenu[ $this->slug ][] = [ '', 'manage_options', 'skmt-separator', '', 'skmt-menu-separator' ];
+			$submenu[ $this->slug ][] = [ '', 'manage_options', 'skmt-separator', '', 'skmt-menu-separator' ]; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- séparateur visuel : WordPress n'offre aucune API pour en insérer un dans un sous-menu.
 		}
 
 		foreach ( $this->modules->get_all() as $module_id => $module ) {
@@ -172,7 +172,7 @@ class Admin {
 			$filtered[]   = $item;
 		}
 
-		$submenu[ $this->slug ] = $filtered;
+		$submenu[ $this->slug ] = $filtered; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- dédoublonnage du sous-menu : aucune API WordPress pour réécrire une entrée existante.
 	}
 
 	/* ================================================================
@@ -407,7 +407,7 @@ class Admin {
 	 * qui ne garde que `.notice` / `.updated` / `.error`.
 	 */
 	public function capture_wp_notices_end(): void {
-		$html  = ob_get_clean() ?: '';
+		$html  = (string) ob_get_clean();
 		$split = $this->split_captured_notices( $html );
 
 		$this->captured_wp_notices = $split['notices'];
@@ -641,7 +641,9 @@ class Admin {
 	 * utilisateur précis depuis un contexte sans utilisateur courant (cron).
 	 */
 	public static function add_persistent_notice( string $id, string $message, string $type = 'info', int $user_id = 0 ): void {
-		$user_id = $user_id ?: get_current_user_id();
+		if ( 0 === $user_id ) {
+			$user_id = get_current_user_id();
+		}
 		if ( ! $user_id ) {
 			return;
 		}
@@ -1242,7 +1244,7 @@ class Admin {
 		return $parent_file ?? '';
 	}
 
-	public function filter_submenu_file( ?string $submenu_file, ?string $parent_file ): string {
+	public function filter_submenu_file( ?string $submenu_file ): string {
 		if ( ! isset( $_GET['page'] ) || strpos( sanitize_text_field( wp_unslash( $_GET['page'] ) ), $this->slug ) !== 0 ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture de navigation (onglet ou page affichée), aucune action déclenchée.
 			return $submenu_file ?? '';
 		}

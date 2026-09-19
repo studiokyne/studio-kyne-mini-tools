@@ -154,8 +154,9 @@ class UrlRewriter {
 				// Le fichier a déjà changé de nom : une ligne non réécrite est un
 				// lien cassé. On ne peut pas revenir en arrière ici, mais on le
 				// dit, avec de quoi corriger à la main.
+				// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- journal d'erreur volontaire, sans interface pour l'afficher.
 				error_log(
-					sprintf( // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+					sprintf(
 						'[SKMT Image Optimizer] réécriture d\'URL échouée dans %s (%s=%s) : %s',
 						$table,
 						$id_col,
@@ -219,7 +220,7 @@ class UrlRewriter {
 			}
 			return $data;
 		}
-		return $data; // Scalaires, null, __PHP_Incomplete_Class : intacts.
+		return $data; // Les scalaires, les valeurs nulles et les objets incomplets restent intacts.
 	}
 
 	/**

@@ -85,7 +85,7 @@ class MediaLibrary {
 	/**
 	 * Charge le JS de l'Image Optimizer sur les pages médiathèque et éditeur.
 	 */
-	public function enqueue_assets( string $hook ): void {
+	public function enqueue_assets(): void {
 		if ( ! function_exists( 'get_current_screen' ) ) {
 			return;
 		}

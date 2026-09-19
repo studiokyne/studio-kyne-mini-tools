@@ -106,7 +106,7 @@ class LoginUrlHandler {
 		// suffisait à faire répondre 404 à des pages parfaitement légitimes.
 		if ( 'wp-login.php' === basename( $path ) && ! is_admin() ) {
 			global $pagenow;
-			$pagenow = 'index.php';
+			$pagenow = 'index.php'; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- voulu : WordPress doit traiter la requête comme le front pour servir son 404.
 
 			if ( ! defined( 'WP_USE_THEMES' ) ) {
 				define( 'WP_USE_THEMES', true ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound
@@ -131,9 +131,11 @@ class LoginUrlHandler {
 			die();
 		}
 
+		// wp-login.php lit ces globales sans les initialiser : on les pose comme
+		// le ferait un accès direct, sinon notices « undefined variable ».
 		global $error, $user_login;
-		$error      = '';
-		$user_login = '';
+		$error      = ''; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- initialisation attendue par wp-login.php.
+		$user_login = ''; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- initialisation attendue par wp-login.php.
 
 		require_once ABSPATH . 'wp-login.php';
 		die;
@@ -174,11 +176,9 @@ class LoginUrlHandler {
 	 * Filtre les URLs de connexion pour pointer vers l'URL personnalisée.
 	 *
 	 * @param string $login_url
-	 * @param string $redirect
-	 * @param bool   $force_reauth
 	 * @return string
 	 */
-	public function filter_login_url( string $login_url, string $redirect = '', bool $force_reauth = false ): string {
+	public function filter_login_url( string $login_url ): string {
 		return $this->filter_site_url( $login_url );
 	}
 }

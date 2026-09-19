@@ -4,6 +4,8 @@
 
 Toute entrée de chemin passe par `get_post_path()` (`sanitize_text_field` + `rawurldecode`) avant d'atteindre `FileManager` — ne jamais faire confiance à un chemin fourni par le client. `FileManager::save_content()` lève une exception sur une cible en lecture seule ou non inscriptible : ne jamais avaler cette valeur de retour, sinon l'éditeur annonce un enregistrement réussi alors que rien n'a atteint le disque.
 
+`FileManager` appelle PHP directement (`unlink`, `rename`, `rmdir`, `file_put_contents`, `is_writable`) et non `WP_Filesystem` : ce dernier peut passer par FTP/SSH sous un autre utilisateur que PHP, et les droits affichés dans la liste ne correspondraient plus à ce que les opérations peuvent réellement faire. La règle PHPCS `WordPress.WP.AlternativeFunctions` y est donc désactivée pour tout le fichier.
+
 ## Éditeur de code
 
 L'éditeur est CodeMirror **livré avec WordPress** (`wp-codemirror`), pas une copie embarquée. `Module::enqueue_code_editor()` tourne sur `admin_enqueue_scripts` à la **priorité 5** (Admin lit `get_admin_js_data()` à 10) et appelle `wp_enqueue_code_editor()` une fois par entrée de `EDITABLE_EXTENSIONS`, en collectant les réglages par extension dans le payload JS `codeEditor`. Le `wp-admin/js/code-editor.js` du cœur câble déjà l'autocomplétion à la frappe pour HTML/CSS/JS/PHP — ne pas la réimplémenter. `wp_enqueue_code_editor()` renvoie `false` quand l'utilisateur a désactivé la coloration syntaxique dans son profil ; le payload est alors vidé et `files.js` retombe sur le textarea nu. Garder `EDITABLE_EXTENSIONS` synchronisé avec `isEditable()` dans `files.js`.

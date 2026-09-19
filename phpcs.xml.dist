@@ -40,6 +40,14 @@
 		<exclude-pattern>*/uninstall.php</exclude-pattern>
 	</rule>
 
+	<!-- Même raison : $tab ou $wp_version y sont des locales de la méthode, et $this y désigne l'instance d'Admin. -->
+	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+	</rule>
+	<rule ref="PHPCompatibility.FunctionDeclarations.NewClosure.ThisFoundOutsideClass">
+		<exclude-pattern>*/templates/*</exclude-pattern>
+	</rule>
+
 	<!-- uninstall.php est procédural par contrat WordPress : ses variables de boucle ne sont pas des globales à protéger. -->
 	<rule ref="WordPress.WP.GlobalVariablesOverride.Prohibited">
 		<exclude-pattern>*/uninstall.php</exclude-pattern>

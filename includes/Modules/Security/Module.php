@@ -75,7 +75,7 @@ class Module extends AbstractModule {
 
 		if ( ( $this->settings['authentication']['enable_custom_login_url'] ?? true ) && ! self::login_url_disabled() ) {
 			add_action( 'wp_loaded', [ $this->login_handler, 'wp_loaded' ], 10 );
-			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ], 10, 3 );
+			add_filter( 'login_url', [ $this->login_handler, 'filter_login_url' ] );
 			add_filter( 'site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
 			add_filter( 'network_site_url', [ $this->login_handler, 'filter_site_url' ], 10 );
 			add_filter( 'wp_redirect', [ $this->login_handler, 'filter_site_url' ], 10 );
@@ -96,7 +96,7 @@ class Module extends AbstractModule {
 			add_filter( 'rest_request_before_callbacks', [ $this->hardening, 'prevent_rest_user_enumeration' ], 10, 3 );
 			add_filter( 'oembed_response_data', [ $this->hardening, 'filter_oembed_response_data' ], PHP_INT_MAX );
 			add_filter( 'wp_sitemaps_add_provider', [ $this->hardening, 'filter_sitemap_providers' ], 10, 2 );
-			add_filter( 'wp_login_errors', [ $this->hardening, 'filter_login_errors' ], PHP_INT_MAX, 2 );
+			add_filter( 'wp_login_errors', [ $this->hardening, 'filter_login_errors' ], PHP_INT_MAX );
 			add_action( 'lost_password', [ $this->hardening, 'mask_lost_password_oracle' ], PHP_INT_MAX );
 		}
 

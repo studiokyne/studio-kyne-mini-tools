@@ -442,12 +442,15 @@ class Module extends AbstractModule {
 			wp_die( esc_html__( 'Fichier introuvable.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$mime = mime_content_type( $abs ) ?: 'application/octet-stream';
+		$mime = (string) mime_content_type( $abs );
+		if ( '' === $mime ) {
+			$mime = 'application/octet-stream';
+		}
 		header( 'Content-Type: ' . $mime );
 		header( 'Content-Disposition: ' . Admin::content_disposition( basename( $abs ) ) );
 		header( 'Content-Length: ' . filesize( $abs ) );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- envoi en flux d'un fichier local, sans le charger en mémoire.
 		readfile( $abs );
 		exit;
 	}
@@ -469,7 +472,7 @@ class Module extends AbstractModule {
 		// tempnam crée un fichier vide — ZipArchive::CREATE l'écrase
 		$zip = new \ZipArchive();
 		if ( $zip->open( $tmp, \ZipArchive::OVERWRITE ) !== true ) {
-			unlink( $tmp );
+			wp_delete_file( $tmp );
 			wp_die( esc_html__( 'Impossible de créer l\'archive.', 'studio-kyne-mini-tools' ) );
 		}
 
@@ -481,9 +484,9 @@ class Module extends AbstractModule {
 		header( 'Content-Disposition: ' . Admin::content_disposition( $filename ) );
 		header( 'Content-Length: ' . filesize( $tmp ) );
 		header( 'Cache-Control: no-cache, no-store, must-revalidate' );
-		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_read_readfile
+		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile -- envoi en flux d'un fichier local, sans le charger en mémoire.
 		readfile( $tmp );
-		unlink( $tmp );
+		wp_delete_file( $tmp );
 		exit;
 	}
 

@@ -353,7 +353,7 @@ class Module extends AbstractModule {
 
 				$this->processor->optimize( $size_file );
 				$converted  = $this->processor->convert( $size_file, $mime_type );
-				$final_file = $converted ?: $size_file;
+				$final_file = false !== $converted ? $converted : $size_file;
 
 				$after        = file_exists( $final_file ) ? (int) filesize( $final_file ) : $before;
 				$total_after += $after;
@@ -380,7 +380,7 @@ class Module extends AbstractModule {
 
 			$this->processor->optimize( $original_file );
 			$converted  = $this->processor->convert( $original_file, $mime_type, $attachment_id );
-			$final_file = $converted ?: $original_file;
+			$final_file = false !== $converted ? $converted : $original_file;
 
 			$after        = file_exists( $final_file ) ? (int) filesize( $final_file ) : $before;
 			$main_after   = $after;

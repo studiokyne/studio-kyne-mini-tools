@@ -22,7 +22,7 @@ class HardeningService {
 	/**
 	 * Bloque l'accès au serveur XML-RPC avec un 403.
 	 */
-	public function block_xmlrpc_server_class( string $class ): string {
+	public function block_xmlrpc_server_class(): string {
 		http_response_code( 403 );
 		exit;
 	}
@@ -201,11 +201,10 @@ class HardeningService {
 	 * Les codes qui ne disent rien d'un compte — mot de passe vide, cookies
 	 * bloqués — sont laissés intacts : l'utilisateur légitime en a besoin.
 	 *
-	 * @param mixed  $errors      WP_Error de la page de connexion.
-	 * @param string $redirect_to Destination après connexion (inutilisée).
+	 * @param mixed $errors WP_Error de la page de connexion.
 	 * @return mixed
 	 */
-	public function filter_login_errors( $errors, $redirect_to = '' ) {
+	public function filter_login_errors( $errors ) {
 		if ( ! $errors instanceof \WP_Error ) {
 			return $errors;
 		}
