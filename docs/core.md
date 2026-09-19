@@ -129,7 +129,7 @@ Toute donnée de requête passe par `sanitize_text_field( wp_unslash( $_POST[...
 
 ## Icônes
 
-Les icônes sont des SVG inline rendus via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Les icônes disponibles sont définies dans `Admin::get_icon_paths()` : `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`, `bell`, `x`, `log-in`, `folder`, `chevron-down`, `palette`, `menu`, `database`, `eye-off`, `folder-tree`, `history`.
+Les icônes sont des SVG inline rendus via `Admin::render_icon(string $icon, string $size, string $extra_class)`. Les icônes disponibles sont définies dans `Admin::get_icon_paths()` : `layout-dashboard`, `package`, `settings`, `image`, `check-circle`, `info`, `shield`, `bell`, `x`, `log-in`, `folder`, `chevron-down`, `palette`, `menu`, `database`, `eye-off`, `folder-tree`, `history`, `mail`.
 
 **Ne jamais inventer ni dessiner un SVG à la main.** Toutes les icônes viennent de [Lucide](https://lucide.dev) (lucide-static v1.34.0). Pour une icône absente de `get_icon_paths()` ou du JS d'un module, récupérer le fichier officiel tel quel. Ne pas approximer en éditant le path d'une autre icône, ne pas fabriquer de coordonnées : le résultat paraît cassé et s'écarte du reste de l'interface. Ça vaut aussi pour les SVG inline des modules JS (icônes de dossier dans `assets/admin/js/modules/media.js`).
 

@@ -6,7 +6,7 @@ Guide de travail pour Claude Code sur ce dépôt. Les règles ci-dessous sont ab
 
 **Studio Kyne Mini Tools** est une extension WordPress modulaire (PHP 7.4+, WP 6.0+). Pas de build, pas de Composer à l'exécution, pas de npm : du PHP pur avec un autoloader PSR-4 maison (`StudioKyne\MiniTools\` → `includes/`). Aucun test automatisé. Le JS tiers est embarqué tel quel sous `assets/admin/js/vendor/`, jamais bundlé.
 
-Huit modules sous `includes/Modules/` : Security, WhiteLabel, ImageOptimizer, MenuCreator, Login, Files, Media, Database. Chacun étend `AbstractModule`, enregistre ses hooks dans `init()`, assainit lui-même ce qu'il persiste (`save_settings()` — le cœur n'applique rien) et déclare ses clés de désinstallation. Réglages : `skmt_settings` (global + état des modules) et `skmt_module_{id}` (par module), fusionnés **récursivement** sur les défauts.
+Dix modules sous `includes/Modules/` : Security, WhiteLabel, ImageOptimizer, MenuCreator, Login, Files, Media, Database, ActivityLog, Smtp. Chacun étend `AbstractModule`, enregistre ses hooks dans `init()`, assainit lui-même ce qu'il persiste (`save_settings()` — le cœur n'applique rien) et déclare ses clés de désinstallation. Réglages : `skmt_settings` (global + état des modules) et `skmt_module_{id}` (par module), fusionnés **récursivement** sur les défauts.
 
 Cycle : `plugins_loaded` → `Plugin::instance()` → `init` → chargement du textdomain, définition des modules (filtre `skmt_module_definitions`), `Module::init()` sur chaque module actif. `Admin` n'existe que sous `is_admin()`. Tout formulaire poste vers `admin-post.php` avec nonce + `manage_options` ; tout endpoint AJAX (`wp_ajax_skmt_{module}_{action}`) vérifie `skmt_admin_nonce` puis la capacité du module.
 
