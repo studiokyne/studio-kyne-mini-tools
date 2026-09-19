@@ -155,7 +155,7 @@ $module_settings = $instance->get_settings();
 			<div class="skmt-option">
 				<div class="skmt-option__content">
 					<label for="skmt_keep_original" class="skmt-option__label"><?php echo esc_html__( 'Conserver l\'original', 'studio-kyne-mini-tools' ); ?><?php echo $this->render_help_tip( __( "Double l'espace disque occupé par la médiathèque. À garder tant que la conversion n'a pas été validée sur le site, à couper ensuite.", 'studio-kyne-mini-tools' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></label>
-					<p class="skmt-option__desc"><?php echo esc_html__( 'Garde une copie du fichier source en plus du format converti.', 'studio-kyne-mini-tools' ); ?></p>
+					<p class="skmt-option__desc"><?php echo esc_html__( "Garde une copie intacte du fichier source, qui permet de restaurer ou de ré-optimiser l'image sans perte depuis sa fiche.", 'studio-kyne-mini-tools' ); ?></p>
 				</div>
 				<div class="skmt-option__control">
 					<label class="skmt-toggle">
