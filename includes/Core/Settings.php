@@ -37,10 +37,10 @@ class Settings {
 	 * Récupère une valeur de setting.
 	 *
 	 * @param string $key     Clé du setting (peut être imbriquée avec des points).
-	 * @param mixed  $default Valeur par défaut.
+	 * @param mixed  $fallback Valeur par défaut.
 	 * @return mixed
 	 */
-	public function get( string $key, $default = null ) {
+	public function get( string $key, $fallback = null ) {
 		$settings = $this->get_all();
 
 		// Support des clés imbriquées (ex: "modules.image_optimizer")
@@ -49,7 +49,7 @@ class Settings {
 
 		foreach ( $keys as $k ) {
 			if ( ! is_array( $value ) || ! array_key_exists( $k, $value ) ) {
-				return $default;
+				return $fallback;
 			}
 			$value = $value[ $k ];
 		}

@@ -300,7 +300,7 @@ class ImageProcessor {
 			return false;
 		}
 
-		$mime = $mime_type ?: $this->get_mime_type( $file_path, $attachment_id );
+		$mime = '' !== $mime_type ? $mime_type : $this->get_mime_type( $file_path, $attachment_id );
 		if ( ! $this->is_supported_mime( $mime ) ) {
 			return false;
 		}
@@ -392,8 +392,9 @@ class ImageProcessor {
 			return false;
 		}
 
-		$data  = @file_get_contents( $source );
-		$image = false !== $data ? @imagecreatefromstring( $data ) : false;
+		$data = file_get_contents( $source ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- fichier local.
+		// GD émet un warning sur une image corrompue : l'échec est traité juste après.
+		$image = false !== $data ? @imagecreatefromstring( $data ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 
 		if ( false === $image ) {
 			$this->log_error( 'convert/gd', $source, 'imagecreatefromstring a échoué' );
@@ -498,6 +499,8 @@ class ImageProcessor {
 	}
 
 	private function is_animated_gif( string $file_path ): bool {
+		// Lecture par blocs d'un fichier local : WP_Filesystem n'offre aucune lecture en flux.
+		// phpcs:disable WordPress.WP.AlternativeFunctions
 		$handle = fopen( $file_path, 'rb' );
 		if ( ! $handle ) {
 			return false;
@@ -512,6 +515,7 @@ class ImageProcessor {
 			$frames += preg_match_all( '/\x00\x21\xF9\x04.{4}\x00[\x2C\x21]/s', $chunk );
 		}
 		fclose( $handle );
+		// phpcs:enable WordPress.WP.AlternativeFunctions
 
 		return $frames > 1;
 	}
@@ -579,6 +583,7 @@ class ImageProcessor {
 			$message = (string) $error;
 		}
 
+		// phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log -- journal d'erreur volontaire, sans interface pour l'afficher.
 		error_log(
 			sprintf(
 				'[SKMT Image Optimizer] %s a échoué pour %s : %s',

@@ -98,7 +98,7 @@ class SvgHandler {
 		}
 
 		add_filter( 'upload_mimes', [ $this, 'allow_mime' ] );
-		add_filter( 'wp_check_filetype_and_ext', [ $this, 'fix_filetype' ], 10, 4 );
+		add_filter( 'wp_check_filetype_and_ext', [ $this, 'fix_filetype' ], 10, 3 );
 		add_filter( 'wp_handle_upload_prefilter', [ $this, 'sanitize_on_upload' ] );
 	}
 
@@ -142,10 +142,9 @@ class SvgHandler {
 	 * @param array<string, mixed> $data
 	 * @param string $file
 	 * @param string $filename
-	 * @param array<string, string>|null $mimes
 	 * @return array<string, mixed>
 	 */
-	public function fix_filetype( $data, $file, $filename, $mimes ) {
+	public function fix_filetype( $data, $file, $filename ) {
 		if ( ! empty( $data['ext'] ) && ! empty( $data['type'] ) ) {
 			return $data;
 		}
@@ -190,7 +189,8 @@ class SvgHandler {
 			return $file;
 		}
 
-		$dirty = file_get_contents( $path );
+		// Fichier temporaire local de l'upload PHP : WP_Filesystem, s'il passe par FTP, ne l'atteint pas.
+		$dirty = file_get_contents( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		if ( false === $dirty || '' === trim( (string) $dirty ) ) {
 			$file['error'] = __( 'Le fichier SVG est vide ou illisible.', 'studio-kyne-mini-tools' );
 			return $file;
@@ -202,7 +202,7 @@ class SvgHandler {
 			return $file;
 		}
 
-		file_put_contents( $path, $clean );
+		file_put_contents( $path, $clean ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 
 		return $file;
 	}
@@ -225,7 +225,7 @@ class SvgHandler {
 		// on ne force l'ancien garde-fou que sur PHP < 8.0 (déprécié au-delà).
 		$entity_previous = null;
 		if ( \PHP_VERSION_ID < 80000 && function_exists( 'libxml_disable_entity_loader' ) ) {
-			$entity_previous = libxml_disable_entity_loader( true );
+			$entity_previous = libxml_disable_entity_loader( true ); // phpcs:ignore Generic.PHP.DeprecatedFunctions.Deprecated -- déprécié en PHP 8, seul garde-fou XXE en PHP 7.4.
 		}
 
 		$dom                     = new \DOMDocument();
@@ -237,7 +237,7 @@ class SvgHandler {
 		libxml_clear_errors();
 		libxml_use_internal_errors( $libxml_previous );
 		if ( null !== $entity_previous && \PHP_VERSION_ID < 80000 && function_exists( 'libxml_disable_entity_loader' ) ) {
-			libxml_disable_entity_loader( $entity_previous );
+			libxml_disable_entity_loader( $entity_previous ); // phpcs:ignore Generic.PHP.DeprecatedFunctions.Deprecated -- idem, restauration de l'état précédent.
 		}
 
 		$root = $dom->documentElement;
@@ -286,7 +286,8 @@ class SvgHandler {
 				continue;
 			}
 
-			$tag = strtolower( $child->localName ?: $child->nodeName );
+			$local = (string) $child->localName;
+			$tag   = strtolower( '' !== $local ? $local : $child->nodeName );
 
 			if ( ! in_array( $tag, self::ALLOWED_TAGS, true ) ) {
 				$node->removeChild( $child );

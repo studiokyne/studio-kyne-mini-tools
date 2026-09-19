@@ -2,7 +2,7 @@
 
 Documentation interne du plugin, exclue des ZIP de release. `CLAUDE.md` à la racine porte les règles absolues et renvoie ici pour le détail.
 
-- [core.md](core.md) — séquence de démarrage, autoloader, stockage des réglages, contrat `AbstractModule`, formulaires et endpoints AJAX, icônes, notices, updater, outillage (Composer, PHPCS, PHPStan, baselines).
+- [core.md](core.md) — séquence de démarrage, autoloader, stockage des réglages, contrat `AbstractModule`, formulaires et endpoints AJAX, icônes, notices, updater, outillage (Composer, PHPCS, PHPStan).
 - [design-system.md](design-system.md) — classes CSS, tokens, modales, formulaires, boutons, tooltips, toasts.
 
 ## Modules

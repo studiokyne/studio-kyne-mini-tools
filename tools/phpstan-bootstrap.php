@@ -4,4 +4,4 @@
  * Fichier d'outillage uniquement : jamais chargé par l'extension.
  */
 
-define( 'WPINC', 'wp-includes' );
+define( 'WPINC', 'wp-includes' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- constante du cœur WordPress, déclarée pour PHPStan uniquement.

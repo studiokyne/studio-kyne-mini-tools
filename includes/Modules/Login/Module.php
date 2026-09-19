@@ -348,8 +348,8 @@ class Module extends AbstractModule {
 	/**
 	 * Valide une couleur hex. Retourne la valeur par défaut si invalide.
 	 */
-	private function sanitize_color( string $color, string $default = '' ): string {
+	private function sanitize_color( string $color, string $fallback = '' ): string {
 		$color = sanitize_hex_color( trim( $color ) );
-		return $color ?: $default;
+		return is_string( $color ) && '' !== $color ? $color : $fallback;
 	}
 }

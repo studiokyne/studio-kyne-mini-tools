@@ -18,18 +18,18 @@ class Autoloader {
 	/**
 	 * Charge une classe.
 	 *
-	 * @param string $class Nom complet de la classe.
+	 * @param string $class_name Nom complet de la classe.
 	 */
-	public static function autoload( string $class ): void {
+	public static function autoload( string $class_name ): void {
 		$prefix = 'StudioKyne\\MiniTools\\';
 
 		// Vérifier que la classe appartient au namespace du plugin
-		if ( strpos( $class, $prefix ) !== 0 ) {
+		if ( strpos( $class_name, $prefix ) !== 0 ) {
 			return;
 		}
 
 		// Retirer le prefix
-		$relative_class = substr( $class, strlen( $prefix ) );
+		$relative_class = substr( $class_name, strlen( $prefix ) );
 
 		// Base des includes. On privilégie la constante définie par le bootstrap,
 		// mais on retombe sur un chemin calculé depuis ce fichier : lors de la

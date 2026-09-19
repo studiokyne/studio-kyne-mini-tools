@@ -354,7 +354,7 @@ class Updater {
 		return [
 			'version'      => ltrim( $release['tag_name'] ?? '', 'v' ),
 			'url'          => $release['html_url'] ?? '',
-			'download_url' => $download_url ?: ( $release['zipball_url'] ?? '' ),
+			'download_url' => '' !== $download_url ? $download_url : ( $release['zipball_url'] ?? '' ),
 			'published_at' => $release['published_at'] ?? '',
 		];
 	}

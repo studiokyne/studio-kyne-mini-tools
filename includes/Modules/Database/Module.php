@@ -820,7 +820,8 @@ class Module extends AbstractModule {
 				echo 'INSERT INTO `' . $table . '` (' . $col_list . ') VALUES (' . implode( ', ', $values ) . ");\n";
 			}
 			$offset += $batch;
-		} while ( count( $rows ) === $batch );
+			$fetched = count( $rows );
+		} while ( $fetched === $batch );
 		// phpcs:enable WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		exit;

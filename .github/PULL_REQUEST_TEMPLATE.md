@@ -18,7 +18,7 @@ Closes #
 
 - [ ] Branche créée depuis `dev`, PR vers `dev`
 - [ ] Pas de bump de version manuel
-- [ ] `composer check` passe (aucun constat neuf, baselines non régénérées)
+- [ ] `composer check` passe (aucun constat, pas de baseline recréée)
 - [ ] Nouveaux fichiers PHP : garde `defined( 'ABSPATH' ) || exit;`
 - [ ] Icônes : SVG Lucide officiels uniquement
 - [ ] `docs/` mis à jour si un piège ou une décision est né de cette PR
