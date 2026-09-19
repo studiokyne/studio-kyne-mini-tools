@@ -996,8 +996,10 @@ class Admin {
 			wp_die( esc_html__( 'Permissions insuffisantes.', 'studio-kyne-mini-tools' ) );
 		}
 
-		$file = $_FILES['skmt_import_file'] ?? null;
-		if ( ! $file || empty( $file['tmp_name'] ) || $file['error'] !== UPLOAD_ERR_OK ) {
+		// Seuls tmp_name et error sont lus : un chemin temporaire et un code d'erreur PHP, jamais réémis.
+		$tmp_name = isset( $_FILES['skmt_import_file']['tmp_name'] ) ? sanitize_text_field( $_FILES['skmt_import_file']['tmp_name'] ) : '';
+		$error    = isset( $_FILES['skmt_import_file']['error'] ) ? (int) $_FILES['skmt_import_file']['error'] : UPLOAD_ERR_NO_FILE;
+		if ( '' === $tmp_name || UPLOAD_ERR_OK !== $error ) {
 			wp_safe_redirect(
 				add_query_arg(
 					[
@@ -1016,7 +1018,7 @@ class Admin {
 		// seule chose qui atteste que ce chemin désigne bien un fichier déposé
 		// par CETTE requête, et non un chemin arbitraire du serveur glissé dans
 		// la variable. C'est la garde standard avant toute lecture d'un upload.
-		if ( ! is_uploaded_file( $file['tmp_name'] ) ) {
+		if ( ! is_uploaded_file( $tmp_name ) ) {
 			wp_safe_redirect(
 				add_query_arg(
 					[
@@ -1035,7 +1037,7 @@ class Admin {
 		// deux opérations qui tiennent en mémoire. Un export complet pèse
 		// quelques dizaines de kilo-octets ; 2 Mo laissent une marge confortable
 		// sans exposer la mémoire de PHP à un fichier de plusieurs centaines.
-		if ( filesize( $file['tmp_name'] ) > self::IMPORT_MAX_BYTES ) {
+		if ( filesize( $tmp_name ) > self::IMPORT_MAX_BYTES ) {
 			wp_safe_redirect(
 				add_query_arg(
 					[
@@ -1051,7 +1053,7 @@ class Admin {
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$raw  = file_get_contents( $file['tmp_name'] );
+		$raw  = file_get_contents( $tmp_name );
 		$data = json_decode( (string) $raw, true );
 
 		if ( ! is_array( $data ) || ! isset( $data['global'] ) ) {
@@ -1214,7 +1216,7 @@ class Admin {
 
 			// Les listes (rôles, IP…) sont transmises telles quelles : leur
 			// sémantique est positionnelle, pas déclarative.
-			$clean[ $key ] = is_array( $value ) && $value !== array_values( $value )
+			$clean[ $key ] = is_array( $value ) && array_values( $value ) !== $value
 				? self::drop_false_values( $value )
 				: $value;
 		}

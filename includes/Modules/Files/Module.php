@@ -205,7 +205,7 @@ class Module extends AbstractModule {
 			$date_fmt  = get_option( 'date_format' ) . ' H:i';
 			$formatted = array_map(
 				function ( $item ) use ( $date_fmt ) {
-					$item['size_fmt']     = ( $item['size'] !== null ) ? FileManager::format_size( (int) $item['size'] ) : '';
+					$item['size_fmt']     = ( null !== $item['size'] ) ? FileManager::format_size( (int) $item['size'] ) : '';
 					$item['modified_fmt'] = $item['modified'] ? date_i18n( $date_fmt, $item['modified'] ) : '';
 					return $item;
 				},
@@ -280,8 +280,8 @@ class Module extends AbstractModule {
 		$this->check_nonce();
 		$this->check_file_mods( false );
 		$parent = $this->get_post_path( 'parent' );
-		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : '';
-		$rel    = ( $parent !== '' ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
+		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing -- nonce vérifié par check_nonce() juste au-dessus.
+		$rel    = ( '' !== $parent ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
 
 		try {
 			$this->fm->create_folder( $rel );
@@ -297,7 +297,7 @@ class Module extends AbstractModule {
 		$paths  = isset( $_POST['paths'] ) ? array_map( 'sanitize_text_field', (array) wp_unslash( $_POST['paths'] ) ) : [];
 		$name   = isset( $_POST['name'] ) ? sanitize_file_name( wp_unslash( $_POST['name'] ) ) : 'archive.zip';
 		$parent = $this->get_post_path( 'parent' );
-		$dest   = ( $parent !== '' ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
+		$dest   = ( '' !== $parent ) ? rtrim( $parent, '/' ) . '/' . $name : $name;
 
 		try {
 			$abs          = $this->fm->create_zip( $paths, $dest );
@@ -387,7 +387,7 @@ class Module extends AbstractModule {
 				]
 				: $files;
 
-			if ( $file['error'] !== UPLOAD_ERR_OK ) {
+			if ( UPLOAD_ERR_OK !== $file['error'] ) {
 				$errors[] = sanitize_text_field( $file['name'] );
 				continue;
 			}
@@ -462,7 +462,7 @@ class Module extends AbstractModule {
 
 		// Fichier temporaire hors racine WP
 		$tmp = tempnam( sys_get_temp_dir(), 'skmt_zip_' );
-		if ( $tmp === false ) {
+		if ( false === $tmp ) {
 			wp_die( esc_html__( 'Impossible de créer le fichier temporaire.', 'studio-kyne-mini-tools' ) );
 		}
 

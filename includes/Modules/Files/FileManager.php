@@ -13,8 +13,8 @@ class FileManager {
 
 	public function __construct( string $root ) {
 		$real = realpath( $root );
-		if ( $real === false ) {
-			throw new \InvalidArgumentException( 'Root path does not exist: ' . $root );
+		if ( false === $real ) {
+			throw new \InvalidArgumentException( 'Root path does not exist: ' . esc_html( $root ) );
 		}
 		$this->root = rtrim( $real, DIRECTORY_SEPARATOR );
 	}
@@ -33,14 +33,14 @@ class FileManager {
 	public function resolve( string $rel ): string {
 		$rel = str_replace( "\0", '', $rel );
 
-		if ( $rel === '' || $rel === '.' || $rel === '/' ) {
+		if ( '' === $rel || '.' === $rel || '/' === $rel ) {
 			return $this->root;
 		}
 
 		$norm = $this->normalize( $rel );
 		$abs  = realpath( $this->root . DIRECTORY_SEPARATOR . $norm );
 
-		if ( $abs === false ) {
+		if ( false === $abs ) {
 			throw new \InvalidArgumentException( 'Path does not exist.' );
 		}
 
@@ -58,7 +58,7 @@ class FileManager {
 		$rel  = str_replace( "\0", '', $rel );
 		$norm = $this->normalize( $rel );
 
-		if ( $norm === '' ) {
+		if ( '' === $norm ) {
 			throw new \InvalidArgumentException( 'Invalid path.' );
 		}
 
@@ -66,7 +66,7 @@ class FileManager {
 
 		// Vérifier que le parent existe et est dans la racine.
 		$parent = realpath( dirname( $abs ) );
-		if ( $parent === false || ( $parent !== $this->root && strpos( $parent, $this->root . DIRECTORY_SEPARATOR ) !== 0 ) ) {
+		if ( false === $parent || ( $this->root !== $parent && strpos( $parent, $this->root . DIRECTORY_SEPARATOR ) !== 0 ) ) {
 			throw new \InvalidArgumentException( 'Parent directory is outside root or does not exist.' );
 		}
 
@@ -83,10 +83,10 @@ class FileManager {
 		}
 		$clean = [];
 		foreach ( $parts as $p ) {
-			if ( $p === '' || $p === '.' ) {
+			if ( '' === $p || '.' === $p ) {
 				continue;
 			}
-			if ( $p === '..' ) {
+			if ( '..' === $p ) {
 				array_pop( $clean );
 				continue;
 			}
@@ -124,21 +124,21 @@ class FileManager {
 			throw new \InvalidArgumentException( 'Not a directory.' );
 		}
 
-		$handle = opendir( $abs );
-		if ( $handle === false ) {
+		$entries = scandir( $abs );
+		if ( false === $entries ) {
 			throw new \RuntimeException( 'Cannot open directory.' );
 		}
 
 		$items = [];
-		while ( false !== ( $entry = readdir( $handle ) ) ) {
-			if ( $entry === '.' || $entry === '..' ) {
+		foreach ( $entries as $entry ) {
+			if ( '.' === $entry || '..' === $entry ) {
 				continue;
 			}
 
 			$full     = $abs . DIRECTORY_SEPARATOR . $entry;
 			$is_dir   = is_dir( $full );
 			$ext      = $is_dir ? '' : strtolower( pathinfo( $entry, PATHINFO_EXTENSION ) );
-			$rel_item = ( $rel === '' || $rel === '/' )
+			$rel_item = ( '' === $rel || '/' === $rel )
 				? $entry
 				: rtrim( str_replace( '\\', '/', $rel ), '/' ) . '/' . $entry;
 
@@ -155,13 +155,12 @@ class FileManager {
 				'writable' => is_writable( $full ),
 			];
 		}
-		closedir( $handle );
 
 		usort(
 			$items,
 			function ( $a, $b ) {
 				if ( $a['type'] !== $b['type'] ) {
-					return $a['type'] === 'dir' ? -1 : 1;
+					return 'dir' === $a['type'] ? -1 : 1;
 				}
 				return strcasecmp( $a['name'], $b['name'] );
 			}
@@ -192,7 +191,7 @@ class FileManager {
 
 	public function rename( string $rel, string $new_name ): bool {
 		$new_name = sanitize_file_name( $new_name );
-		if ( $new_name === '' ) {
+		if ( '' === $new_name ) {
 			throw new \InvalidArgumentException( 'Invalid name.' );
 		}
 
@@ -244,7 +243,7 @@ class FileManager {
 		}
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 		$content = file_get_contents( $abs );
-		if ( $content === false ) {
+		if ( false === $content ) {
 			throw new \RuntimeException( 'Cannot read file.' );
 		}
 		return $content;

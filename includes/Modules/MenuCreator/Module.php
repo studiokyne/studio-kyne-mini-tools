@@ -1242,7 +1242,7 @@ class Module extends AbstractModule {
 	 * @param mixed $icon
 	 */
 	private function sanitize_icon_value( $icon ): ?string {
-		if ( $icon === null || '' === $icon ) {
+		if ( null === $icon || '' === $icon ) {
 			return null;
 		}
 		$icon = (string) $icon;
